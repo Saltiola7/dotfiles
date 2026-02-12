@@ -1,0 +1,49 @@
+# --- Source Common Configuration ---
+if [ -f "$HOME/.common_profile" ]; then
+    . "$HOME/.common_profile"
+fi
+
+# --- Bash Specifics ---
+
+# Cargo
+. "$HOME/.cargo/env"
+
+# Bash Preexec
+[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
+
+# --- Oh My Bash ---
+export OSH=~/.oh-my-bash
+# OSH_THEME="font"  # Disabled for Starship
+completions=(
+  git
+  composer
+  ssh
+)
+aliases=(
+  general
+)
+plugins=(
+  git
+  bashmarks
+)
+source "$OSH"/oh-my-bash.sh
+
+# --- Tools Initialization ---
+
+# Atuin
+eval "$(atuin init bash)"
+
+# Starship
+eval "$(starship init bash)"
+
+# Zoxide
+eval "$(zoxide init bash)"
+
+# Direnv
+eval "$(direnv hook bash)"
+
+# FZF
+[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+# Fix: Force Up Arrow to trigger Atuin (maps standard Up to Application Up)
+bind '"\e[A": "\eOA"'

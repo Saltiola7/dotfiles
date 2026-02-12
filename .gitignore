@@ -1,0 +1,4 @@
+.env
+.chezmoi.toml
+docs/
+.idea/

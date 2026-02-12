@@ -1,0 +1,15 @@
+{{- $name := promptStringOnce . "name" "Your full name" "Tommi Saltiola" -}}
+{{- $email := promptStringOnce . "email" "Your email address" "tommi@tommisaltiola.com" -}}
+{{- $clickhouseHost := promptStringOnce . "clickhouse_host" "ClickHouse host (or leave empty to skip alias)" "zzd2xg9oti.europe-west4.gcp.clickhouse.cloud" -}}
+{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini)" "macbook" -}}
+
+encryption = "age"
+[age]
+    identity = "~/.config/chezmoi/key.txt"
+    recipient = "age1agtsh9jxq93rdl68mtjmf9g8qwp3da89xdvkdculnv894aepd4us4m5rdm"
+
+[data]
+    name = {{ $name | quote }}
+    email = {{ $email | quote }}
+    clickhouse_host = {{ $clickhouseHost | quote }}
+    machine_type = {{ $machineType | quote }}

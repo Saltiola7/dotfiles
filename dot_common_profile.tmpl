@@ -1,0 +1,67 @@
+# Common Shell Configuration (Bash & Zsh)
+
+# --- Environment Variables ---
+
+# Local bin
+export PATH="{{ .chezmoi.homeDir }}/.local/bin:$PATH"
+
+# Volta
+export VOLTA_HOME="{{ .chezmoi.homeDir }}/.volta"
+export PATH="$VOLTA_HOME/bin:$PATH"
+
+# NPM
+if command -v npm &> /dev/null; then
+    export PATH="$(npm config get prefix)/bin:$PATH"
+fi
+
+# LM Studio
+export PATH="$PATH:{{ .chezmoi.homeDir }}/.cache/lm-studio/bin"
+
+# Antigravity
+export PATH="{{ .chezmoi.homeDir }}/.antigravity/antigravity/bin:$PATH"
+
+# Abctl
+export PATH="$PATH:{{ .chezmoi.homeDir }}/abctl"
+
+# --- Aliases ---
+alias vim='nvim'
+alias python='python3'
+alias py='python3'
+
+# --- OS Specific Configuration ---
+
+# macOS Specific
+
+# Homebrew PHP
+export PATH="/opt/homebrew/opt/php@8.2/bin:$PATH"
+export PATH="/opt/homebrew/opt/php@8.2/sbin:$PATH"
+
+# Homebrew Postgres
+export PATH="/opt/homebrew/opt/postgresql@16/bin:$PATH"
+export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+export PATH="/opt/homebrew/opt/libpq/bin:$PATH"
+
+# JetBrains Toolbox
+export PATH="$PATH:{{ .chezmoi.homeDir }}/Library/Application Support/JetBrains/Toolbox/scripts"
+
+# Screaming Frog
+alias sf='/Applications/Screaming\ Frog\ SEO\ Spider.app/Contents/MacOS/ScreamingFrogSEOSpiderLauncher'
+export PATH="$PATH:/Applications/Screaming Frog SEO Spider.app/Contents/MacOS/"
+
+# KeePassXC
+export PATH="$PATH:/Applications/KeePassXC.app/Contents/MacOS/"
+
+# Modular
+export MODULAR_HOME="{{ .chezmoi.homeDir }}/.modular"
+export PATH="{{ .chezmoi.homeDir }}/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
+
+# Google Cloud SDK
+if [ -f '{{ .chezmoi.homeDir }}/google-cloud-sdk/path.zsh.inc' ]; then . '{{ .chezmoi.homeDir }}/google-cloud-sdk/path.zsh.inc'; fi
+
+# Pkg Config
+export PKG_CONFIG_PATH="/opt/homebrew/opt/openblas/lib/pkgconfig:$PKG_CONFIG_PATH"
+
+# Custom macOS Aliases
+{{ if .clickhouse_host -}}
+alias ch='clickhouse client --host {{ .clickhouse_host }} --secure --password'
+{{- end }}

@@ -1,0 +1,53 @@
+# --- Source Common Configuration ---
+if [ -f "$HOME/.common_profile" ]; then
+    . "$HOME/.common_profile"
+fi
+
+# --- Zsh Specifics ---
+
+# Path to your oh-my-zsh installation.
+export ZSH="$HOME/.oh-my-zsh"
+
+ZSH_THEME="robbyrussell"
+
+plugins=(git postgres python docker brew wp-cli pep8 npm marked2 macos iterm2 docker-compose dbt celery)
+
+source $ZSH/oh-my-zsh.sh
+
+# User configuration
+
+# iTerm2 Integration
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# Completions
+autoload -Uz compinit
+zstyle ':completion:*' menu select
+compinit
+fpath+=~/.wp-cli
+fpath+=~/.zfunc
+
+# Google Cloud SDK Completion
+
+if [ -f '{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc' ]; then . '{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc'; fi
+
+
+# --- Tools Initialization ---
+
+# Atuin
+. "$HOME/.atuin/bin/env"
+eval "$(atuin init zsh)"
+
+# Zoxide
+eval "$(zoxide init zsh)"
+
+# FZF
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+
+# Starship
+eval "$(starship init zsh)"
+
+# Direnv
+eval "$(direnv hook zsh)"
+# Added by LM Studio CLI (lms)
+export PATH="$PATH:{{ .chezmoi.homeDir }}/.cache/lm-studio/bin"
+# End of LM Studio CLI section

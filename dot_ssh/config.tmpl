@@ -1,0 +1,30 @@
+# Added by Colima
+{{ if stat (joinPath .chezmoi.homeDir ".colima/ssh_config") }}
+Include {{ .chezmoi.homeDir }}/.colima/ssh_config
+{{ end }}
+
+# Added by OrbStack: 'orb' SSH host for Linux machines
+# This only works if it's at the top of ssh_config (before any Host blocks).
+# This won't be added again if you remove it.
+Include {{ .chezmoi.homeDir }}/.orbstack/ssh/config
+
+Host 134.122.4.116
+  HostName 134.122.4.116
+  User master_bvdfzugbtj
+  Port 22
+  IdentityFile ~/.ssh/cloudways_ths
+
+Host pi
+    HostName 192.168.100.150
+    User tommi
+
+Host fedora
+  HostName 192.168.100.151
+  User tommi
+  IdentityFile ~/.ssh/kdefedora
+
+Host hovitunkki
+  HostName hovitunkki.vip
+  User t
+  IdentityFile ~/.ssh/id_rsa_hovitunkki
+  PubkeyAuthentication yes
