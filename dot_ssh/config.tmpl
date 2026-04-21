@@ -7,26 +7,5 @@ Include {{ .chezmoi.homeDir }}/.colima/ssh_config
 # This won't be added again if you remove it.
 Include {{ .chezmoi.homeDir }}/.orbstack/ssh/config
 
-Host cloudways
-  HostName {{ onepasswordRead "op://Personal/Cloudways SSH/hostname" }}
-  User {{ onepasswordRead "op://Personal/Cloudways SSH/username" }}
-  Port 22
-  IdentityFile ~/.ssh/cloudways_ths
-
-Host pi
-  HostName {{ onepasswordRead "op://Personal/Raspberry Pi SSH/hostname" }}
-  User {{ onepasswordRead "op://Personal/Raspberry Pi SSH/username" }}
-
-Host fedora
-  HostName {{ onepasswordRead "op://Personal/Fedora SSH/hostname" }}
-  User {{ onepasswordRead "op://Personal/Fedora SSH/username" }}
-  IdentityFile ~/.ssh/kdefedora
-
-Host hovitunkki
-  HostName {{ onepasswordRead "op://Personal/Hovitunkki SSH/hostname" }}
-  User {{ onepasswordRead "op://Personal/Hovitunkki SSH/username" }}
-  IdentityFile ~/.ssh/id_rsa_hovitunkki
-  PubkeyAuthentication yes
-
 Host *
   IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
