@@ -9,7 +9,7 @@ All dotfiles are managed by [chezmoi](https://www.chezmoi.io/) from a single sou
 
 - **Source of truth:** `~/.local/share/chezmoi/` (git repo → github.com/Saltiola7/dotfiles)
 - **Chezmoi config:** `~/.config/chezmoi/chezmoi.toml`
-- **Encryption key:** `~/.config/chezmoi/key.txt` (age, backed up in 1Password)
+- **Encryption key:** `~/.config/chezmoi/key.txt` (age, backed up in password manager)
 - **Target:** `~/` (home directory)
 
 ## Machines
@@ -36,27 +36,22 @@ Secrets are managed via **1Password CLI** (`op`). Two patterns are used dependin
 
 ### 1Password items
 
-| Item | Vault | Usage |
-|------|-------|-------|
-| Gemini API Key | Personal | Shell env (`$GEMINI_API_KEY`) |
-| Google AI API Key | Personal | Shell env (`$GOOGLE_GENERATIVE_AI_API_KEY`) |
-| OpenAI API Key | Personal | Shell env (`$OPENAI_API_KEY`) |
-| Databricks | Personal | `.databrickscfg` template (host + token) |
+API keys and service credentials are stored as individual items in 1Password. Shell env vars are loaded via `op read` at startup; config file secrets use chezmoi's `onepasswordRead` template function.
 
 ### Shell secrets (runtime `op read`)
 
 In `.common_profile`, API keys are fetched at every shell start:
 ```bash
-export GEMINI_API_KEY="$(op read 'op://Personal/Gemini API Key/credential')"
+export EXAMPLE_API_KEY="$(op read 'op://Vault/Item Name/field')"
 ```
 
 No guard — shell startup fails if 1Password is locked. Unlock the app and open a new shell.
 
 ### Config file secrets (chezmoi `onepasswordRead`)
 
-For files that require secrets baked in (e.g., `.databrickscfg`), use chezmoi's template function:
+For files that require secrets baked in, use chezmoi's template function:
 ```
-token = {{ onepasswordRead "op://Personal/Databricks/credential" }}
+token = {{ onepasswordRead "op://Vault/Item Name/field" }}
 ```
 
 These are resolved at `chezmoi apply` time. Re-run `chezmoi apply` after rotating secrets.
@@ -94,7 +89,7 @@ chezmoi chattr +template ~/.newconfig
 
 ## Adding a New Secret
 
-1. Create item in 1Password (Personal vault, category: API Credential)
+1. Create item in 1Password (category: API Credential)
 2. Choose the appropriate pattern:
    - **Env var needed by CLI tools** → add `op read` line to `.common_profile`
    - **Config file needs the value** → use `{{ onepasswordRead "op://..." }}` in a `.tmpl` file
@@ -107,7 +102,7 @@ brew install chezmoi age 1password-cli
 
 # 2. Restore age key from 1Password
 mkdir -p ~/.config/chezmoi
-# Copy key from 1Password item "chezmoi age encryption key" → ~/.config/chezmoi/key.txt
+# Copy age key from password manager → ~/.config/chezmoi/key.txt
 chmod 600 ~/.config/chezmoi/key.txt
 
 # 3. Sign in to 1Password CLI
@@ -143,7 +138,7 @@ git add -A && git commit -m "description" && git push
 - File naming follows chezmoi conventions (`dot_`, `private_`, `.tmpl`, `.age`)
 - `private_` prefix → file gets 0600 permissions
 - `.tmpl` suffix → file is a Go template
-- Templates use `{{ .chezmoi.homeDir }}` instead of hardcoded `~` or `/Users/tis`
+- Templates use `{{ .chezmoi.homeDir }}` instead of hardcoded home paths
 - `.chezmoiignore` excludes `.DS_Store`
 - `gh/hosts.yml` is explicitly excluded (contains auth tokens managed by `gh` itself)
 
