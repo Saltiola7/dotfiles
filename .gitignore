@@ -1,6 +1,5 @@
 .env
 .chezmoi.toml
-docs/
 .idea/
 .jbeval/
 .DS_Store
