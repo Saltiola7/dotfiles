@@ -16,7 +16,7 @@ import subprocess
 import sys
 
 KITTY = "/Applications/kitty.app/Contents/MacOS/kitty"
-SOCKET_GLOB = "/tmp/mykitty-*"
+SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
 
 
 def find_socket():

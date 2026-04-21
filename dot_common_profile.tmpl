@@ -84,19 +84,25 @@ alias ch="clickhouse client --host \"\$(op read 'op://Personal/ClickHouse Cloud/
 
 # --- Environment Variables ---
 
-# Silence direnv output
-export DIRENV_LOG_FORMAT=""
-
 # Carapace completion bridges
 export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
 
-# --- Secrets (via 1Password CLI) ---
-export GEMINI_API_KEY="$(op read 'op://Personal/Gemini API Key/credential')"
-export GEMINI_DEEP_RESEARCH_API_KEY="$GEMINI_API_KEY"
-export GOOGLE_GENERATIVE_AI_API_KEY="$(op read 'op://Personal/Google AI API Key/credential')"
-export OPENAI_API_KEY="$(op read 'op://Personal/OpenAI API Key/credential')"
-
-# AWS
-export AWS_PROFILE="$(op read 'op://Personal/AWS Bedrock/profile')"
-export AWS_REGION="$(op read 'op://Personal/AWS Bedrock/region')"
-export CLAUDE_CODE_USE_BEDROCK=1
+# --- Secrets (lazy-loaded via 1Password CLI) ---
+# Run 'secret' to load all secrets into the current shell session.
+# Secrets are cached in memory — only one biometric prompt per session.
+secret() {
+  if [ -n "$_SECRETS_LOADED" ]; then
+    echo "Secrets already loaded."
+    return 0
+  fi
+  echo "Loading secrets from 1Password..."
+  export GEMINI_API_KEY="$(op read 'op://Personal/Gemini API Key/credential')" && \
+  export GEMINI_DEEP_RESEARCH_API_KEY="$GEMINI_API_KEY" && \
+  export GOOGLE_GENERATIVE_AI_API_KEY="$(op read 'op://Personal/Google AI API Key/credential')" && \
+  export OPENAI_API_KEY="$(op read 'op://Personal/OpenAI API Key/credential')" && \
+  export AWS_PROFILE="$(op read 'op://Personal/AWS Bedrock/profile')" && \
+  export AWS_REGION="$(op read 'op://Personal/AWS Bedrock/region')" && \
+  export CLAUDE_CODE_USE_BEDROCK=1 && \
+  _SECRETS_LOADED=1 && \
+  echo "Secrets loaded." || echo "Failed to load secrets — is 1Password unlocked?"
+}

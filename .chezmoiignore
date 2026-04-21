@@ -2,4 +2,5 @@
 .aerospace.toml
 {{ end }}
 docs/
+README.md
 **/.DS_Store

@@ -76,10 +76,10 @@ Kitty must be configured for socket-based remote control:
 ```conf
 # In kitty.conf
 allow_remote_control socket-only
-listen_on unix:/tmp/mykitty
+listen_on unix:~/.local/share/kitty/control-socket
 ```
 
-Kitty appends `-{PID}` to the socket path at startup (e.g., `/tmp/mykitty-36767`). All scripts discover the socket via `ls /tmp/mykitty-* | head -1`.
+Kitty appends `-{PID}` to the socket path at startup (e.g., `~/.local/share/kitty/control-socket-36767`). All scripts discover the socket via glob on `~/.local/share/kitty/control-socket-*`.
 
 `socket-only` restricts remote control to the unix socket -- programs running inside Kitty terminals cannot send remote control commands unless they connect to the socket explicitly. This is more secure than `allow_remote_control yes`.
 
@@ -227,7 +227,7 @@ This differs from the zellij approach where the snapshot IS the layout. Here, th
 ```conf
 # Remote control for workspace scripts
 allow_remote_control socket-only
-listen_on unix:/tmp/mykitty
+listen_on unix:~/.local/share/kitty/control-socket
 
 # Sessions
 enabled_layouts splits,fat,grid,horizontal,stack,tall,vertical
