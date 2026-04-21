@@ -3,6 +3,7 @@
         {
             "complex_modifications": {
                 "rules": [
+{{ if ne .machine_type "mac-mini" -}}
                     {
                         "description": "Caps Lock to Hyper on hold, Escape on tap",
                         "manipulators": [
@@ -32,7 +33,7 @@
                                 "type": "basic"
                             }
                         ]
-                    }{{ if ne .machine_type "mac-mini" }},
+                    },
                     {
                         "description": "Space to MEH on hold, space on tap",
                         "manipulators": [
@@ -146,7 +147,8 @@
                                 "type": "basic"
                             }
                         ]
-                    }{{ end }}
+                    }
+{{- end }}
                 ]
             },
             "devices": [

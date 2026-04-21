@@ -3,47 +3,69 @@ if [ -f "$HOME/.common_profile" ]; then
     . "$HOME/.common_profile"
 fi
 
-# --- Bash Specifics ---
-
-# Cargo
-. "$HOME/.cargo/env"
-
-# Bash Preexec
-[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
+# --- ble.sh early init (must come before oh-my-bash) ---
+# Provides autosuggestions, syntax highlighting, enhanced completion
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+    [[ $- == *i* ]] && [[ -f "$HOME/.local/share/blesh/ble.sh" ]] && source "$HOME/.local/share/blesh/ble.sh" --noattach
+fi
 
 # --- Oh My Bash ---
-export OSH=~/.oh-my-bash
-# OSH_THEME="font"  # Disabled for Starship
+export OSH="$HOME/.oh-my-bash"
+
+# Theme: empty because starship handles the prompt
+OSH_THEME=""
+
 completions=(
-  git
-  composer
-  ssh
+    git
+    composer
+    ssh
 )
 aliases=(
-  general
+    general
 )
 plugins=(
-  git
-  bashmarks
+    git
+    bashmarks
 )
-source "$OSH"/oh-my-bash.sh
 
-# --- Tools Initialization ---
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+    source "$OSH/oh-my-bash.sh"
+fi
 
-# Atuin
-eval "$(atuin init bash)"
+# --- Tool integrations (guarded from IntelliJ terminal scanner) ---
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+    # Google Cloud SDK completions
+    [ -f "$HOME/google-cloud-sdk/completion.bash.inc" ] && . "$HOME/google-cloud-sdk/completion.bash.inc"
 
-# Starship
-eval "$(starship init bash)"
+    # Atuin (shell history)
+    [ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
 
-# Zoxide
-eval "$(zoxide init bash)"
+    # Direnv (per-directory env)
+    eval "$(direnv hook bash)"
 
-# Direnv
-eval "$(direnv hook bash)"
+    # Zoxide (smart cd)
+    eval "$(zoxide init bash)"
 
-# FZF
-[ -f ~/.fzf.bash ] && source ~/.fzf.bash
+    # Mise (runtime version manager)
+    eval "$(mise activate bash)"
+
+    # Carapace (completion engine)
+    source <(carapace _carapace)
+
+    # fzf (fuzzy finder)
+    [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+    # Starship prompt (overrides oh-my-bash prompt)
+    eval "$(starship init bash)"
+fi
+
+# --- Bash Preexec ---
+[[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 
 # Fix: Force Up Arrow to trigger Atuin (maps standard Up to Application Up)
 bind '"\e[A": "\eOA"'
+
+# --- ble.sh late attach (must come last) ---
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+    [[ ${BLE_VERSION-} ]] && ble-attach
+fi
