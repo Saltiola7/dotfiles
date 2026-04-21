@@ -1,8 +1,7 @@
 # Added by Colima
-{{ if stat (joinPath .chezmoi.homeDir ".colima/ssh_config") }}
+{{ if stat (joinPath .chezmoi.homeDir ".colima/ssh_config") -}}
 Include {{ .chezmoi.homeDir }}/.colima/ssh_config
 {{ end }}
-
 # Added by OrbStack: 'orb' SSH host for Linux machines
 # This only works if it's at the top of ssh_config (before any Host blocks).
 # This won't be added again if you remove it.
@@ -28,3 +27,6 @@ Host hovitunkki
   User t
   IdentityFile ~/.ssh/id_rsa_hovitunkki
   PubkeyAuthentication yes
+
+Host *
+  IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"

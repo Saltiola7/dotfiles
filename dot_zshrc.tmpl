@@ -5,49 +5,51 @@ fi
 
 # --- Zsh Specifics ---
 
-# Path to your oh-my-zsh installation.
+# Path to your oh-my-zsh installation
 export ZSH="$HOME/.oh-my-zsh"
 
 ZSH_THEME="robbyrussell"
-
-plugins=(git postgres python docker brew wp-cli pep8 npm marked2 macos iterm2 docker-compose dbt celery)
+plugins=(git)
 
 source $ZSH/oh-my-zsh.sh
 
-# User configuration
+# Canonicalize PATH (zsh-specific: make path array unique)
+typeset -U path PATH
 
-# iTerm2 Integration
-test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
-
-# Completions
+# --- Completions ---
 autoload -Uz compinit
 zstyle ':completion:*' menu select
 compinit
-fpath+=~/.wp-cli
 fpath+=~/.zfunc
 
 # Google Cloud SDK Completion
+if [ -f "{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc" ]; then
+    . "{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc"
+fi
 
-if [ -f '{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc' ]; then . '{{ .chezmoi.homeDir }}/google-cloud-sdk/completion.zsh.inc'; fi
+# --- Tool integrations ---
 
+# Atuin (shell history)
+[ -x "$(command -v atuin)" ] && eval "$(atuin init zsh)"
 
-# --- Tools Initialization ---
-
-# Atuin
-. "$HOME/.atuin/bin/env"
-eval "$(atuin init zsh)"
-
-# Zoxide
+# Zoxide (smart cd)
 eval "$(zoxide init zsh)"
 
-# FZF
+# Direnv (per-directory env)
+eval "$(direnv hook zsh)"
+
+# Mise (runtime version manager)
+eval "$(mise activate zsh)"
+
+# Carapace (completion engine)
+source <(carapace _carapace)
+eval "$(carapace _carapace)"
+
+# fzf (fuzzy finder)
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 
-# Starship
+# Starship prompt
 eval "$(starship init zsh)"
 
-# Direnv
-eval "$(direnv hook zsh)"
-# Added by LM Studio CLI (lms)
-export PATH="$PATH:{{ .chezmoi.homeDir }}/.cache/lm-studio/bin"
-# End of LM Studio CLI section
+# Zsh Autosuggestions
+source $(brew --prefix)/share/zsh-autosuggestions/zsh-autosuggestions.zsh
