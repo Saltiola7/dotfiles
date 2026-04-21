@@ -1,0 +1,99 @@
+[completion]
+copilot = false
+activate_on_typing = true
+signature_hint_on_typing = false
+
+[formatting]
+line_length = 79
+
+[datasources]
+
+[server]
+browser = "default"
+follow_symlink = false
+
+[snippets]
+include_default_snippets = true
+custom_paths = []
+
+[diagnostics]
+sql_linter = true
+
+[save]
+format_on_save = false
+autosave_delay = 1000
+autosave = "after_delay"
+
+[ai]
+rules = ""
+inline_tooltip = true
+mode = "agent"
+
+[ai.anthropic]
+
+[ai.google]
+
+[ai.open_ai]
+model = "gemini-2.5-pro"
+base_url = "https://api.openai.com/v1"
+
+[ai.custom_providers]
+
+[ai.models]
+edit_model = "google/gemini-3-pro-preview"
+chat_model = "google/gemini-3-pro-preview"
+displayed_models = ["openai/gpt-5", "google/gemini-3-pro-preview", "google/gemini-3.1-pro-preview", "google/gemini-3.1-pro-preview-customtools"]
+custom_models = ["google/gemini-3.1-pro-preview-customtools", "google/gemini-3.1-pro-preview"]
+
+[runtime]
+std_stream_max_bytes = 1000000
+on_cell_change = "autorun"
+output_max_bytes = 8000000
+auto_instantiate = true
+watcher_on_save = "lazy"
+default_auto_download = []
+reactive_tests = true
+auto_reload = "autorun"
+default_sql_output = "auto"
+default_csv_encoding = "utf-8"
+
+[mcp]
+presets = ["marimo"]
+
+[mcp.mcpServers]
+
+[language_servers.pylsp]
+enable_pydocstyle = false
+enabled = true
+enable_flake8 = false
+enable_mypy = true
+enable_pylint = false
+enable_ruff = true
+enable_pyflakes = false
+
+[language_servers.basedpyright]
+
+[language_servers.ty]
+
+[display]
+code_editor_font_size = 14
+reference_highlighting = false
+theme = "system"
+default_table_page_size = 10
+default_table_max_columns = 50
+default_width = "full"
+cell_output = "below"
+dataframes = "rich"
+
+[keymap]
+destructive_delete = true
+preset = "default"
+
+[keymap.overrides]
+
+[experimental]
+chat_modes = true
+external_agents = true
+
+[package_management]
+manager = "uv"

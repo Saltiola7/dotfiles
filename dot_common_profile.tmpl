@@ -91,11 +91,12 @@ export DIRENV_LOG_FORMAT=""
 export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
 
 # --- Secrets (via 1Password CLI) ---
-# These are loaded at shell startup via `op read`
-# Uncomment and configure once 1Password CLI is fully set up:
-# export GEMINI_API_KEY="$(op read 'op://Private/Gemini API Key/credential')"
-# export GEMINI_DEEP_RESEARCH_API_KEY="$GEMINI_API_KEY"
-# export GOOGLE_GENERATIVE_AI_API_KEY="$(op read 'op://Private/Google AI API Key/credential')"
-# export AWS_PROFILE=BedrockDeveloperAccess-302432775606
-# export AWS_REGION=us-west-2
-# export CLAUDE_CODE_USE_BEDROCK=1
+export GEMINI_API_KEY="$(op read 'op://Personal/Gemini API Key/credential')"
+export GEMINI_DEEP_RESEARCH_API_KEY="$GEMINI_API_KEY"
+export GOOGLE_GENERATIVE_AI_API_KEY="$(op read 'op://Personal/Google AI API Key/credential')"
+export OPENAI_API_KEY="$(op read 'op://Personal/OpenAI API Key/credential')"
+
+# AWS (non-secret config)
+export AWS_PROFILE=BedrockDeveloperAccess-302432775606
+export AWS_REGION=us-west-2
+export CLAUDE_CODE_USE_BEDROCK=1
