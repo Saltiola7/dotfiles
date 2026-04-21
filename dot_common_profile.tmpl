@@ -55,9 +55,11 @@ export PATH="$PATH:{{ .chezmoi.homeDir }}/Library/Application Support/JetBrains/
 export MODULAR_HOME="{{ .chezmoi.homeDir }}/.modular"
 export PATH="{{ .chezmoi.homeDir }}/.modular/pkg/packages.modular.com_mojo/bin:$PATH"
 
-# Google Cloud SDK
-if [ -f "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.bash.inc" ]; then
-    . "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.bash.inc"
+# Google Cloud SDK (shell-aware: zsh needs .zsh.inc, bash needs .bash.inc)
+if [ -n "$ZSH_VERSION" ]; then
+    [ -f "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.zsh.inc" ] && . "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.zsh.inc"
+else
+    [ -f "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.bash.inc" ] && . "{{ .chezmoi.homeDir }}/google-cloud-sdk/path.bash.inc"
 fi
 export USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
