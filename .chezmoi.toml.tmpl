@@ -1,6 +1,5 @@
-{{- $name := promptStringOnce . "name" "Your full name" "Tommi Saltiola" -}}
-{{- $email := promptStringOnce . "email" "Your email address" "tommi@tommisaltiola.com" -}}
-{{- $clickhouseHost := promptStringOnce . "clickhouse_host" "ClickHouse host (or leave empty to skip alias)" "zzd2xg9oti.europe-west4.gcp.clickhouse.cloud" -}}
+{{- $name := promptStringOnce . "name" "Your full name" "" -}}
+{{- $email := promptStringOnce . "email" "Your email address" "" -}}
 {{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini)" "macbook" -}}
 
 encryption = "age"
@@ -11,5 +10,4 @@ encryption = "age"
 [data]
     name = {{ $name | quote }}
     email = {{ $email | quote }}
-    clickhouse_host = {{ $clickhouseHost | quote }}
     machine_type = {{ $machineType | quote }}

@@ -78,9 +78,7 @@ export PATH="$PATH:/Applications/Screaming Frog SEO Spider.app/Contents/MacOS/"
 
 
 # ClickHouse
-{{ if .clickhouse_host -}}
-alias ch='clickhouse client --host {{ .clickhouse_host }} --secure --password'
-{{- end }}
+alias ch="clickhouse client --host \"\$(op read 'op://Personal/ClickHouse Cloud/host')\" --secure --password"
 
 # --- Environment Variables ---
 
@@ -96,7 +94,7 @@ export GEMINI_DEEP_RESEARCH_API_KEY="$GEMINI_API_KEY"
 export GOOGLE_GENERATIVE_AI_API_KEY="$(op read 'op://Personal/Google AI API Key/credential')"
 export OPENAI_API_KEY="$(op read 'op://Personal/OpenAI API Key/credential')"
 
-# AWS (non-secret config)
-export AWS_PROFILE=BedrockDeveloperAccess-302432775606
-export AWS_REGION=us-west-2
+# AWS
+export AWS_PROFILE="$(op read 'op://Personal/AWS Bedrock/profile')"
+export AWS_REGION="$(op read 'op://Personal/AWS Bedrock/region')"
 export CLAUDE_CODE_USE_BEDROCK=1

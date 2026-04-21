@@ -25,7 +25,7 @@ autosave_delay = 1000
 autosave = "after_delay"
 
 [ai]
-rules = ""
+rules = "prefer duckdb for dataframes. prefer altair for data visualization. "
 inline_tooltip = true
 mode = "agent"
 
@@ -58,7 +58,7 @@ default_sql_output = "auto"
 default_csv_encoding = "utf-8"
 
 [mcp]
-presets = ["marimo"]
+presets = ["marimo", "context7"]
 
 [mcp.mcpServers]
 
@@ -94,6 +94,8 @@ preset = "default"
 [experimental]
 chat_modes = true
 external_agents = true
+rtc_v2 = false
+performant_table_charts = true
 
 [package_management]
 manager = "uv"
