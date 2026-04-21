@@ -1,7 +1,7 @@
 # Dotfiles Management Specification
 
 **Status:** Stable
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
 
 ## Architecture
 
@@ -31,26 +31,38 @@ Secrets are managed via **1Password CLI** (`op`). Two patterns are used dependin
 
 | Pattern | When | Secrets on disk? |
 |---------|------|-----------------|
-| `op read` at shell startup | Environment variables (API keys) | No |
+| `secret` function (lazy `op read`) | Environment variables (API keys) — loaded on demand, not at shell start | No |
 | `onepasswordRead` in chezmoi template | Config files that need secrets baked in | Yes (in target file, 0600 perms) |
 
 ### 1Password items
 
 | Item | Vault | Usage |
 |------|-------|-------|
-| Gemini API Key | Personal | Shell env (`$GEMINI_API_KEY`) |
-| Google AI API Key | Personal | Shell env (`$GOOGLE_GENERATIVE_AI_API_KEY`) |
-| OpenAI API Key | Personal | Shell env (`$OPENAI_API_KEY`) |
+| Gemini API Key | Personal | Shell env (`$GEMINI_API_KEY`) via `secret` |
+| Google AI API Key | Personal | Shell env (`$GOOGLE_GENERATIVE_AI_API_KEY`) via `secret` |
+| OpenAI API Key | Personal | Shell env (`$OPENAI_API_KEY`) via `secret` |
+| AWS Bedrock | Personal | Shell env (`$AWS_PROFILE`, `$AWS_REGION`) via `secret` |
+| ClickHouse Cloud | Personal | `ch` alias fetches host inline at invocation |
 | Databricks | Personal | `.databrickscfg` template (host + token) |
 
-### Shell secrets (runtime `op read`)
+### Shell secrets (lazy-loaded `op read`)
 
-In `.common_profile`, API keys are fetched at every shell start:
+In `.common_profile`, API keys are **not** loaded at shell startup. Call `secret` to load them on demand:
+
 ```bash
-export GEMINI_API_KEY="$(op read 'op://Personal/Gemini API Key/credential')"
+secret   # prompts once for Touch ID, exports all API keys into the current session
 ```
 
-No guard — shell startup fails if 1Password is locked. Unlock the app and open a new shell.
+Secrets are cached for the lifetime of the shell session via `_SECRETS_LOADED` guard — subsequent calls print "Secrets already loaded." without re-prompting.
+
+**Keys loaded by `secret`:**
+- `$GEMINI_API_KEY` / `$GEMINI_DEEP_RESEARCH_API_KEY`
+- `$GOOGLE_GENERATIVE_AI_API_KEY`
+- `$OPENAI_API_KEY`
+- `$AWS_PROFILE` / `$AWS_REGION`
+- `$CLAUDE_CODE_USE_BEDROCK=1`
+
+The ClickHouse alias (`ch`) fetches its host inline via `op read` at invocation time — no `secret` call needed.
 
 ### Config file secrets (chezmoi `onepasswordRead`)
 
@@ -96,8 +108,9 @@ chezmoi chattr +template ~/.newconfig
 
 1. Create item in 1Password (Personal vault, category: API Credential)
 2. Choose the appropriate pattern:
-   - **Env var needed by CLI tools** → add `op read` line to `.common_profile`
+   - **Env var needed by CLI tools** → add `op read` line inside the `secret()` function in `.common_profile`
    - **Config file needs the value** → use `{{ onepasswordRead "op://..." }}` in a `.tmpl` file
+   - **Single command needs a value** → inline `$(op read '...')` directly in an alias (like `ch`)
 
 ## Deploying to a New Machine
 
@@ -141,11 +154,39 @@ git add -A && git commit -m "description" && git push
 ## Conventions
 
 - File naming follows chezmoi conventions (`dot_`, `private_`, `.tmpl`, `.age`)
-- `private_` prefix → file gets 0600 permissions
+- `private_` prefix → file gets 0600 permissions (files) / 0700 (directories)
 - `.tmpl` suffix → file is a Go template
 - Templates use `{{ .chezmoi.homeDir }}` instead of hardcoded `~` or `/Users/tis`
-- `.chezmoiignore` excludes `.DS_Store`
+- `.chezmoiignore` excludes `.DS_Store` and `README.md`
 - `gh/hosts.yml` is explicitly excluded (contains auth tokens managed by `gh` itself)
+- `private_dot_ssh/` and `private_dot_boto` use `private_` prefix for restrictive permissions
+
+## SSH Config
+
+`~/.ssh/config` is managed via `private_dot_ssh/config.tmpl`. Security defaults applied to `Host *`:
+
+```
+StrictHostKeyChecking ask   # prompt on unknown hosts, never silently accept
+HashKnownHosts yes          # obfuscate hostnames in known_hosts
+ServerAliveInterval 60      # keepalive every 60s
+ServerAliveCountMax 3       # disconnect after 3 missed keepalives
+```
+
+Authentication is handled entirely by the 1Password SSH agent (`IdentityAgent`). No private keys on disk.
+
+## Kitty Remote Control Socket
+
+Kitty's remote control socket is at `~/.local/share/kitty/control-socket` (Kitty appends `-{PID}` at startup, e.g. `control-socket-36767`). Workspace scripts discover it via glob:
+
+```python
+SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
+```
+
+The directory `~/.local/share/kitty/` must exist before Kitty starts. Create it if missing:
+
+```bash
+mkdir -p ~/.local/share/kitty
+```
 
 ## What's NOT Managed
 
@@ -154,3 +195,4 @@ git add -A && git commit -m "description" && git push
 - SSH keys (managed by 1Password agent)
 - `gh` auth tokens (managed by `gh auth`)
 - Any project-specific `.env` files
+- `~/.atuin/` (self-installer artefact — atuin is now installed via Homebrew)
