@@ -14,6 +14,7 @@ tap "nikitabobko/tap"
 tap "petere/postgresql"
 tap "shopify/shopify"
 brew "openssl@3"
+brew "age"
 brew "libssh"
 brew "ansible"
 brew "jpeg-xl"
@@ -96,7 +97,6 @@ brew "rsync"
 brew "rtk"
 brew "ruby"
 brew "speedtest-cli"
-brew "sshpass"
 brew "starship"
 brew "syncthing"
 brew "tailscale"
@@ -133,7 +133,6 @@ cask "rustdesk"
 cask "shortcat"
 cask "speedify"
 cask "tailscale-app"
-cask "wave"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
 mas "Amphetamine", id: 937984704
@@ -148,7 +147,6 @@ mas "Mate Translate", id: 1005088137
 mas "PDF Expert", id: 1055273043
 mas "Prompt", id: 1594420480
 mas "Slack", id: 803453959
-mas "Strongbox", id: 1481853033
 mas "Telegram", id: 747648890
 mas "The Unarchiver", id: 425424353
 mas "WhatsApp", id: 310633997

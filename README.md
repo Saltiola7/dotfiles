@@ -17,3 +17,16 @@ This repository is not meant to be cloned or applied directly. It's published as
 - Keyboard remapping (Karabiner)
 - Tmux, starship prompt, atuin, direnv, git, ssh
 - Homebrew dependencies (Brewfile)
+
+## Tests
+
+Unit tests for kitty workspace scripts (session serialization/deserialization):
+
+```bash
+python3 -m venv /tmp/dotfiles-test-venv
+source /tmp/dotfiles-test-venv/bin/activate
+pip install pytest
+pytest tests/ -v
+```
+
+CI runs on push/PR via GitHub Actions.

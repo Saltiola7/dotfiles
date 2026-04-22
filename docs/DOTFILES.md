@@ -1,7 +1,7 @@
 # Dotfiles Management Specification
 
 **Status:** Stable
-**Updated:** 2026-04-20
+**Updated:** 2026-04-21
 
 ## Architecture
 
@@ -9,7 +9,7 @@ All dotfiles are managed by [chezmoi](https://www.chezmoi.io/) from a single sou
 
 - **Source of truth:** `~/.local/share/chezmoi/` (git repo → github.com/Saltiola7/dotfiles)
 - **Chezmoi config:** `~/.config/chezmoi/chezmoi.toml`
-- **Encryption key:** `~/.config/chezmoi/key.txt` (age, backed up in password manager)
+- **Encryption key:** `~/.config/chezmoi/key.txt` (age, backed up in 1Password)
 - **Target:** `~/` (home directory)
 
 ## Machines
@@ -31,27 +31,44 @@ Secrets are managed via **1Password CLI** (`op`). Two patterns are used dependin
 
 | Pattern | When | Secrets on disk? |
 |---------|------|-----------------|
-| `op read` at shell startup | Environment variables (API keys) | No |
+| `secret` function (lazy `op read`) | Environment variables (API keys) — loaded on demand, not at shell start | No |
 | `onepasswordRead` in chezmoi template | Config files that need secrets baked in | Yes (in target file, 0600 perms) |
 
 ### 1Password items
 
-API keys and service credentials are stored as individual items in 1Password. Shell env vars are loaded via `op read` at startup; config file secrets use chezmoi's `onepasswordRead` template function.
+| Item | Vault | Usage |
+|------|-------|-------|
+| Gemini API Key | Personal | Shell env (`$GEMINI_API_KEY`) via `secret` |
+| Google AI API Key | Personal | Shell env (`$GOOGLE_GENERATIVE_AI_API_KEY`) via `secret` |
+| OpenAI API Key | Personal | Shell env (`$OPENAI_API_KEY`) via `secret` |
+| AWS Bedrock | Personal | Shell env (`$AWS_PROFILE`, `$AWS_REGION`) via `secret` |
+| ClickHouse Cloud | Personal | `ch` alias fetches host inline at invocation |
+| Databricks | Personal | `.databrickscfg` template (host + token) |
 
-### Shell secrets (runtime `op read`)
+### Shell secrets (lazy-loaded `op read`)
 
-In `.common_profile`, API keys are fetched at every shell start:
+In `.common_profile`, API keys are **not** loaded at shell startup. Call `secret` to load them on demand:
+
 ```bash
-export EXAMPLE_API_KEY="$(op read 'op://Vault/Item Name/field')"
+secret   # prompts once for Touch ID, exports all API keys into the current session
 ```
 
-No guard — shell startup fails if 1Password is locked. Unlock the app and open a new shell.
+Secrets are cached for the lifetime of the shell session via `_SECRETS_LOADED` guard — subsequent calls print "Secrets already loaded." without re-prompting.
+
+**Keys loaded by `secret`:**
+- `$GEMINI_API_KEY` / `$GEMINI_DEEP_RESEARCH_API_KEY`
+- `$GOOGLE_GENERATIVE_AI_API_KEY`
+- `$OPENAI_API_KEY`
+- `$AWS_PROFILE` / `$AWS_REGION`
+- `$CLAUDE_CODE_USE_BEDROCK=1`
+
+The ClickHouse alias (`ch`) fetches its host inline via `op read` at invocation time — no `secret` call needed.
 
 ### Config file secrets (chezmoi `onepasswordRead`)
 
-For files that require secrets baked in, use chezmoi's template function:
+For files that require secrets baked in (e.g., `.databrickscfg`), use chezmoi's template function:
 ```
-token = {{ onepasswordRead "op://Vault/Item Name/field" }}
+token = {{ onepasswordRead "op://Personal/Databricks/credential" }}
 ```
 
 These are resolved at `chezmoi apply` time. Re-run `chezmoi apply` after rotating secrets.
@@ -89,10 +106,11 @@ chezmoi chattr +template ~/.newconfig
 
 ## Adding a New Secret
 
-1. Create item in 1Password (category: API Credential)
+1. Create item in 1Password (Personal vault, category: API Credential)
 2. Choose the appropriate pattern:
-   - **Env var needed by CLI tools** → add `op read` line to `.common_profile`
+   - **Env var needed by CLI tools** → add `op read` line inside the `secret()` function in `.common_profile`
    - **Config file needs the value** → use `{{ onepasswordRead "op://..." }}` in a `.tmpl` file
+   - **Single command needs a value** → inline `$(op read '...')` directly in an alias (like `ch`)
 
 ## Deploying to a New Machine
 
@@ -102,7 +120,7 @@ brew install chezmoi age 1password-cli
 
 # 2. Restore age key from 1Password
 mkdir -p ~/.config/chezmoi
-# Copy age key from password manager → ~/.config/chezmoi/key.txt
+# Copy key from 1Password item "chezmoi age encryption key" → ~/.config/chezmoi/key.txt
 chmod 600 ~/.config/chezmoi/key.txt
 
 # 3. Sign in to 1Password CLI
@@ -136,11 +154,77 @@ git add -A && git commit -m "description" && git push
 ## Conventions
 
 - File naming follows chezmoi conventions (`dot_`, `private_`, `.tmpl`, `.age`)
-- `private_` prefix → file gets 0600 permissions
+- `private_` prefix → file gets 0600 permissions (files) / 0700 (directories)
 - `.tmpl` suffix → file is a Go template
-- Templates use `{{ .chezmoi.homeDir }}` instead of hardcoded home paths
-- `.chezmoiignore` excludes `.DS_Store`
+- Templates use `{{ .chezmoi.homeDir }}` instead of hardcoded `~` or `/Users/tis`
+- `.chezmoiignore` excludes `.DS_Store` and `README.md`
 - `gh/hosts.yml` is explicitly excluded (contains auth tokens managed by `gh` itself)
+- `private_dot_ssh/` and `private_dot_boto` use `private_` prefix for restrictive permissions
+
+## SSH Config
+
+`~/.ssh/config` is managed via `private_dot_ssh/config.tmpl`. Security defaults applied to `Host *`:
+
+```
+StrictHostKeyChecking ask   # prompt on unknown hosts, never silently accept
+HashKnownHosts yes          # obfuscate hostnames in known_hosts
+ServerAliveInterval 60      # keepalive every 60s
+ServerAliveCountMax 3       # disconnect after 3 missed keepalives
+```
+
+Authentication is handled entirely by the 1Password SSH agent (`IdentityAgent`). No private keys on disk.
+
+## Kitty Remote Control Socket
+
+Kitty's remote control socket is at `~/.local/share/kitty/control-socket` (Kitty appends `-{PID}` at startup, e.g. `control-socket-36767`). Workspace scripts discover it via `kitty-query.py find-socket-cmd`.
+
+```python
+# kitty-query.py uses glob internally
+SOCKET_GLOB = str(Path.home() / ".local" / "share" / "kitty" / "control-socket-*")
+```
+
+The directory `~/.local/share/kitty/` must exist before Kitty starts. This is handled automatically by the chezmoi `run_once_create-kitty-socket-dir.sh` script on first `chezmoi apply`.
+
+## Kitty Quick Access Terminal
+
+A Quake-style drop-down terminal that slides from the top of the screen, toggled with a global hotkey. Configured via `~/.config/kitty/quick-access-terminal.conf`.
+
+### Setup
+
+1. Run `kitten quick-access-terminal` once from kitty to register the macOS Service
+2. Go to **System Settings > Keyboard > Keyboard Shortcuts > Services > General**
+3. Find **"Quick access to kitty"** and assign a shortcut (currently `Ctrl+Space`)
+4. The shortcut now works globally from any app
+
+### Changing the shortcut
+
+The shortcut is stored in macOS, not in kitty config. To change it:
+
+1. Open **System Settings > Keyboard > Keyboard Shortcuts > Services > General**
+2. Click the existing shortcut next to "Quick access to kitty"
+3. Press the new key combination
+
+### Configuration
+
+Edit `quick-access-terminal.conf` to customize appearance:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `edge` | `top` | Which screen edge the terminal drops from |
+| `lines` | `25` | Height in lines |
+| `background_opacity` | `0.85` | Window transparency |
+| `hide_on_focus_loss` | `yes` | Auto-hide when clicking away |
+
+> **Note:** `macos_global_shortcut` in `kitty.conf` is a different feature — it toggles focus on the main kitty window, not the quick access terminal.
+
+## Python Dependencies (uv + PEP 723)
+
+The kitty workspace scripts depend on `kitty-query.py`, a shared Python module that uses [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare its dependencies (`typer`, `plumbum`). The `uv` tool reads this metadata and auto-manages a cached venv — no manual `pip install` needed.
+
+- **Bootstrap**: `run_once_before_install-uv.sh` installs `uv` via mise (or curl fallback) on first `chezmoi apply`
+- **Runtime**: bash scripts call `uv run --script ~/.config/kitty/kitty-query.py <subcommand>`
+- **Testing**: `uv sync && uv run pytest tests/ -v` installs test deps and runs all 161 tests
+- **CI**: GitHub Actions uses `astral-sh/setup-uv` and tests on Python 3.12 + 3.13
 
 ## What's NOT Managed
 
@@ -149,3 +233,4 @@ git add -A && git commit -m "description" && git push
 - SSH keys (managed by 1Password agent)
 - `gh` auth tokens (managed by `gh auth`)
 - Any project-specific `.env` files
+- `~/.atuin/` (self-installer artefact — atuin is now installed via Homebrew)

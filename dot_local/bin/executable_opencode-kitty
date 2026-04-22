@@ -3,154 +3,194 @@
 # opencode-kitty - Launch opencode with session binding to Kitty window IDs
 #
 # Behavior:
-#   1. Checks mapping file for a direct kitty_window_id -> opencode_session_id binding
-#   2. If bound, verifies the session still exists and resumes it
-#   3. If unbound, finds the most recent unbound session for this directory
-#   4. After opencode exits, writes the binding so next launch resumes the same session
+#   1. Purges stale window->session bindings (windows no longer in kitty)
+#   2. Checks mapping file for a direct kitty_window_id -> opencode_session_id binding
+#   3. If bound, verifies the session still exists and resumes it
+#   4. If unbound, finds the most recent unbound session for this directory
 #
 # Usage:
 #   opencode-kitty              # auto-detect context from KITTY_WINDOW_ID
 #   opencode-kitty --session X  # explicitly resume session X (passes through to opencode)
+#   opencode-kitty --validate   # check prerequisites without executing
+#
+# Debugging:
+#   KITTY_WORKSPACE_DEBUG=1 opencode-kitty
+#   tail -f ~/.local/share/kitty/workspace.log
 #
 # Environment (set automatically by Kitty):
 #   KITTY_WINDOW_ID - numeric window ID within the Kitty instance
+#
+# Dependencies:
+#   - kitty-query.py (installed via chezmoi to ~/.config/kitty/kitty-query.py)
+#   - uv (for running kitty-query.py with inline dependencies)
 
-set -euo pipefail
+set -uo pipefail
+trap 'echo "opencode-kitty: error on line $LINENO" >&2' ERR
 
+# ── Shared tooling ──
+
+KQ="$HOME/.config/kitty/kitty-query.py"
 OC_STORAGE="$HOME/.local/share/opencode-kitty"
+LOG_FILE="$HOME/.local/share/kitty/workspace.log"
+SOCKET_GLOB="$HOME/.local/share/kitty/control-socket-*"
+
 mkdir -p "$OC_STORAGE"
 
 DB_PATH="${OPENCODE_DB:-$(opencode db path 2>/dev/null || echo "")}"
 PROJECT_DIR="$(pwd)"
 
-# Pass-through: if --session is explicitly provided, just forward to opencode
+log() {
+    [[ "${KITTY_WORKSPACE_DEBUG:-}" == "1" ]] || return 0
+    echo "[$(date '+%H:%M:%S')] opencode-kitty: $*" >> "$LOG_FILE"
+}
+
+_find_socket() { ls $SOCKET_GLOB 2>/dev/null | head -1 || true; }
+
+# ── Validate mode ──
+
+if [[ "${1:-}" == "--validate" ]]; then
+    echo "opencode-kitty prerequisites:"
+
+    # kitty binary
+    _kitty=$(command -v kitty || true)
+    if [[ -n "$_kitty" ]]; then
+        echo "  [OK] kitty binary: $_kitty"
+    else
+        echo "  [FAIL] kitty binary: not found on PATH"
+    fi
+
+    # uv
+    _uv=$(command -v uv || true)
+    if [[ -n "$_uv" ]]; then
+        echo "  [OK] uv: $_uv"
+    else
+        echo "  [FAIL] uv: not found on PATH"
+    fi
+
+    # kitty-query.py
+    if [[ -f "$KQ" ]]; then
+        echo "  [OK] kitty-query: $KQ"
+    else
+        echo "  [FAIL] kitty-query: $KQ (not found)"
+    fi
+
+    # kitty socket
+    _socket=$(_find_socket)
+    if [[ -n "$_socket" ]]; then
+        echo "  [OK] kitty socket: $_socket"
+    else
+        echo "  [WARN] kitty socket: not found (kitty not running)"
+    fi
+
+    # opencode binary
+    _oc=$(command -v opencode || true)
+    if [[ -n "$_oc" ]]; then
+        echo "  [OK] opencode: $_oc"
+    else
+        echo "  [FAIL] opencode: not found on PATH"
+    fi
+
+    # opencode DB
+    if [[ -n "$DB_PATH" && -f "$DB_PATH" ]]; then
+        echo "  [OK] opencode DB: $DB_PATH"
+    elif [[ -n "$DB_PATH" ]]; then
+        echo "  [FAIL] opencode DB: $DB_PATH (file not found)"
+    else
+        echo "  [FAIL] opencode DB: path unknown"
+    fi
+
+    # sqlite3
+    _sql=$(command -v sqlite3 || true)
+    if [[ -n "$_sql" ]]; then
+        echo "  [OK] sqlite3: $_sql"
+    else
+        echo "  [FAIL] sqlite3: not found on PATH"
+    fi
+
+    # python3
+    _py=$(command -v python3 || true)
+    if [[ -n "$_py" ]]; then
+        echo "  [OK] python3: $_py"
+    else
+        echo "  [FAIL] python3: not found on PATH"
+    fi
+
+    # KITTY_WINDOW_ID
+    if [[ -n "${KITTY_WINDOW_ID:-}" ]]; then
+        echo "  [OK] KITTY_WINDOW_ID: $KITTY_WINDOW_ID"
+    else
+        echo "  [WARN] KITTY_WINDOW_ID: not set (not running inside kitty)"
+    fi
+
+    # workspace detection
+    if [[ -n "${_socket:-}" && -n "${_kitty:-}" && -n "${KITTY_WINDOW_ID:-}" ]]; then
+        _ws=$("$_kitty" @ --to=unix:"$_socket" ls 2>/dev/null \
+            | uv run --script "$KQ" detect-workspace "$KITTY_WINDOW_ID" 2>/dev/null || true)
+        if [[ -n "$_ws" ]]; then
+            echo "  [OK] workspace: $_ws"
+        else
+            echo "  [WARN] workspace: not detected for window $KITTY_WINDOW_ID"
+        fi
+    else
+        echo "  [SKIP] workspace: cannot detect (missing socket/kitty/window ID)"
+    fi
+
+    # map file
+    _ws="${_ws:-standalone}"
+    _map="$OC_STORAGE/${_ws}.map"
+    if [[ -f "$_map" ]]; then
+        _total=$(grep -c '=' "$_map" 2>/dev/null || echo 0)
+        _stale=0
+        if [[ -n "${_socket:-}" && -n "${_kitty:-}" ]]; then
+            _live=$("$_kitty" @ --to=unix:"$_socket" ls 2>/dev/null \
+                | uv run --script "$KQ" list-win-ids 2>/dev/null || true)
+            while IFS='=' read -r wid sid; do
+                [[ -z "$wid" || "$wid" == \#* ]] && continue
+                if ! echo "$_live" | grep -qx "$wid" 2>/dev/null; then
+                    _stale=$((_stale + 1))
+                fi
+            done < "$_map"
+        fi
+        echo "  [OK] map file: $_map ($_total bindings, $_stale stale)"
+    else
+        echo "  [INFO] map file: $_map (does not exist yet)"
+    fi
+
+    # sessions for this project
+    if [[ -n "$DB_PATH" && -f "$DB_PATH" ]]; then
+        _total_sessions=$(uv run --script "$KQ" query-sessions-cmd "$DB_PATH" "$PROJECT_DIR" --limit 100 2>/dev/null | wc -l | tr -d ' ')
+        echo "  [OK] sessions for $PROJECT_DIR: $_total_sessions active"
+    fi
+
+    # secret function
+    if bash -l -c 'type secret' &>/dev/null; then
+        echo "  [OK] secret(): available in login shell"
+    else
+        echo "  [WARN] secret(): not found in login shell"
+    fi
+
+    exit 0
+fi
+
+# ── Pass-through: if --session is explicitly provided, just forward to opencode ──
+
 for arg in "$@"; do
     if [[ "$arg" == "--session" ]]; then
         exec opencode "$@"
     fi
 done
 
+log "Starting: KITTY_WINDOW_ID=${KITTY_WINDOW_ID:-unset} project=$PROJECT_DIR"
+
 # ── Detect workspace name from Kitty user vars ──
 
 detect_workspace() {
     local socket
-    socket=$(ls /tmp/mykitty-* 2>/dev/null | head -1)
+    socket=$(_find_socket)
     [[ -n "$socket" ]] || return 1
 
-    /Applications/kitty.app/Contents/MacOS/kitty @ --to=unix:"$socket" ls 2>/dev/null | python3 -c "
-import json, sys
-win_id = int(sys.argv[1])
-data = json.load(sys.stdin)
-for oswin in data:
-    for tab in oswin.get('tabs', []):
-        for win in tab.get('windows', []):
-            if win.get('user_vars', {}).get('workspace'):
-                # Found workspace tag -- return it for any window in this OS window
-                # Check if our window is in this OS window
-                pass
-        for win in tab.get('windows', []):
-            if win['id'] == win_id:
-                # Found our window -- now find the workspace tag in this OS window
-                for t2 in oswin.get('tabs', []):
-                    for w2 in t2.get('windows', []):
-                        ws = w2.get('user_vars', {}).get('workspace')
-                        if ws:
-                            print(ws)
-                            sys.exit(0)
-" "${KITTY_WINDOW_ID:-0}" 2>/dev/null || true
-}
-
-# ── Helpers (same logic as opencode-zellij) ──
-
-session_exists() {
-    local sid="$1"
-    [[ -n "$DB_PATH" && -f "$DB_PATH" ]] || return 1
-    local count
-    count=$(sqlite3 "$DB_PATH" "
-        SELECT COUNT(*) FROM session
-        WHERE id = '$sid' AND time_archived IS NULL;
-    " 2>/dev/null || echo "0")
-    [[ "$count" -gt 0 ]]
-}
-
-bound_session_ids() {
-    local map_file="$1"
-    [[ -f "$map_file" ]] || return 0
-    grep -v '^#' "$map_file" 2>/dev/null | grep -v '^$' | cut -d= -f2
-}
-
-find_unbound_session() {
-    local map_file="$1"
-    [[ -n "$DB_PATH" && -f "$DB_PATH" ]] || return 1
-
-    local bound_ids=""
-    if [[ -f "$map_file" ]]; then
-        bound_ids=$(bound_session_ids "$map_file" | sed "s/^/'/;s/$/'/" | paste -sd, -)
-    fi
-
-    local where_not_bound=""
-    if [[ -n "$bound_ids" ]]; then
-        where_not_bound="AND s.id NOT IN ($bound_ids)"
-    fi
-
-    # Check for seed file (created by kitty-workspace from snapshot restore)
-    local seed_file="$OC_STORAGE/${WORKSPACE:-standalone}.seed"
-    if [[ -f "$seed_file" ]]; then
-        local seed_ids
-        seed_ids=$(grep -v '^$' "$seed_file" 2>/dev/null | sed "s/^/'/;s/$/'/" | paste -sd, - || true)
-        if [[ -n "$seed_ids" ]]; then
-            local seeded_session
-            seeded_session=$(sqlite3 "$DB_PATH" "
-                SELECT s.id
-                FROM session s
-                JOIN project p ON s.project_id = p.id
-                WHERE p.worktree = '$PROJECT_DIR'
-                  AND s.time_archived IS NULL
-                  AND s.parent_id IS NULL
-                  AND s.id IN ($seed_ids)
-                  $where_not_bound
-                ORDER BY s.time_updated DESC
-                LIMIT 1;
-            " 2>/dev/null || true)
-
-            if [[ -n "$seeded_session" ]]; then
-                # Remove from seed so next pane gets the next one
-                local escaped
-                escaped=$(printf '%s\n' "$seeded_session" | sed 's/[.[\*^$()+?{|\\]/\\&/g')
-                grep -v "^${escaped}$" "$seed_file" > "$seed_file.tmp" 2>/dev/null || true
-                mv "$seed_file.tmp" "$seed_file"
-                echo "$seeded_session"
-                return 0
-            fi
-        fi
-    fi
-
-    # Fallback: most recent unbound session
-    sqlite3 "$DB_PATH" "
-        SELECT s.id
-        FROM session s
-        JOIN project p ON s.project_id = p.id
-        WHERE p.worktree = '$PROJECT_DIR'
-          AND s.time_archived IS NULL
-          AND s.parent_id IS NULL
-          $where_not_bound
-        ORDER BY s.time_updated DESC
-        LIMIT 1;
-    " 2>/dev/null || true
-}
-
-find_latest_session() {
-    [[ -n "$DB_PATH" && -f "$DB_PATH" ]] || return 1
-    sqlite3 "$DB_PATH" "
-        SELECT s.id
-        FROM session s
-        JOIN project p ON s.project_id = p.id
-        WHERE p.worktree = '$PROJECT_DIR'
-          AND s.time_archived IS NULL
-          AND s.parent_id IS NULL
-        ORDER BY s.time_updated DESC
-        LIMIT 1;
-    " 2>/dev/null || true
+    "$(command -v kitty)" @ --to=unix:"$socket" ls 2>/dev/null \
+        | uv run --script "$KQ" detect-workspace "${KITTY_WINDOW_ID:-0}" 2>/dev/null || true
 }
 
 # ── Main logic ──
@@ -160,14 +200,37 @@ WORKSPACE=$(detect_workspace)
 MAP_FILE="$OC_STORAGE/${WORKSPACE:-standalone}.map"
 SESSION_ID=""
 
+log "Workspace: ${WORKSPACE:-none}, map: $MAP_FILE"
+
+if [[ -z "$DB_PATH" || ! -f "$DB_PATH" ]]; then
+    log "WARNING: opencode DB not found at '$DB_PATH'"
+fi
+
+# Purge stale bindings via kitty-query
+if [[ -n "$WORKSPACE" && -f "$MAP_FILE" ]]; then
+    LIVE_WIN_IDS=$(
+        socket=$(_find_socket)
+        if [[ -n "$socket" ]]; then
+            "$(command -v kitty)" @ --to=unix:"$socket" ls 2>/dev/null \
+                | uv run --script "$KQ" list-win-ids 2>/dev/null || true
+        fi
+    )
+
+    if [[ -n "$LIVE_WIN_IDS" ]]; then
+        # shellcheck disable=SC2086
+        uv run --script "$KQ" purge-stale "$MAP_FILE" $LIVE_WIN_IDS 2>/dev/null || true
+    fi
+fi
+
 if [[ -n "$KITTY_WIN" && -n "$WORKSPACE" ]]; then
     # Running inside a workspace -- try direct binding lookup
     if [[ -f "$MAP_FILE" ]]; then
         EXISTING=$(grep "^${KITTY_WIN}=" "$MAP_FILE" 2>/dev/null || true)
         if [[ -n "$EXISTING" ]]; then
             SESSION_ID="${EXISTING#*=}"
-            if ! session_exists "$SESSION_ID"; then
-                echo "Bound session $SESSION_ID no longer exists. Finding a new one..."
+            log "Direct binding found: window $KITTY_WIN -> session $SESSION_ID"
+            if ! uv run --script "$KQ" session-exists-cmd "$DB_PATH" "$SESSION_ID" &>/dev/null; then
+                log "Bound session $SESSION_ID no longer exists, removing"
                 grep -v "^${KITTY_WIN}=" "$MAP_FILE" > "$MAP_FILE.tmp" 2>/dev/null || true
                 mv "$MAP_FILE.tmp" "$MAP_FILE"
                 SESSION_ID=""
@@ -177,31 +240,41 @@ if [[ -n "$KITTY_WIN" && -n "$WORKSPACE" ]]; then
 
     # No valid binding -- find an unbound session
     if [[ -z "$SESSION_ID" ]]; then
-        SESSION_ID=$(find_unbound_session "$MAP_FILE")
+        log "No direct binding, searching for unbound session..."
+        SESSION_ID=$(uv run --script "$KQ" find-unbound-session \
+            "$DB_PATH" "$PROJECT_DIR" "$MAP_FILE" "$WORKSPACE" 2>/dev/null || true)
         if [[ -n "$SESSION_ID" ]]; then
             echo "${KITTY_WIN}=${SESSION_ID}" >> "$MAP_FILE"
-            echo "Bound window $KITTY_WIN to session $SESSION_ID"
+            log "Bound window $KITTY_WIN to session $SESSION_ID"
         fi
     fi
 else
     # Not in a workspace -- just find the most recent session
-    SESSION_ID=$(find_latest_session)
+    log "No workspace context, finding latest session"
+    SESSION_ID=$(uv run --script "$KQ" query-sessions-cmd \
+        "$DB_PATH" "$PROJECT_DIR" 2>/dev/null || true)
 fi
 
 # ── Launch opencode ──
 
-# Write binding before exec (since exec replaces this process)
-if [[ -n "$KITTY_WIN" && -n "$WORKSPACE" && -z "$SESSION_ID" ]]; then
-    # No existing session -- opencode will create one.
-    # We can't capture the binding post-exec since exec replaces us.
-    # Instead, on next launch opencode-kitty will find the latest session.
-    :
+if [[ -n "$SESSION_ID" ]]; then
+    log "Resuming session: $SESSION_ID"
+    echo "Resuming opencode session: $SESSION_ID"
+    opencode --session "$SESSION_ID"
+    EXIT_CODE=$?
+else
+    log "No session found, starting fresh"
+    echo "No previous session found for $PROJECT_DIR. Starting fresh."
+    opencode
+    EXIT_CODE=$?
 fi
 
-if [[ -n "$SESSION_ID" ]]; then
-    echo "Resuming opencode session: $SESSION_ID"
-    exec opencode --session "$SESSION_ID"
+# If opencode exits, keep the pane alive so errors are visible
+if [[ $EXIT_CODE -ne 0 ]]; then
+    log "opencode exited with code $EXIT_CODE"
+    echo ""
+    echo "opencode exited with code $EXIT_CODE. Press Enter to close, or type a command."
+    exec bash
 else
-    echo "No previous session found for $PROJECT_DIR. Starting fresh."
-    exec opencode
+    log "opencode exited cleanly"
 fi

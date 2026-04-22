@@ -7,26 +7,9 @@ Include {{ .chezmoi.homeDir }}/.colima/ssh_config
 # This won't be added again if you remove it.
 Include {{ .chezmoi.homeDir }}/.orbstack/ssh/config
 
-Host 134.122.4.116
-  HostName 134.122.4.116
-  User master_bvdfzugbtj
-  Port 22
-  IdentityFile ~/.ssh/cloudways_ths
-
-Host pi
-    HostName 192.168.100.150
-    User tommi
-
-Host fedora
-  HostName 192.168.100.151
-  User tommi
-  IdentityFile ~/.ssh/kdefedora
-
-Host hovitunkki
-  HostName hovitunkki.vip
-  User t
-  IdentityFile ~/.ssh/id_rsa_hovitunkki
-  PubkeyAuthentication yes
-
 Host *
   IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+  StrictHostKeyChecking ask
+  HashKnownHosts yes
+  ServerAliveInterval 60
+  ServerAliveCountMax 3

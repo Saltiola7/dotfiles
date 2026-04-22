@@ -12,11 +12,12 @@ Usage:
 import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 
-KITTY = "/Applications/kitty.app/Contents/MacOS/kitty"
-SOCKET_GLOB = "/tmp/mykitty-*"
+KITTY = shutil.which("kitty")
+SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
 
 
 def find_socket():
@@ -80,7 +81,7 @@ def parse_session_file(path):
                     if skip_next:
                         skip_next = False
                         continue
-                    if part.startswith("'kitty-unserialize-data="):
+                    if part.startswith("kitty-unserialize-data="):
                         # Skip the unserialize metadata
                         continue
                     if part.startswith("--var="):
