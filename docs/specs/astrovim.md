@@ -57,7 +57,7 @@ Only two files were changed from the template:
 
 ### Why catppuccin-mocha
 
-Zellij is configured with catppuccin-mocha (`~/.config/zellij/config.kdl`). Using the same palette in nvim means status lines, tab bars, and editor chrome don't clash visually when nvim runs inside a zellij pane.
+Kitty and the terminal environment use catppuccin-mocha. Using the same palette in nvim means status lines, tab bars, and editor chrome don't clash visually.
 
 ### Why standard vim keybindings (no Colemak-DH)
 

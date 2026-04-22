@@ -1,0 +1,267 @@
+#!/bin/bash
+#
+# kitty-workspace - Open or focus a project workspace in Kitty
+#
+# Called from PyCharm External Tool (or anywhere) with a project directory.
+#
+# Behavior:
+#   1. Derives workspace name from directory basename
+#   2. Checks if a Kitty OS window already has this workspace
+#      - Found: focuses that OS window and brings Kitty to foreground
+#      - Not found: builds the workspace from the hardcoded definition,
+#        then restores extra tabs from a snapshot if one exists
+#
+# Usage:
+#   kitty-workspace /path/to/project
+#   kitty-workspace                    # uses current directory
+
+set -euo pipefail
+
+KITTY="/Applications/kitty.app/Contents/MacOS/kitty"
+SESSIONS_DIR="$HOME/.config/kitty/sessions"
+OC_STORAGE="$HOME/.local/share/opencode-kitty"
+
+# ── Find the kitty remote control socket ──
+
+SOCKET=$(ls /tmp/mykitty-* 2>/dev/null | head -1)
+if [[ -z "$SOCKET" ]]; then
+    echo "Error: No kitty socket found. Is kitty running with listen_on configured?" >&2
+    exit 1
+fi
+
+KITTY_RC="$KITTY @ --to=unix:$SOCKET"
+
+# ── Resolve project directory and workspace name ──
+
+PROJECT_DIR="${1:-$(pwd)}"
+BASENAME="$(basename "$PROJECT_DIR")"
+
+# ── Check if workspace OS window already exists ──
+
+OSWIN_ID=$($KITTY_RC ls 2>/dev/null | python3 -c "
+import json, sys
+target = sys.argv[1]
+data = json.load(sys.stdin)
+for oswin in data:
+    for tab in oswin.get('tabs', []):
+        for win in tab.get('windows', []):
+            if win.get('user_vars', {}).get('workspace') == target:
+                print(oswin['id'])
+                sys.exit(0)
+" "$BASENAME" 2>/dev/null || true)
+
+if [[ -n "$OSWIN_ID" ]]; then
+    $KITTY_RC focus-window --match "var:workspace=$BASENAME" 2>/dev/null || true
+    open -a kitty
+    exit 0
+fi
+
+# ── Helpers ──
+
+# Create the initial OS window, return first window ID
+create_os_window() {
+    local cwd="$1"
+    local tab_title="$2"
+    $KITTY_RC launch --type=os-window --tab-title="$tab_title" --cwd="$cwd" \
+        --var workspace="$BASENAME"
+}
+
+# Add a vsplit pane, return new window ID
+add_vsplit() {
+    local match_win="$1"
+    local cwd="$2"
+    shift 2
+    $KITTY_RC launch --match "window_id:$match_win" --location=vsplit --cwd="$cwd" "$@"
+}
+
+# Add a new tab, return new window ID
+add_tab() {
+    local match_win="$1"
+    local tab_title="$2"
+    local cwd="$3"
+    shift 3
+    $KITTY_RC launch --type=tab --match "window_id:$match_win" \
+        --tab-title="$tab_title" --cwd="$cwd" "$@"
+}
+
+# Pre-type a command into a pane (no Enter -- user can review/edit first)
+type_cmd() {
+    local win_id="$1"
+    local cmd="$2"
+    sleep 0.3  # let the shell prompt render
+    $KITTY_RC send-text --match "id:$win_id" "$cmd"
+}
+
+# Seed opencode session IDs from snapshot for opencode-kitty to pick up
+seed_opencode_sessions() {
+    local snapshot="$SESSIONS_DIR/${BASENAME}.snapshot.conf"
+    [[ -f "$snapshot" ]] || return 0
+
+    mkdir -p "$OC_STORAGE"
+    local seed_file="$OC_STORAGE/${BASENAME}.seed"
+
+    # Extract opencode session IDs from the snapshot's opencode-kitty map
+    local map_file="$OC_STORAGE/${BASENAME}.map"
+    if [[ -f "$map_file" ]]; then
+        # Save the session IDs (values) for the new panes to pick up
+        grep -v '^#' "$map_file" 2>/dev/null | grep -v '^$' | cut -d= -f2 > "$seed_file" 2>/dev/null || true
+        # Clear the stale map (old window IDs won't match new ones)
+        rm -f "$map_file"
+    fi
+}
+
+# ── Workspace definitions ──
+
+build_seo-data-science() {
+    local cwd="/Users/tis/MGM/git/seo-data-science"
+
+    seed_opencode_sessions
+
+    # Tab 1: servers (two panes: prefect + marimo)
+    local win1 win2
+    win1=$(create_os_window "$cwd" "servers")
+    win2=$(add_vsplit "$win1" "$cwd")
+    type_cmd "$win1" "mise run local-prefect"
+    type_cmd "$win2" "marimo --watch notebooks/"
+
+    # Tab 2: opencode
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+
+    # Focus servers tab
+    $KITTY_RC focus-tab --match "title:^servers$" 2>/dev/null || true
+}
+
+build_tsc() {
+    local cwd="/Users/tis/github/tsc"
+
+    seed_opencode_sessions
+
+    # Tab 1: app (Django)
+    local win1
+    win1=$(create_os_window "$cwd" "app")
+    type_cmd "$win1" "make start"
+
+    # Tab 2: flowbite (two panes)
+    local win2 win3
+    win2=$(add_tab "$win1" "flowbite" "/Users/tis/github/flowbite/flowbite-admin-dashboard-v2.2.0")
+    win3=$(add_vsplit "$win2" "/Users/tis/github/flowbite/flowbite-pro-marketing-ui-pages-main")
+    type_cmd "$win2" "npm start"
+    type_cmd "$win3" "npm start"
+
+    # Tab 3: opencode
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+
+    # Focus app tab
+    $KITTY_RC focus-tab --match "title:^app$" 2>/dev/null || true
+}
+
+build_dotfiles() {
+    local cwd="/Users/tis/github/dotfiles"
+
+    seed_opencode_sessions
+
+    # Tab 1: shell
+    local win1
+    win1=$(create_os_window "$cwd" "shell")
+
+    # Tab 2: opencode
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+
+    # Focus shell tab
+    $KITTY_RC focus-tab --match "title:^shell$" 2>/dev/null || true
+}
+
+# ── Restore extra tabs from snapshot ──
+
+restore_extra_tabs() {
+    local snapshot="$SESSIONS_DIR/${BASENAME}.snapshot.conf"
+    [[ -f "$snapshot" ]] || return 0
+
+    # Find the first window ID in the workspace (to anchor new tabs)
+    local first_win
+    first_win=$($KITTY_RC ls 2>/dev/null | python3 -c "
+import json, sys
+target = sys.argv[1]
+data = json.load(sys.stdin)
+for oswin in data:
+    for tab in oswin.get('tabs', []):
+        for win in tab.get('windows', []):
+            if win.get('user_vars', {}).get('workspace') == target:
+                print(win['id'])
+                sys.exit(0)
+" "$BASENAME" 2>/dev/null || true)
+
+    [[ -n "$first_win" ]] || return 0
+
+    # Parse snapshot for tabs that aren't part of the base definition
+    python3 -c "
+import sys, os
+
+snapshot_path = sys.argv[1]
+basename = sys.argv[2]
+
+# Known base tab titles per workspace
+base_tabs = {
+    'seo-data-science': {'servers', 'opencode'},
+    'tsc': {'app', 'flowbite', 'opencode'},
+    'dotfiles': {'shell', 'opencode'},
+}
+
+known = base_tabs.get(basename, set())
+# Case-insensitive matching for base tab names
+known_lower = {t.lower() for t in known}
+extra_tabs = []
+current_tab = None
+
+with open(snapshot_path) as f:
+    for line in f:
+        line = line.strip()
+        if line.startswith('new_tab'):
+            title = line[len('new_tab'):].strip() or 'tab'
+            current_tab = {'title': title, 'in_base': title.lower() in known_lower}
+        elif line.startswith('cd ') and current_tab and not current_tab['in_base']:
+            current_tab['cwd'] = line.split(None, 1)[1]
+        elif line.startswith('launch') and current_tab and not current_tab['in_base']:
+            # Extract command (skip kitty-unserialize-data and --var args)
+            parts = line.split()
+            cmd = []
+            for p in parts[1:]:
+                if p.startswith(\"'kitty-unserialize-data\") or p.startswith('--'):
+                    continue
+                cmd.append(p)
+            current_tab['cmd'] = cmd
+            extra_tabs.append(current_tab)
+            current_tab = None
+
+# Output extra tabs as: title|cwd|cmd
+for tab in extra_tabs:
+    cwd = tab.get('cwd', os.path.expanduser('~'))
+    cmd = ' '.join(tab.get('cmd', []))
+    print(f'{tab[\"title\"]}|{cwd}|{cmd}')
+" "$snapshot" "$BASENAME" | while IFS='|' read -r title cwd cmd; do
+        if [[ -n "$cmd" ]]; then
+            $KITTY_RC launch --type=tab --match "window_id:$first_win" \
+                --tab-title="$title" --cwd="$cwd" $cmd
+        else
+            $KITTY_RC launch --type=tab --match "window_id:$first_win" \
+                --tab-title="$title" --cwd="$cwd"
+        fi
+    done
+}
+
+# ── Dispatch ──
+
+BUILD_FN="build_${BASENAME}"
+
+if type "$BUILD_FN" &>/dev/null; then
+    "$BUILD_FN"
+    restore_extra_tabs
+else
+    # Fallback: generic workspace with shell + opencode panes (vertical split)
+    seed_opencode_sessions
+
+    win1=$(create_os_window "$PROJECT_DIR" "$BASENAME")
+    add_vsplit "$win1" "$PROJECT_DIR" bash -l -c "exec opencode-kitty"
+fi
+
+open -a kitty

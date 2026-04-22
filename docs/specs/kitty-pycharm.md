@@ -2,7 +2,6 @@
 
 **Status:** Experimental (v1, initial implementation)
 **Created:** 2026-04-20
-**Replaces:** Zellij workspace scripts (zellij has been removed)
 
 ## Overview
 
@@ -37,17 +36,6 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 | `~/.local/bin/opencode-kitty` | OpenCode session binding to Kitty window IDs (207 lines) | Experimental |
 | `~/.config/kitty/save-workspace.py` | F16 handler: snapshot workspace state per project (158 lines) | Experimental |
 | `~/.config/kitty/load-snapshot.py` | Snapshot parser for extra-tab restoration (221 lines) | Experimental |
-
-### Legacy (kept intact, parallel use)
-
-| Path | Purpose |
-|------|---------|
-| `~/.local/bin/seo-workspace` | Zellij workspace launcher for SEO |
-| `~/.local/bin/seo-data-science-workspace` | Copy of seo-workspace (convention rename) |
-| `~/.local/bin/tsc-workspace` | Zellij workspace launcher for TSC |
-| `~/.local/bin/dotfiles-workspace` | Zellij workspace launcher for dotfiles |
-| `~/.local/bin/opencode-zellij` | OpenCode session binding for zellij panes |
-| `~/.local/bin/kitty-tab` | Simple single-tab launcher (superseded by kitty-workspace) |
 
 ### Storage (created at runtime)
 
@@ -142,8 +130,8 @@ flowchart LR
     C --> D{Has workspace user var?}
     D -->|Yes| E[Generate session file from tab/pane state]
     D -->|No| F[Exit: not a workspace]
-    E --> G[Write {workspace}.snapshot.conf]
-    E --> H[Copy {workspace}.map to .map.snapshot]
+    E --> G["Write workspace.snapshot.conf"]
+    E --> H["Copy workspace.map to .map.snapshot"]
 ```
 
 ### Data Flow: OpenCode Session Resumption
@@ -163,7 +151,7 @@ flowchart TD
     H -->|No| K[Query DB: most recent unbound session]
     K -->|Found| L[Write binding to .map]
     L --> F
-    K -->|None| M[exec opencode (fresh)]
+    K -->|None| M[exec opencode, new session]
     G --> H
 ```
 
@@ -184,7 +172,7 @@ All DB queries filter with:
 
 ### Workspace Build Functions
 
-Each project has a hardcoded build function in `kitty-workspace`. These define the base structure:
+Projects with custom needs have hardcoded build functions in `kitty-workspace`. These define the base structure:
 
 ```bash
 build_seo-data-science() {
@@ -206,6 +194,15 @@ build_dotfiles() {
 }
 ```
 
+### Generic Fallback
+
+Projects without a `build_*` function get a generic workspace automatically:
+
+- A new OS window tagged with `workspace=<dirname>`
+- Two vertical-split panes: shell (left) + opencode with session resumption (right)
+
+This means any project can be opened from PyCharm without needing a custom build function.
+
 Commands are pre-typed into panes using `kitty @ send-text` without a trailing newline, so the user can review/edit before pressing Enter.
 
 ### Layered Restore Model
@@ -218,7 +215,7 @@ When a workspace is opened, the system uses a layered approach:
 
 3. **Session layer**: `opencode-kitty` handles opencode session resumption independently using its map/seed mechanism.
 
-This differs from the zellij approach where the snapshot IS the layout. Here, the build function is always the source of truth for commands, and the snapshot only captures structural additions.
+The build function is always the source of truth for commands, and the snapshot only captures structural additions.
 
 ## Kitty Configuration Details
 
@@ -260,18 +257,6 @@ Note: This feature works with Kitty's native session system (loaded via `kitty -
 
 ## Design Decisions
 
-### Why Kitty Native Instead of Zellij
-
-| Factor | Zellij | Kitty Native | Decision |
-|--------|--------|-------------|----------|
-| Detach/reattach | Built-in | Not supported | Not needed -- Kitty stays open |
-| Performance | Extra rendering layer | Direct GPU rendering | Kitty wins |
-| Keyboard protocol | Supports kitty protocol | Native | Kitty wins |
-| Config language | KDL | Plain text / Python | Kitty wins for AI-assisted editing |
-| Session persistence | Built-in | Manual (snapshot system) | Acceptable tradeoff |
-| Nested tab bars | Zellij tabs inside Kitty tabs | Single tab bar | Cleaner UI |
-| Process count | Kitty + zellij | Kitty only | Simpler |
-
 ### Why Programmatic Build Instead of Session Files
 
 Kitty session files (`.conf`) work for static layouts but have limitations when launched via remote control:
@@ -288,8 +273,7 @@ Server commands (`mise run local-prefect`, `marimo --watch notebooks/`, `make st
 
 1. The user may want to adjust flags or environment before starting
 2. Failed processes would close the pane (no `--hold` needed)
-3. Matches the zellij `print -z` pattern the user was already familiar with
-4. Allows the user to see all workspace panes before committing to starting services
+3. Allows the user to see all workspace panes before committing to starting services
 
 ### Why exec in opencode-kitty
 
