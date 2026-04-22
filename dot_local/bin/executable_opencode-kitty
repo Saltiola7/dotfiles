@@ -238,6 +238,40 @@ bound_session_ids() {
     grep -v '^#' "$map_file" 2>/dev/null | grep -v '^$' | cut -d= -f2
 }
 
+find_active_session() {
+    # Check if another opencode process is running for $PROJECT_DIR.
+    # If so, return the most recently updated session ID (the one it's likely using).
+    [[ -n "$DB_PATH" && -f "$DB_PATH" ]] || return 0
+
+    local has_active=false
+    ps -eo pid,command 2>/dev/null | grep '[o]pencode' | grep -v 'opencode-kitty' | awk '{print $1}' | while read -r pid; do
+        [[ -z "$pid" ]] && continue
+        # Skip our own process tree
+        [[ "$pid" == "$$" || "$pid" == "$PPID" ]] && continue
+        local cwd
+        cwd=$(lsof -p "$pid" -a -d cwd -Fn 2>/dev/null | grep '^n' | sed 's/^n//')
+        if [[ "$cwd" == "$PROJECT_DIR" ]]; then
+            echo "active" > /tmp/opencode-kitty-active-$$.flag
+            break
+        fi
+    done
+
+    if [[ -f "/tmp/opencode-kitty-active-$$.flag" ]]; then
+        rm -f "/tmp/opencode-kitty-active-$$.flag"
+        # Return the most recently updated session -- the running instance is using it
+        sqlite3 "$DB_PATH" "
+            SELECT s.id
+            FROM session s
+            JOIN project p ON s.project_id = p.id
+            WHERE p.worktree = '$PROJECT_DIR'
+              AND s.time_archived IS NULL
+              AND s.parent_id IS NULL
+            ORDER BY s.time_updated DESC
+            LIMIT 1;
+        " 2>/dev/null || true
+    fi
+}
+
 find_unbound_session() {
     local map_file="$1"
     [[ -n "$DB_PATH" && -f "$DB_PATH" ]] || return 0
@@ -245,6 +279,20 @@ find_unbound_session() {
     local bound_ids=""
     if [[ -f "$map_file" ]]; then
         bound_ids=$(bound_session_ids "$map_file" | sed "s/^/'/;s/$/'/" | paste -sd, -)
+    fi
+
+    # Detect sessions in use by running opencode processes for this project.
+    # If another opencode is already running in $PROJECT_DIR, its session
+    # (the most recently updated one) must be excluded from candidates.
+    local active_session=""
+    active_session=$(find_active_session)
+    if [[ -n "$active_session" ]]; then
+        log "Active opencode process detected, excluding session: $active_session"
+        if [[ -n "$bound_ids" ]]; then
+            bound_ids="${bound_ids},'${active_session}'"
+        else
+            bound_ids="'${active_session}'"
+        fi
     fi
 
     local where_not_bound=""
