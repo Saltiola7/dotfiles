@@ -32,8 +32,8 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 
 | Path | Purpose | Status |
 |------|---------|--------|
-| `~/.local/bin/kitty-workspace` | Workspace launcher: focus or create project workspace | Experimental |
-| `~/.local/bin/opencode-kitty` | OpenCode session binding to Kitty window IDs | Experimental |
+| `~/.local/bin/kitty-workspace` | Workspace launcher with `--validate` and debug logging | Experimental |
+| `~/.local/bin/opencode-kitty` | OpenCode session binding with stale-purge, `--validate`, and debug logging | Experimental |
 | `~/.config/kitty/save-workspace.py` | F16 handler: snapshot workspace state per project | Experimental |
 | `~/.config/kitty/load-snapshot.py` | Snapshot parser for extra-tab restoration | Experimental |
 
@@ -50,6 +50,7 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 | `~/.local/share/opencode-kitty/{workspace}.map` | Live window-to-session bindings | `kitty_window_id=opencode_session_id` (one per line) |
 | `~/.local/share/opencode-kitty/{workspace}.seed` | Session IDs to restore from snapshot | One session ID per line (consumed on use) |
 | `~/.local/share/opencode-kitty/{workspace}.map.snapshot` | Backup of map at snapshot time | Same as .map |
+| `~/.local/share/kitty/workspace.log` | Debug log (when `KITTY_WORKSPACE_DEBUG=1`) | Timestamped log lines |
 
 ### External Dependencies
 
@@ -112,7 +113,10 @@ Assign a keyboard shortcut via Settings > Keymap > External Tools > kitty-worksp
 ```mermaid
 flowchart TD
     A[PyCharm hotkey] --> B[kitty-workspace $ProjectFileDir$]
-    B --> C{Workspace OS window exists?}
+    B --> S{Kitty running?}
+    S -->|Yes| C{Workspace OS window exists?}
+    S -->|No| T[open -a kitty, wait for socket]
+    T --> C
     C -->|Yes| D[Focus existing OS window]
     C -->|No| E{build_* function defined?}
     E -->|Yes| F[Run build function]
@@ -123,7 +127,7 @@ flowchart TD
     J -->|Yes| K[restore_extra_tabs: add non-base tabs from snapshot]
     J -->|No| L[Done]
     K --> L
-    E -->|No| M[Fallback: plain shell tab]
+    E -->|No| M[Fallback: shell tab + opencode tab]
     D --> N[open -a kitty]
     L --> N
     M --> N
@@ -148,7 +152,8 @@ flowchart LR
 flowchart TD
     A[opencode-kitty starts in pane] --> B[Read KITTY_WINDOW_ID]
     B --> C[kitty @ ls: find workspace name for this window]
-    C --> D{Binding in .map file?}
+    C --> P[Purge stale bindings from .map]
+    P --> D{Binding in .map file?}
     D -->|Yes| E{Session still exists in DB?}
     E -->|Yes| F[exec opencode --session ID]
     E -->|No| G[Remove stale binding]
@@ -166,11 +171,12 @@ flowchart TD
 ### opencode-kitty Session Resolution Priority
 
 ```
-1. Explicit --session flag        -> pass through to opencode directly
-2. Direct binding in .map file    -> verify session exists, resume if valid
-3. Seeded session from .seed file -> pick first unbound seeded session
-4. Most recent unbound session    -> query DB, exclude already-bound sessions
-5. Fresh session                  -> start opencode with no --session flag
+0. Purge stale bindings            -> remove .map entries for windows not in kitty @ ls
+1. Explicit --session flag         -> pass through to opencode directly
+2. Direct binding in .map file     -> verify session exists, resume if valid
+3. Seeded session from .seed file  -> pick first unbound seeded session
+4. Most recent unbound session     -> query DB, exclude already-bound sessions
+5. Fresh session                   -> start opencode with no --session flag
 ```
 
 All DB queries filter with:
@@ -207,9 +213,14 @@ build_dotfiles() {
 Projects without a `build_*` function get a generic workspace automatically:
 
 - A new OS window tagged with `workspace=<dirname>`
-- Two vertical-split panes: shell (left) + opencode with session resumption (right)
+- Tab 1: shell (project directory)
+- Tab 2: opencode (opencode-kitty with session resumption)
 
-This means any project can be opened from PyCharm without needing a custom build function.
+This matches the `build_dotfiles` pattern. Any project can be opened from PyCharm without needing a custom build function.
+
+### Auto-Launch
+
+If Kitty is not running when the hotkey is pressed, the script launches it via `open -a kitty` and waits up to 15 seconds for the remote control socket to appear before proceeding.
 
 Commands are pre-typed into panes using `kitty @ send-text` without a trailing newline, so the user can review/edit before pressing Enter.
 
@@ -275,6 +286,10 @@ Kitty session files (`.conf`) work for static layouts but have limitations when 
 
 The programmatic approach (`kitty @ launch`) is reliable, composable, and allows `send-text` for pre-typing commands. Session files are kept as documentation and as targets for `save_as_session` snapshots.
 
+### Why `secret &&` Before opencode
+
+Opencode tabs are launched with `bash -l -c "secret && exec opencode-kitty"`. The `secret` function (defined in `.common_profile`) loads API keys from 1Password into environment variables (e.g., `AWS_PROFILE`, `AWS_REGION` for Bedrock). Without it, opencode cannot authenticate with the provider. The login shell (`bash -l`) ensures `.common_profile` is sourced so the `secret` function is available. If `secret` fails (e.g., 1Password not unlocked), the opencode tab will not launch.
+
 ### Why Pre-Type Instead of Auto-Execute
 
 Server commands (`mise run local-prefect`, `marimo --watch notebooks/`, `make start`, `npm start`) are pre-typed into panes rather than auto-started because:
@@ -335,6 +350,8 @@ On workspace open, if a snapshot exists:
 
 ## Testing Checklist
 
+### Manual Tests
+
 1. **First hotkey press**: Creates workspace with correct tabs, splits, and pre-typed commands
 2. **Second hotkey press**: Focuses existing workspace without duplicating
 3. **F16 in workspace**: Creates `{workspace}.snapshot.conf` silently
@@ -342,6 +359,48 @@ On workspace open, if a snapshot exists:
 5. **Opencode session**: Resumes the correct session (check with `opencode session list`)
 6. **Ctrl+Shift+T in workspace**: New tab opens in project directory, not root
 7. **Multiple workspaces**: Each OS window is independent, no cross-contamination
+8. **Kitty not running**: Hotkey launches kitty, waits for socket, then creates workspace
+9. **Stale bindings**: Close kitty, reopen, verify old window->session bindings are purged
+10. **Secret authentication**: Opencode tab loads API keys via 1Password before starting
+
+### Validation
+
+Run `--validate` on both scripts to check prerequisites without side effects:
+
+```bash
+kitty-workspace --validate
+opencode-kitty --validate
+```
+
+## Debugging
+
+### Debug Logging
+
+Both scripts support debug logging controlled by `KITTY_WORKSPACE_DEBUG=1`:
+
+```bash
+# Ad-hoc debugging from terminal
+KITTY_WORKSPACE_DEBUG=1 kitty-workspace /path/to/project
+
+# Watch logs in real-time
+tail -f ~/.local/share/kitty/workspace.log
+```
+
+To enable permanently in PyCharm, add `KITTY_WORKSPACE_DEBUG=1` as an environment variable in the External Tool configuration.
+
+Log file: `~/.local/share/kitty/workspace.log`
+
+Both scripts log key decision points: socket discovery, workspace detection, session binding, stale purge actions, and build function dispatch.
+
+### Error Handling
+
+Scripts use `set -uo pipefail` (strict unset-variable checking + pipe failure propagation) with an ERR trap that prints the failing line number:
+
+```
+opencode-kitty: error on line 142
+```
+
+The `-e` (exit-on-error) flag is intentionally **not** used. Previous iterations showed that `set -e` caused silent script deaths on benign failures (e.g., `ls` glob returning no matches, `grep` finding no results). Instead, critical operations check return values explicitly, and non-critical operations use `|| true` to degrade gracefully.
 
 ## Portability
 

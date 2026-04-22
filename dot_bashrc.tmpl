@@ -63,7 +63,7 @@ fi
 [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 
 # Fix: Force Up Arrow to trigger Atuin (maps standard Up to Application Up)
-bind '"\e[A": "\eOA"'
+[[ $- == *i* ]] && bind '"\e[A": "\eOA"'
 
 # --- ble.sh late attach (must come last) ---
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then

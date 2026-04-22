@@ -14,19 +14,135 @@
 # Usage:
 #   kitty-workspace /path/to/project
 #   kitty-workspace                    # uses current directory
+#   kitty-workspace --validate         # check prerequisites without executing
+#
+# Debugging:
+#   KITTY_WORKSPACE_DEBUG=1 kitty-workspace /path/to/project
+#   tail -f ~/.local/share/kitty/workspace.log
 
-set -euo pipefail
+set -uo pipefail
+trap 'echo "kitty-workspace: error on line $LINENO" >&2' ERR
 
-KITTY="$(command -v kitty)"
+# ── Logging ──
+
+LOG_FILE="$HOME/.local/share/kitty/workspace.log"
+
+log() {
+    if [[ "${KITTY_WORKSPACE_DEBUG:-}" == "1" ]]; then
+        echo "[$(date '+%H:%M:%S')] kitty-workspace: $*" >> "$LOG_FILE"
+    fi
+}
+
+# ── Constants ──
+
+KITTY="$(command -v kitty || true)"
 SESSIONS_DIR="$HOME/.config/kitty/sessions"
 OC_STORAGE="$HOME/.local/share/opencode-kitty"
+SOCKET_GLOB="$HOME/.local/share/kitty/control-socket-*"
 
-# ── Find the kitty remote control socket ──
+# ── Validate mode ──
 
-SOCKET=$(ls ~/.local/share/kitty/control-socket-* 2>/dev/null | head -1)
-if [[ -z "$SOCKET" ]]; then
-    echo "Error: No kitty socket found. Is kitty running with listen_on configured?" >&2
+if [[ "${1:-}" == "--validate" ]]; then
+    echo "kitty-workspace prerequisites:"
+
+    # kitty binary
+    if [[ -n "$KITTY" && -x "$KITTY" ]]; then
+        echo "  [OK] kitty binary: $KITTY"
+    else
+        echo "  [FAIL] kitty binary: not found on PATH"
+    fi
+
+    # kitty socket
+    _socket=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+    if [[ -n "$_socket" ]]; then
+        echo "  [OK] kitty socket: $_socket"
+    else
+        echo "  [WARN] kitty socket: not found (kitty not running -- will auto-launch)"
+    fi
+
+    # kitty remote control
+    if [[ -n "$_socket" && -n "$KITTY" ]]; then
+        if $KITTY @ --to=unix:"$_socket" ls &>/dev/null; then
+            echo "  [OK] kitty remote control: responding"
+        else
+            echo "  [FAIL] kitty remote control: not responding on $_socket"
+        fi
+    fi
+
+    # sessions dir
+    if [[ -d "$SESSIONS_DIR" ]]; then
+        echo "  [OK] sessions dir: $SESSIONS_DIR"
+    else
+        echo "  [WARN] sessions dir: $SESSIONS_DIR (does not exist yet)"
+    fi
+
+    # opencode-kitty
+    _ock=$(command -v opencode-kitty || true)
+    if [[ -n "$_ock" && -x "$_ock" ]]; then
+        echo "  [OK] opencode-kitty: $_ock"
+    else
+        echo "  [FAIL] opencode-kitty: not found on PATH"
+    fi
+
+    # opencode
+    _oc=$(command -v opencode || true)
+    if [[ -n "$_oc" ]]; then
+        echo "  [OK] opencode: $_oc"
+    else
+        echo "  [FAIL] opencode: not found on PATH"
+    fi
+
+    # python3
+    _py=$(command -v python3 || true)
+    if [[ -n "$_py" ]]; then
+        echo "  [OK] python3: $_py"
+    else
+        echo "  [FAIL] python3: not found on PATH"
+    fi
+
+    # socket directory
+    if [[ -d "$HOME/.local/share/kitty" ]]; then
+        echo "  [OK] socket dir: $HOME/.local/share/kitty"
+    else
+        echo "  [FAIL] socket dir: $HOME/.local/share/kitty (missing -- run chezmoi apply)"
+    fi
+
+    # secret function (check if it's defined in a login shell)
+    if bash -l -c 'type secret' &>/dev/null; then
+        echo "  [OK] secret(): available in login shell"
+    else
+        echo "  [FAIL] secret(): not found in login shell"
+    fi
+
+    exit 0
+fi
+
+# ── Find the kitty remote control socket (start kitty if needed) ──
+
+if [[ -z "$KITTY" ]]; then
+    echo "Error: kitty not found on PATH" >&2
     exit 1
+fi
+
+log "Starting: args=$*"
+
+SOCKET=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+if [[ -z "$SOCKET" ]]; then
+    log "No socket found, launching kitty..."
+    open -a kitty
+    for _i in {1..30}; do
+        sleep 0.5
+        SOCKET=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+        [[ -n "$SOCKET" ]] && break
+    done
+    if [[ -z "$SOCKET" ]]; then
+        echo "Error: Kitty started but socket not found after 15s." >&2
+        echo "Is listen_on configured in kitty.conf?" >&2
+        exit 1
+    fi
+    log "Kitty launched, socket: $SOCKET"
+else
+    log "Socket: $SOCKET"
 fi
 
 KITTY_RC="$KITTY @ --to=unix:$SOCKET"
@@ -35,6 +151,7 @@ KITTY_RC="$KITTY @ --to=unix:$SOCKET"
 
 PROJECT_DIR="${1:-$(pwd)}"
 BASENAME="$(basename "$PROJECT_DIR")"
+log "Project: $PROJECT_DIR ($BASENAME)"
 
 # ── Check if workspace OS window already exists ──
 
@@ -51,10 +168,13 @@ for oswin in data:
 " "$BASENAME" 2>/dev/null || true)
 
 if [[ -n "$OSWIN_ID" ]]; then
+    log "Existing workspace found (os_window=$OSWIN_ID), focusing"
     $KITTY_RC focus-window --match "var:workspace=$BASENAME" 2>/dev/null || true
     open -a kitty
     exit 0
 fi
+
+log "No existing workspace, creating new one"
 
 # ── Helpers ──
 
@@ -62,8 +182,16 @@ fi
 create_os_window() {
     local cwd="$1"
     local tab_title="$2"
-    $KITTY_RC launch --type=os-window --tab-title="$tab_title" --cwd="$cwd" \
-        --var workspace="$BASENAME"
+    local win_id
+    win_id=$($KITTY_RC launch --type=os-window --tab-title="$tab_title" --cwd="$cwd" \
+        --var workspace="$BASENAME")
+    if [[ -z "$win_id" ]]; then
+        echo "Error: failed to create OS window for $tab_title" >&2
+        log "ERROR: create_os_window failed (cwd=$cwd title=$tab_title)"
+        exit 1
+    fi
+    log "Created OS window: win_id=$win_id title=$tab_title cwd=$cwd"
+    echo "$win_id"
 }
 
 # Add a vsplit pane, return new window ID
@@ -71,7 +199,10 @@ add_vsplit() {
     local match_win="$1"
     local cwd="$2"
     shift 2
-    $KITTY_RC launch --match "window_id:$match_win" --location=vsplit --cwd="$cwd" "$@"
+    local win_id
+    win_id=$($KITTY_RC launch --match "window_id:$match_win" --location=vsplit --cwd="$cwd" "$@")
+    log "Added vsplit: win_id=$win_id match=$match_win cwd=$cwd"
+    echo "$win_id"
 }
 
 # Add a new tab, return new window ID
@@ -80,8 +211,11 @@ add_tab() {
     local tab_title="$2"
     local cwd="$3"
     shift 3
-    $KITTY_RC launch --type=tab --match "window_id:$match_win" \
-        --tab-title="$tab_title" --cwd="$cwd" "$@"
+    local win_id
+    win_id=$($KITTY_RC launch --type=tab --match "window_id:$match_win" \
+        --tab-title="$tab_title" --cwd="$cwd" "$@")
+    log "Added tab: win_id=$win_id title=$tab_title match=$match_win cwd=$cwd"
+    echo "$win_id"
 }
 
 # Pre-type a command into a pane (no Enter -- user can review/edit first)
@@ -90,6 +224,7 @@ type_cmd() {
     local cmd="$2"
     sleep 0.3  # let the shell prompt render
     $KITTY_RC send-text --match "id:$win_id" "$cmd"
+    log "Typed command in win_id=$win_id: $cmd"
 }
 
 # Seed opencode session IDs from snapshot for opencode-kitty to pick up
@@ -107,6 +242,7 @@ seed_opencode_sessions() {
         grep -v '^#' "$map_file" 2>/dev/null | grep -v '^$' | cut -d= -f2 > "$seed_file" 2>/dev/null || true
         # Clear the stale map (old window IDs won't match new ones)
         rm -f "$map_file"
+        log "Seeded from snapshot: $snapshot"
     fi
 }
 
@@ -125,10 +261,11 @@ build_seo-data-science() {
     type_cmd "$win2" "marimo --watch notebooks/"
 
     # Tab 2: opencode
-    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "secret && exec opencode-kitty"
 
     # Focus servers tab
     $KITTY_RC focus-tab --match "title:^servers$" 2>/dev/null || true
+    log "build_seo-data-science complete"
 }
 
 build_tsc() {
@@ -149,10 +286,11 @@ build_tsc() {
     type_cmd "$win3" "npm start"
 
     # Tab 3: opencode
-    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "secret && exec opencode-kitty"
 
     # Focus app tab
     $KITTY_RC focus-tab --match "title:^app$" 2>/dev/null || true
+    log "build_tsc complete"
 }
 
 build_dotfiles() {
@@ -165,10 +303,11 @@ build_dotfiles() {
     win1=$(create_os_window "$cwd" "shell")
 
     # Tab 2: opencode
-    add_tab "$win1" "opencode" "$cwd" bash -l -c "exec opencode-kitty"
+    add_tab "$win1" "opencode" "$cwd" bash -l -c "secret && exec opencode-kitty"
 
     # Focus shell tab
     $KITTY_RC focus-tab --match "title:^shell$" 2>/dev/null || true
+    log "build_dotfiles complete"
 }
 
 # ── Restore extra tabs from snapshot ──
@@ -192,6 +331,8 @@ for oswin in data:
 " "$BASENAME" 2>/dev/null || true)
 
     [[ -n "$first_win" ]] || return 0
+
+    log "Restoring extra tabs from $snapshot (anchor=$first_win)"
 
     # Parse snapshot for tabs that aren't part of the base definition
     python3 -c "
@@ -246,6 +387,7 @@ for tab in extra_tabs:
             $KITTY_RC launch --type=tab --match "window_id:$first_win" \
                 --tab-title="$title" --cwd="$cwd"
         fi
+        log "Restored extra tab: $title (cwd=$cwd)"
     done
 }
 
@@ -254,14 +396,20 @@ for tab in extra_tabs:
 BUILD_FN="build_${BASENAME}"
 
 if type "$BUILD_FN" &>/dev/null; then
+    log "Dispatching: $BUILD_FN"
     "$BUILD_FN"
     restore_extra_tabs
 else
-    # Fallback: generic workspace with shell + opencode panes (vertical split)
+    log "No build function for '$BASENAME', using generic fallback"
+    # Fallback: generic workspace with shell tab + opencode tab
     seed_opencode_sessions
 
     win1=$(create_os_window "$PROJECT_DIR" "$BASENAME")
-    add_vsplit "$win1" "$PROJECT_DIR" bash -l -c "exec opencode-kitty"
+    add_tab "$win1" "opencode" "$PROJECT_DIR" bash -l -c "secret && exec opencode-kitty"
+
+    # Focus shell tab
+    $KITTY_RC focus-tab --match "title:^${BASENAME}$" 2>/dev/null || true
 fi
 
 open -a kitty
+log "Done"
