@@ -81,7 +81,7 @@ def parse_session_file(path):
                     if skip_next:
                         skip_next = False
                         continue
-                    if part.startswith("'kitty-unserialize-data="):
+                    if part.startswith("kitty-unserialize-data="):
                         # Skip the unserialize metadata
                         continue
                     if part.startswith("--var="):

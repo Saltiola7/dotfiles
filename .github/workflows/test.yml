@@ -1,0 +1,31 @@
+name: Tests
+
+on:
+  push:
+    paths:
+      - "private_dot_config/kitty/**"
+      - "dot_local/bin/**"
+      - "tests/**"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "private_dot_config/kitty/**"
+      - "dot_local/bin/**"
+      - "tests/**"
+      - "pyproject.toml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install pytest
+        run: pip install pytest
+      - name: Run tests
+        run: pytest tests/ -v

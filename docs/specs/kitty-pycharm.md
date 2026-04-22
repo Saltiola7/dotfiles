@@ -43,6 +43,17 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 |----------------------|---------|
 | `run_once_create-kitty-socket-dir.sh` | Creates `~/.local/share/kitty/` on first `chezmoi apply` (required for socket) |
 
+### Tests (not deployed, in `.chezmoiignore`)
+
+| Path | Purpose |
+|------|---------|
+| `tests/kitty/conftest.py` | Shared pytest fixtures (realistic `kitty @ ls` JSON, session file samples) |
+| `tests/kitty/test_save_workspace.py` | Tests for `find_active_workspace` and `generate_session_file` |
+| `tests/kitty/test_load_snapshot.py` | Tests for `parse_session_file` |
+| `tests/kitty/test_roundtrip.py` | Round-trip tests: `generate_session_file` → `parse_session_file` → verify equivalence |
+| `pyproject.toml` | pytest configuration |
+| `.github/workflows/test.yml` | CI: runs `pytest tests/ -v` on push/PR (Python 3.9 + 3.12) |
+
 ### Storage (created at runtime)
 
 | Path | Purpose | Format |
@@ -348,6 +359,43 @@ On workspace open, if a snapshot exists:
 - Running process state is lost -- only the command name is captured
 - The snapshot captures ALL OS windows' state but only saves the focused workspace's data
 
+## Automated Tests
+
+Unit tests cover the pure-logic functions extracted from the kitty workspace scripts. Run with:
+
+```bash
+# Create a venv (pytest is not installed system-wide)
+python3 -m venv /tmp/dotfiles-test-venv
+source /tmp/dotfiles-test-venv/bin/activate
+pip install pytest
+
+# Run all tests
+pytest tests/ -v
+```
+
+Tests are in `tests/kitty/` and are excluded from chezmoi deployment via `.chezmoiignore`. CI runs on push/PR via GitHub Actions (`.github/workflows/test.yml`).
+
+### What's tested
+
+| Function | File | Tests | Coverage |
+|----------|------|-------|----------|
+| `find_active_workspace(state)` | `save-workspace.py` | 6 | Focused, multi-workspace, no workspace var, no focus, empty state, cross-tab |
+| `generate_session_file(oswin)` | `save-workspace.py` | 13 | Tab structure, active tab, shell filtering, fg process serialization, user vars, layouts (list/string), cwd, empty cases |
+| `parse_session_file(path)` | `load-snapshot.py` | 23 | Multi-tab, minimal, layouts, panes, cwds, commands, var args, titles, absolute/relative paths, focus_tab edge cases, comments, ignored directives, empty file, kitty-unserialize-data filtering |
+| Round-trip: `generate` → `parse` | Both | 12 | Tab count, titles, layouts, focus index, pane count, cwd, commands, user vars, empty, format validation |
+
+### Test fixtures
+
+Fixtures use realistic `kitty @ ls` JSON structures (see `tests/kitty/conftest.py`). They model:
+- Single workspace (2 tabs: shell + opencode)
+- Multiple workspaces (2 OS windows)
+- Complex workspace (3 tabs, multiple panes, mixed processes, mixed layout types)
+- Edge cases (no workspace var, no focus, empty fg_procs)
+
+### Bugs caught by tests
+
+- **`kitty-unserialize-data` filter bug** (`load-snapshot.py:84`): The parser checked for `'kitty-unserialize-data=` with a leading single-quote, but `shlex.split()` strips quotes before the check runs. The filter silently failed, leaving serialization metadata in parsed commands. Fixed by removing the quote prefix from the `startswith()` check.
+
 ## Testing Checklist
 
 ### Manual Tests
@@ -426,6 +474,7 @@ All kitty-related scripts avoid hardcoded user or machine-specific paths:
 
 ### Future Work
 
+- **Extract inline Python from bash scripts**: 6 inline Python snippets in `kitty-workspace` and `opencode-kitty` duplicate logic (e.g., "find workspace by window ID" appears 3 times). Extracting into a shared `kitty-workspace-utils.py` module would eliminate duplication and make them testable. Note: snippet #3 (`restore_extra_tabs` parser) has the same `'kitty-unserialize-data` quoting fragility that was fixed in `load-snapshot.py` — it currently works because it uses `str.split()` instead of `shlex.split()`, preserving quotes, but is fragile.
 - **Periodic auto-snapshot**: launchd plist that calls `save-workspace.py` every N minutes
 - **Session switcher keybinding**: Map a key to quickly switch between workspaces (e.g., `kitty @ action goto_session`)
 - **Aerospace integration**: Auto-route workspace OS windows to specific Aerospace workspaces via `on-window-detected` rules
