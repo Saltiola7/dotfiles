@@ -185,6 +185,38 @@ SOCKET_GLOB = str(Path.home() / ".local" / "share" / "kitty" / "control-socket-*
 
 The directory `~/.local/share/kitty/` must exist before Kitty starts. This is handled automatically by the chezmoi `run_once_create-kitty-socket-dir.sh` script on first `chezmoi apply`.
 
+## Kitty Quick Access Terminal
+
+A Quake-style drop-down terminal that slides from the top of the screen, toggled with a global hotkey. Configured via `~/.config/kitty/quick-access-terminal.conf`.
+
+### Setup
+
+1. Run `kitten quick-access-terminal` once from kitty to register the macOS Service
+2. Go to **System Settings > Keyboard > Keyboard Shortcuts > Services > General**
+3. Find **"Quick access to kitty"** and assign a shortcut (currently `Ctrl+Space`)
+4. The shortcut now works globally from any app
+
+### Changing the shortcut
+
+The shortcut is stored in macOS, not in kitty config. To change it:
+
+1. Open **System Settings > Keyboard > Keyboard Shortcuts > Services > General**
+2. Click the existing shortcut next to "Quick access to kitty"
+3. Press the new key combination
+
+### Configuration
+
+Edit `quick-access-terminal.conf` to customize appearance:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `edge` | `top` | Which screen edge the terminal drops from |
+| `lines` | `25` | Height in lines |
+| `background_opacity` | `0.85` | Window transparency |
+| `hide_on_focus_loss` | `yes` | Auto-hide when clicking away |
+
+> **Note:** `macos_global_shortcut` in `kitty.conf` is a different feature — it toggles focus on the main kitty window, not the quick access terminal.
+
 ## Python Dependencies (uv + PEP 723)
 
 The kitty workspace scripts depend on `kitty-query.py`, a shared Python module that uses [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare its dependencies (`typer`, `plumbum`). The `uv` tool reads this metadata and auto-manages a cached venv — no manual `pip install` needed.
