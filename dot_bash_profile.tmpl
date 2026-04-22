@@ -1,6 +1,9 @@
 # Source bashrc for interactive shells
 [[ -f ~/.bashrc ]] && source ~/.bashrc
 
+# 1Password SSH agent
+export SSH_AUTH_SOCK="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
 __conda_setup="$('{{ .chezmoi.homeDir }}/anaconda3/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
