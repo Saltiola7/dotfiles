@@ -3,10 +3,13 @@ if [ -f "$HOME/.common_profile" ]; then
     . "$HOME/.common_profile"
 fi
 
+# Everything below is interactive-only (skip for bash -l -c "..." contexts)
+[[ $- != *i* ]] && return
+
 # --- ble.sh early init (must come before oh-my-bash) ---
 # Provides autosuggestions, syntax highlighting, enhanced completion
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
-    [[ $- == *i* ]] && [[ -f "$HOME/.local/share/blesh/ble.sh" ]] && source "$HOME/.local/share/blesh/ble.sh" --noattach
+    [[ -f "$HOME/.local/share/blesh/ble.sh" ]] && source "$HOME/.local/share/blesh/ble.sh" --noattach
 fi
 
 # --- Oh My Bash ---
@@ -63,7 +66,7 @@ fi
 [[ -f ~/.bash-preexec.sh ]] && source ~/.bash-preexec.sh
 
 # Fix: Force Up Arrow to trigger Atuin (maps standard Up to Application Up)
-[[ $- == *i* ]] && bind '"\e[A": "\eOA"'
+bind '"\e[A": "\eOA"'
 
 # --- ble.sh late attach (must come last) ---
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
