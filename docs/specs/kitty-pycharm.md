@@ -32,8 +32,9 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 
 | Path | Purpose | Status |
 |------|---------|--------|
-| `~/.local/bin/kitty-workspace` | Workspace launcher with `--validate` and debug logging | Experimental |
-| `~/.local/bin/opencode-kitty` | OpenCode session binding with stale-purge, `--validate`, and debug logging | Experimental |
+| `~/.local/bin/kitty-workspace` | Workspace launcher (thin bash orchestrator calling kitty-query.py) | Experimental |
+| `~/.local/bin/opencode-kitty` | OpenCode session binding (thin bash orchestrator calling kitty-query.py) | Experimental |
+| `~/.config/kitty/kitty-query.py` | Shared Python module: all workspace logic (typer CLI, PEP 723 inline deps) | Experimental |
 | `~/.config/kitty/save-workspace.py` | F16 handler: snapshot workspace state per project | Experimental |
 | `~/.config/kitty/load-snapshot.py` | Snapshot parser for extra-tab restoration | Experimental |
 
@@ -42,17 +43,19 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 | Path (chezmoi source) | Purpose |
 |----------------------|---------|
 | `run_once_create-kitty-socket-dir.sh` | Creates `~/.local/share/kitty/` on first `chezmoi apply` (required for socket) |
+| `run_once_before_install-uv.sh` | Installs `uv` via mise (or curl fallback) on first `chezmoi apply` (required for kitty-query.py) |
 
 ### Tests (not deployed, in `.chezmoiignore`)
 
 | Path | Purpose |
 |------|---------|
 | `tests/kitty/conftest.py` | Shared pytest fixtures (realistic `kitty @ ls` JSON, session file samples) |
+| `tests/kitty/test_kitty_query.py` | Tests for kitty-query.py: 106 tests (unit + CLI integration) |
 | `tests/kitty/test_save_workspace.py` | Tests for `find_active_workspace` and `generate_session_file` |
 | `tests/kitty/test_load_snapshot.py` | Tests for `parse_session_file` |
 | `tests/kitty/test_roundtrip.py` | Round-trip tests: `generate_session_file` → `parse_session_file` → verify equivalence |
-| `pyproject.toml` | pytest configuration |
-| `.github/workflows/test.yml` | CI: runs `pytest tests/ -v` on push/PR (Python 3.9 + 3.12) |
+| `pyproject.toml` | Project config: pytest settings, dependency groups (pytest, typer, plumbum) |
+| `.github/workflows/test.yml` | CI: runs `uv run pytest tests/ -v` on push/PR (Python 3.12 + 3.13) |
 
 ### Storage (created at runtime)
 
@@ -62,16 +65,20 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 | `~/.local/share/opencode-kitty/{workspace}.seed` | Session IDs to restore from snapshot | One session ID per line (consumed on use) |
 | `~/.local/share/opencode-kitty/{workspace}.map.snapshot` | Backup of map at snapshot time | Same as .map |
 | `~/.local/share/kitty/workspace.log` | Debug log (when `KITTY_WORKSPACE_DEBUG=1`) | Timestamped log lines |
+| `/tmp/kitty-workspace.lock` | Prevents concurrent workspace creation (mkdir-based lock, 30s stale timeout) | Directory (presence = locked) |
 
 ### External Dependencies
 
 | Dependency | Used by | Purpose |
 |-----------|---------|---------|
 | Kitty 0.43+ | All | Sessions, `save_as_session`, `tab_bar_filter`, remote control. Discovered via `command -v kitty` (bash) or `shutil.which("kitty")` (Python). |
-| `sqlite3` | opencode-kitty | Queries opencode's session database |
-| `python3` | save-workspace.py, load-snapshot.py, kitty-workspace | JSON parsing, session file generation |
+| `uv` | kitty-workspace, opencode-kitty | Runs kitty-query.py with PEP 723 inline script metadata. Installed via `run_once_before_install-uv.sh`. |
+| `python3` 3.12+ | kitty-query.py, save-workspace.py, load-snapshot.py | All Python logic |
+| `typer` | kitty-query.py | CLI framework (auto-installed by uv from PEP 723 metadata) |
+| `plumbum` | kitty-query.py | Subprocess calls to ps, lsof (auto-installed by uv) |
+| `sqlite3` (stdlib) | kitty-query.py | Queries opencode's session database (parameterized queries, no SQL injection) |
 | `opencode` | opencode-kitty | `opencode db path`, `opencode --session` |
-| OpenCode SQLite DB | opencode-kitty | Session lookup (`~/.local/share/opencode/opencode.db`) |
+| OpenCode SQLite DB | kitty-query.py | Session lookup (`~/.local/share/opencode/opencode.db`) |
 
 ## Architecture
 
@@ -85,7 +92,7 @@ allow_remote_control socket-only
 listen_on unix:~/.local/share/kitty/control-socket
 ```
 
-Kitty appends `-{PID}` to the socket path at startup (e.g., `~/.local/share/kitty/control-socket-36767`). All scripts discover the socket via glob on `~/.local/share/kitty/control-socket-*`.
+Kitty appends `-{PID}` to the socket path at startup (e.g., `~/.local/share/kitty/control-socket-36767`). Scripts discover the socket via bash glob (`ls ~/.local/share/kitty/control-socket-* | head -1`) for speed, or via `kitty-query.py find-socket-cmd` in validate mode.
 
 The socket directory (`~/.local/share/kitty/`) must exist before Kitty starts. This is handled automatically by chezmoi via `run_once_create-kitty-socket-dir.sh`, which runs `mkdir -p ~/.local/share/kitty` on first apply.
 
@@ -124,9 +131,11 @@ Assign a keyboard shortcut via Settings > Keymap > External Tools > kitty-worksp
 ```mermaid
 flowchart TD
     A[PyCharm hotkey] --> B[kitty-workspace $ProjectFileDir$]
-    B --> S{Kitty running?}
+    B --> LK{Acquire lock}
+    LK -->|Locked by another instance| X[Exit immediately]
+    LK -->|Lock acquired| S{Kitty running?}
     S -->|Yes| C{Workspace OS window exists?}
-    S -->|No| T[open -a kitty, wait for socket]
+    S -->|No| T["open -a kitty, wait for socket<br/>capture default window ID"]
     T --> C
     C -->|Yes| D[Focus existing OS window]
     C -->|No| E{build_* function defined?}
@@ -136,12 +145,14 @@ flowchart TD
     H --> I[Launch opencode-kitty in opencode tab]
     I --> J{Snapshot exists?}
     J -->|Yes| K[restore_extra_tabs: add non-base tabs from snapshot]
-    J -->|No| L[Done]
+    J -->|No| L{Launched kitty fresh?}
     K --> L
     E -->|No| M[Fallback: shell tab + opencode tab]
-    D --> N[open -a kitty]
-    L --> N
-    M --> N
+    M --> L
+    L -->|Yes| CL[Close default startup window]
+    L -->|No| N[open -a kitty]
+    CL --> N
+    D --> N
 ```
 
 ### Data Flow: Snapshot Save (F16)
@@ -166,7 +177,7 @@ flowchart TD
     C --> P[Purge stale bindings from .map]
     P --> D{Binding in .map file?}
     D -->|Yes| E{Session still exists in DB?}
-    E -->|Yes| F[exec opencode --session ID]
+    E -->|Yes| F[opencode --session ID]
     E -->|No| G[Remove stale binding]
     D -->|No| H{Seed file exists?}
     H -->|Yes| I[Pick first unbound seeded session]
@@ -175,8 +186,12 @@ flowchart TD
     H -->|No| K[Query DB: most recent unbound session]
     K -->|Found| L[Write binding to .map]
     L --> F
-    K -->|None| M[exec opencode, new session]
+    K -->|None| M[opencode, new session]
     G --> H
+    F --> R{Exit code 0?}
+    M --> R
+    R -->|Yes| Z[Pane closes normally]
+    R -->|No| ERR["Show error, drop to bash shell"]
 ```
 
 ### opencode-kitty Session Resolution Priority
@@ -231,7 +246,9 @@ This matches the `build_dotfiles` pattern. Any project can be opened from PyChar
 
 ### Auto-Launch
 
-If Kitty is not running when the hotkey is pressed, the script launches it via `open -a kitty` and waits up to 15 seconds for the remote control socket to appear before proceeding.
+If Kitty is not running when the hotkey is pressed, the script launches it via `open -a kitty` and waits up to 15 seconds for the remote control socket to appear. When Kitty starts, it opens a default OS window. After the workspace is fully built, the script closes that default window (by ID captured at launch time) so only the workspace window remains.
+
+A `mkdir`-based lock at `/tmp/kitty-workspace.lock` prevents concurrent execution — if the hotkey fires multiple times in quick succession (keyboard bounce, PyCharm double-trigger), only the first invocation proceeds. Stale locks older than 30 seconds are automatically reclaimed.
 
 Commands are pre-typed into panes using `kitty @ send-text` without a trailing newline, so the user can review/edit before pressing Enter.
 
@@ -285,6 +302,25 @@ This restricts the tab bar to showing only tabs from the active Kitty session, p
 
 Note: This feature works with Kitty's native session system (loaded via `kitty --session`). Workspaces created via `kitty @` remote control are not formal Kitty sessions, so this filter has no effect on them currently. The setting is forward-looking for when the workspace system may adopt native session loading.
 
+### kitty-query.py: Shared Logic Module
+
+All workspace logic that was previously inline Python in bash scripts (or complex bash functions) is now consolidated in `~/.config/kitty/kitty-query.py`. This is a single-file Python module with:
+
+- **PEP 723 inline script metadata**: declares `typer` and `plumbum` as dependencies. `uv run --script` reads this metadata and auto-creates a cached venv on first run.
+- **Typer CLI**: 11 subcommands callable from bash (e.g., `uv run --script kitty-query.py find-oswin myproject < <(kitty @ ls)`)
+- **Pure functions**: All core algorithms are testable without mocking kitty or external processes
+- **Parameterized SQL**: Uses Python's `sqlite3` stdlib with `?` placeholders — no SQL injection risk (replacing the bash dynamic SQL string construction)
+- **Process detection**: Uses plumbum to call `ps` and `lsof` for active opencode process detection (replacing the bash temp-file-to-escape-subshell hack)
+
+The bash scripts (`kitty-workspace`, `opencode-kitty`) are now thin orchestrators that:
+1. Discover the socket via bash glob (`ls $SOCKET_GLOB | head -1`) for speed
+2. Query kitty state via `kitty @ ls | kitty-query.py <subcommand>`
+3. Issue `kitty @` remote control commands directly (launch, focus-tab, send-text)
+4. Delegate all data processing to `kitty-query.py`
+5. Log via inline bash (`echo >> $LOG_FILE`) — not via `kitty-query.py`, to avoid ~150ms overhead per `uv run` invocation
+
+Base tab names for snapshot restoration are passed from bash to Python as CLI arguments, eliminating the hardcoded `base_tabs` dict that previously had to be kept in sync manually.
+
 ## Design Decisions
 
 ### Why Programmatic Build Instead of Session Files
@@ -309,14 +345,14 @@ Server commands (`mise run local-prefect`, `marimo --watch notebooks/`, `make st
 2. Failed processes would close the pane (no `--hold` needed)
 3. Allows the user to see all workspace panes before committing to starting services
 
-### Why exec in opencode-kitty
+### Why No exec in opencode-kitty
 
-`opencode-kitty` uses `exec opencode --session ID` rather than `opencode --session ID` followed by post-exec cleanup. This is because:
+`opencode-kitty` runs `opencode --session ID` as a child process (not `exec`) and captures its exit code. This is because:
 
-1. When `kitty @ launch` runs a command as a pane's process, the pane closes when the process exits
-2. Without `exec`, the bash script would continue after opencode exits, do post-exec work, then exit -- closing the pane
-3. With `exec`, opencode replaces the bash process. The pane stays alive as long as opencode runs
-4. The tradeoff: post-exec binding for fresh sessions is lost. `opencode-kitty` handles this by falling back to "most recent session" on next launch
+1. With `exec`, opencode replaces the bash process. If opencode crashes, the pane closes immediately — the error message vanishes before you can read it
+2. Without `exec`, the script captures the exit code. On non-zero exit, it prints the error and drops to an interactive bash shell (`exec bash`), keeping the pane alive for debugging
+3. On clean exit (code 0), the script exits normally and the pane closes as expected
+4. The tradeoff vs `exec`: an extra bash process in the process tree while opencode runs. This is negligible
 
 ### Why User Variables for Workspace Detection
 
@@ -364,12 +400,12 @@ On workspace open, if a snapshot exists:
 Unit tests cover the pure-logic functions extracted from the kitty workspace scripts. Run with:
 
 ```bash
-# Create a venv (pytest is not installed system-wide)
-python3 -m venv /tmp/dotfiles-test-venv
-source /tmp/dotfiles-test-venv/bin/activate
-pip install pytest
+# Using uv (recommended — manages the venv and deps automatically)
+uv sync && uv run pytest tests/ -v
 
-# Run all tests
+# Or manually
+python3 -m venv .venv && source .venv/bin/activate
+pip install pytest typer plumbum
 pytest tests/ -v
 ```
 
@@ -379,10 +415,28 @@ Tests are in `tests/kitty/` and are excluded from chezmoi deployment via `.chezm
 
 | Function | File | Tests | Coverage |
 |----------|------|-------|----------|
+| `find_oswin_by_workspace(state, workspace)` | `kitty-query.py` | 8 | Match, missing, multi-workspace, empty state, no vars, edge cases |
+| `find_win_by_workspace(state, workspace)` | `kitty-query.py` | 5 | First window, missing, correct oswin, empty, no vars |
+| `detect_workspace_by_win(state, win_id)` | `kitty-query.py` | 8 | Direct match, sibling detection, multi-workspace, cross-boundary, unknown ID |
+| `list_all_win_ids(state)` | `kitty-query.py` | 4 | Single/multi workspace, empty state, no windows |
+| `parse_extra_tabs(snapshot, base_tabs)` | `kitty-query.py` | 11 | Base filtering, cwd, cmd, case-insensitive, unserialize-data, empty |
+| `find_socket()` | `kitty-query.py` | 3 | Found, not found, sorted order |
+| `parse_map_file(path)` / `write_map_file(path, data)` | `kitty-query.py` | 9 | Parse, comments, empty, roundtrip, special chars, nested dirs |
+| `compute_stale_bindings(bindings, live_ids)` | `kitty-query.py` | 5 | All live, all stale, mixed, empty inputs |
+| `query_sessions(db, dir, ...)` | `kitty-query.py` | 11 | Most recent, limit, exclude/only, archived, child, wrong project, combined |
+| `session_exists(db, id)` | `kitty-query.py` | 4 | Active, archived, nonexistent session/db |
+| `consume_seed(path, id)` | `kitty-query.py` | 4 | Removes exact match, preserves others, handles missing/empty |
+| `detect_active_opencode_pids(dir)` | `kitty-query.py` | 2 | No processes, ps failure |
+| `find_active_session_id(db, dir)` | `kitty-query.py` | 2 | No active, active returns latest |
+| `find_unbound_session_id(db, dir, map, ws)` | `kitty-query.py` | 4 | Finds unbound, no available, uses seed, excludes active |
+| `debug_log(msg, script)` | `kitty-query.py` | 3 | Debug enabled/disabled/unset |
+| CLI subcommands (typer CliRunner) | `kitty-query.py` | 23 | All 11 subcommands tested via CLI: find-oswin, find-win, detect-workspace, list-win-ids, parse-extra-tabs-cmd, find-socket-cmd, purge-stale, session-exists-cmd, query-sessions-cmd |
 | `find_active_workspace(state)` | `save-workspace.py` | 6 | Focused, multi-workspace, no workspace var, no focus, empty state, cross-tab |
 | `generate_session_file(oswin)` | `save-workspace.py` | 13 | Tab structure, active tab, shell filtering, fg process serialization, user vars, layouts (list/string), cwd, empty cases |
 | `parse_session_file(path)` | `load-snapshot.py` | 23 | Multi-tab, minimal, layouts, panes, cwds, commands, var args, titles, absolute/relative paths, focus_tab edge cases, comments, ignored directives, empty file, kitty-unserialize-data filtering |
 | Round-trip: `generate` → `parse` | Both | 12 | Tab count, titles, layouts, focus index, pane count, cwd, commands, user vars, empty, format validation |
+
+**Total: 160 tests**
 
 ### Test fixtures
 
@@ -391,6 +445,12 @@ Fixtures use realistic `kitty @ ls` JSON structures (see `tests/kitty/conftest.p
 - Multiple workspaces (2 OS windows)
 - Complex workspace (3 tabs, multiple panes, mixed processes, mixed layout types)
 - Edge cases (no workspace var, no focus, empty fg_procs)
+
+kitty-query.py tests additionally use:
+- SQLite databases with sessions (active, archived, child sessions across projects)
+- Map files (with comments, blank lines, special characters)
+- Seed files (for session restoration)
+- Snapshot files (with base tabs, extra tabs, kitty-unserialize-data tokens)
 
 ### Bugs caught by tests
 
@@ -434,11 +494,11 @@ KITTY_WORKSPACE_DEBUG=1 kitty-workspace /path/to/project
 tail -f ~/.local/share/kitty/workspace.log
 ```
 
-To enable permanently in PyCharm, add `KITTY_WORKSPACE_DEBUG=1` as an environment variable in the External Tool configuration.
+To enable permanently, temporarily add `export KITTY_WORKSPACE_DEBUG=1` near the top of `kitty-workspace` and/or `opencode-kitty` (after `set -uo pipefail`). Remove it when done debugging. Note: PyCharm's External Tool dialog does not expose an environment variables field, so the env var must be set either in the script itself or by wrapping the program call through `/bin/bash -c "KITTY_WORKSPACE_DEBUG=1 kitty-workspace ..."`.
 
 Log file: `~/.local/share/kitty/workspace.log`
 
-Both scripts log key decision points: socket discovery, workspace detection, session binding, stale purge actions, and build function dispatch.
+Logging uses inline bash (`echo >> file`) for zero overhead. Both scripts log key decision points: lock acquisition, socket discovery, workspace detection, session binding, stale purge actions, build function dispatch, and default window cleanup.
 
 ### Error Handling
 
@@ -474,7 +534,6 @@ All kitty-related scripts avoid hardcoded user or machine-specific paths:
 
 ### Future Work
 
-- **Extract inline Python from bash scripts**: 6 inline Python snippets in `kitty-workspace` and `opencode-kitty` duplicate logic (e.g., "find workspace by window ID" appears 3 times). Extracting into a shared `kitty-workspace-utils.py` module would eliminate duplication and make them testable. Note: snippet #3 (`restore_extra_tabs` parser) has the same `'kitty-unserialize-data` quoting fragility that was fixed in `load-snapshot.py` — it currently works because it uses `str.split()` instead of `shlex.split()`, preserving quotes, but is fragile.
 - **Periodic auto-snapshot**: launchd plist that calls `save-workspace.py` every N minutes
 - **Session switcher keybinding**: Map a key to quickly switch between workspaces (e.g., `kitty @ action goto_session`)
 - **Aerospace integration**: Auto-route workspace OS windows to specific Aerospace workspaces via `on-window-detected` rules

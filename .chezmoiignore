@@ -4,5 +4,8 @@
 docs/
 tests/
 pyproject.toml
+uv.lock
+.venv/
 README.md
 **/.DS_Store
+**/__pycache__/

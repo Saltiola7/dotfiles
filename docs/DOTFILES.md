@@ -176,13 +176,23 @@ Authentication is handled entirely by the 1Password SSH agent (`IdentityAgent`).
 
 ## Kitty Remote Control Socket
 
-Kitty's remote control socket is at `~/.local/share/kitty/control-socket` (Kitty appends `-{PID}` at startup, e.g. `control-socket-36767`). Workspace scripts discover it via glob:
+Kitty's remote control socket is at `~/.local/share/kitty/control-socket` (Kitty appends `-{PID}` at startup, e.g. `control-socket-36767`). Workspace scripts discover it via `kitty-query.py find-socket-cmd`.
 
 ```python
-SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
+# kitty-query.py uses glob internally
+SOCKET_GLOB = str(Path.home() / ".local" / "share" / "kitty" / "control-socket-*")
 ```
 
 The directory `~/.local/share/kitty/` must exist before Kitty starts. This is handled automatically by the chezmoi `run_once_create-kitty-socket-dir.sh` script on first `chezmoi apply`.
+
+## Python Dependencies (uv + PEP 723)
+
+The kitty workspace scripts depend on `kitty-query.py`, a shared Python module that uses [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare its dependencies (`typer`, `plumbum`). The `uv` tool reads this metadata and auto-manages a cached venv — no manual `pip install` needed.
+
+- **Bootstrap**: `run_once_before_install-uv.sh` installs `uv` via mise (or curl fallback) on first `chezmoi apply`
+- **Runtime**: bash scripts call `uv run --script ~/.config/kitty/kitty-query.py <subcommand>`
+- **Testing**: `uv sync && uv run pytest tests/ -v` installs test deps and runs all 161 tests
+- **CI**: GitHub Actions uses `astral-sh/setup-uv` and tests on Python 3.12 + 3.13
 
 ## What's NOT Managed
 

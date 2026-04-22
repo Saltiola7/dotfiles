@@ -19,26 +19,30 @@
 # Debugging:
 #   KITTY_WORKSPACE_DEBUG=1 kitty-workspace /path/to/project
 #   tail -f ~/.local/share/kitty/workspace.log
+#
+# Dependencies:
+#   - kitty-query.py (installed via chezmoi to ~/.config/kitty/kitty-query.py)
+#   - uv (for running kitty-query.py with inline dependencies)
 
 set -uo pipefail
 trap 'echo "kitty-workspace: error on line $LINENO" >&2' ERR
 
-# ── Logging ──
+# ── Shared tooling ──
 
-LOG_FILE="$HOME/.local/share/kitty/workspace.log"
-
-log() {
-    if [[ "${KITTY_WORKSPACE_DEBUG:-}" == "1" ]]; then
-        echo "[$(date '+%H:%M:%S')] kitty-workspace: $*" >> "$LOG_FILE"
-    fi
-}
-
-# ── Constants ──
-
+KQ="$HOME/.config/kitty/kitty-query.py"
 KITTY="$(command -v kitty || true)"
 SESSIONS_DIR="$HOME/.config/kitty/sessions"
 OC_STORAGE="$HOME/.local/share/opencode-kitty"
+LOG_FILE="$HOME/.local/share/kitty/workspace.log"
+LOCK_DIR="/tmp/kitty-workspace.lock"
 SOCKET_GLOB="$HOME/.local/share/kitty/control-socket-*"
+
+log() {
+    [[ "${KITTY_WORKSPACE_DEBUG:-}" == "1" ]] || return 0
+    echo "[$(date '+%H:%M:%S')] kitty-workspace: $*" >> "$LOG_FILE"
+}
+
+_find_socket() { ls $SOCKET_GLOB 2>/dev/null | head -1 || true; }
 
 # ── Validate mode ──
 
@@ -52,8 +56,23 @@ if [[ "${1:-}" == "--validate" ]]; then
         echo "  [FAIL] kitty binary: not found on PATH"
     fi
 
+    # uv
+    _uv=$(command -v uv || true)
+    if [[ -n "$_uv" ]]; then
+        echo "  [OK] uv: $_uv"
+    else
+        echo "  [FAIL] uv: not found on PATH"
+    fi
+
+    # kitty-query.py
+    if [[ -f "$KQ" ]]; then
+        echo "  [OK] kitty-query: $KQ"
+    else
+        echo "  [FAIL] kitty-query: $KQ (not found)"
+    fi
+
     # kitty socket
-    _socket=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+    _socket=$(_find_socket)
     if [[ -n "$_socket" ]]; then
         echo "  [OK] kitty socket: $_socket"
     else
@@ -124,15 +143,34 @@ if [[ -z "$KITTY" ]]; then
     exit 1
 fi
 
+# Prevent concurrent execution (race condition: multiple hotkey presses)
+cleanup_lock() { rmdir "$LOCK_DIR" 2>/dev/null || true; }
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+    # Another instance is running. Check if it's stale (>30s old).
+    if [[ -d "$LOCK_DIR" ]]; then
+        lock_age=$(( $(date +%s) - $(stat -f %m "$LOCK_DIR" 2>/dev/null || echo 0) ))
+        if [[ "$lock_age" -gt 30 ]]; then
+            rmdir "$LOCK_DIR" 2>/dev/null || true
+            mkdir "$LOCK_DIR" 2>/dev/null || { log "Lock contention, exiting"; exit 0; }
+        else
+            log "Another instance running (lock age=${lock_age}s), exiting"
+            exit 0
+        fi
+    fi
+fi
+trap cleanup_lock EXIT
+
 log "Starting: args=$*"
 
-SOCKET=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+SOCKET=$(_find_socket)
+LAUNCHED_KITTY=false
+DEFAULT_WIN=""
 if [[ -z "$SOCKET" ]]; then
     log "No socket found, launching kitty..."
     open -a kitty
     for _i in {1..30}; do
         sleep 0.5
-        SOCKET=$(ls $SOCKET_GLOB 2>/dev/null | head -1 || true)
+        SOCKET=$(_find_socket)
         [[ -n "$SOCKET" ]] && break
     done
     if [[ -z "$SOCKET" ]]; then
@@ -140,7 +178,18 @@ if [[ -z "$SOCKET" ]]; then
         echo "Is listen_on configured in kitty.conf?" >&2
         exit 1
     fi
-    log "Kitty launched, socket: $SOCKET"
+    LAUNCHED_KITTY=true
+    # Capture the default startup window so we can close it after workspace creation
+    DEFAULT_WIN=$($KITTY @ --to=unix:$SOCKET ls 2>/dev/null | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for oswin in data:
+    for tab in oswin.get('tabs', []):
+        for win in tab.get('windows', []):
+            print(win['id'])
+            sys.exit(0)
+" 2>/dev/null || true)
+    log "Kitty launched, socket: $SOCKET, default_win: $DEFAULT_WIN"
 else
     log "Socket: $SOCKET"
 fi
@@ -155,17 +204,7 @@ log "Project: $PROJECT_DIR ($BASENAME)"
 
 # ── Check if workspace OS window already exists ──
 
-OSWIN_ID=$($KITTY_RC ls 2>/dev/null | python3 -c "
-import json, sys
-target = sys.argv[1]
-data = json.load(sys.stdin)
-for oswin in data:
-    for tab in oswin.get('tabs', []):
-        for win in tab.get('windows', []):
-            if win.get('user_vars', {}).get('workspace') == target:
-                print(oswin['id'])
-                sys.exit(0)
-" "$BASENAME" 2>/dev/null || true)
+OSWIN_ID=$($KITTY_RC ls 2>/dev/null | uv run --script "$KQ" find-oswin "$BASENAME" 2>/dev/null || true)
 
 if [[ -n "$OSWIN_ID" ]]; then
     log "Existing workspace found (os_window=$OSWIN_ID), focusing"
@@ -312,74 +351,34 @@ build_dotfiles() {
 
 # ── Restore extra tabs from snapshot ──
 
+# Base tab names per workspace (passed to kitty-query parse-extra-tabs-cmd)
+# These must match the tabs created by the build_* functions above.
+base_tabs_for() {
+    case "$1" in
+        seo-data-science) echo "servers opencode" ;;
+        tsc)              echo "app flowbite opencode" ;;
+        dotfiles)         echo "shell opencode" ;;
+        *)                echo "$1 opencode" ;;  # generic fallback
+    esac
+}
+
 restore_extra_tabs() {
     local snapshot="$SESSIONS_DIR/${BASENAME}.snapshot.conf"
     [[ -f "$snapshot" ]] || return 0
 
     # Find the first window ID in the workspace (to anchor new tabs)
     local first_win
-    first_win=$($KITTY_RC ls 2>/dev/null | python3 -c "
-import json, sys
-target = sys.argv[1]
-data = json.load(sys.stdin)
-for oswin in data:
-    for tab in oswin.get('tabs', []):
-        for win in tab.get('windows', []):
-            if win.get('user_vars', {}).get('workspace') == target:
-                print(win['id'])
-                sys.exit(0)
-" "$BASENAME" 2>/dev/null || true)
+    first_win=$($KITTY_RC ls 2>/dev/null | uv run --script "$KQ" find-win "$BASENAME" 2>/dev/null || true)
 
     [[ -n "$first_win" ]] || return 0
 
     log "Restoring extra tabs from $snapshot (anchor=$first_win)"
 
-    # Parse snapshot for tabs that aren't part of the base definition
-    python3 -c "
-import sys, os
-
-snapshot_path = sys.argv[1]
-basename = sys.argv[2]
-
-# Known base tab titles per workspace
-base_tabs = {
-    'seo-data-science': {'servers', 'opencode'},
-    'tsc': {'app', 'flowbite', 'opencode'},
-    'dotfiles': {'shell', 'opencode'},
-}
-
-known = base_tabs.get(basename, set())
-# Case-insensitive matching for base tab names
-known_lower = {t.lower() for t in known}
-extra_tabs = []
-current_tab = None
-
-with open(snapshot_path) as f:
-    for line in f:
-        line = line.strip()
-        if line.startswith('new_tab'):
-            title = line[len('new_tab'):].strip() or 'tab'
-            current_tab = {'title': title, 'in_base': title.lower() in known_lower}
-        elif line.startswith('cd ') and current_tab and not current_tab['in_base']:
-            current_tab['cwd'] = line.split(None, 1)[1]
-        elif line.startswith('launch') and current_tab and not current_tab['in_base']:
-            # Extract command (skip kitty-unserialize-data and --var args)
-            parts = line.split()
-            cmd = []
-            for p in parts[1:]:
-                if p.startswith(\"'kitty-unserialize-data\") or p.startswith('--'):
-                    continue
-                cmd.append(p)
-            current_tab['cmd'] = cmd
-            extra_tabs.append(current_tab)
-            current_tab = None
-
-# Output extra tabs as: title|cwd|cmd
-for tab in extra_tabs:
-    cwd = tab.get('cwd', os.path.expanduser('~'))
-    cmd = ' '.join(tab.get('cmd', []))
-    print(f'{tab[\"title\"]}|{cwd}|{cmd}')
-" "$snapshot" "$BASENAME" | while IFS='|' read -r title cwd cmd; do
+    # Parse snapshot for tabs not in the base definition
+    local base
+    base=$(base_tabs_for "$BASENAME")
+    # shellcheck disable=SC2086
+    uv run --script "$KQ" parse-extra-tabs-cmd "$snapshot" $base 2>/dev/null | while IFS='|' read -r title cwd cmd; do
         if [[ -n "$cmd" ]]; then
             $KITTY_RC launch --type=tab --match "window_id:$first_win" \
                 --tab-title="$title" --cwd="$cwd" $cmd
@@ -409,6 +408,12 @@ else
 
     # Focus shell tab
     $KITTY_RC focus-tab --match "title:^${BASENAME}$" 2>/dev/null || true
+fi
+
+# Close kitty's default startup window if we launched kitty fresh
+if [[ "$LAUNCHED_KITTY" == "true" && -n "$DEFAULT_WIN" ]]; then
+    $KITTY_RC close-window --match "id:$DEFAULT_WIN" 2>/dev/null || true
+    log "Closed default startup window: $DEFAULT_WIN"
 fi
 
 open -a kitty

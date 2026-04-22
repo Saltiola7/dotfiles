@@ -1,6 +1,10 @@
 [project]
 name = "dotfiles"
-requires-python = ">=3.9"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[dependency-groups]
+test = ["pytest>=7.0", "typer", "plumbum"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
