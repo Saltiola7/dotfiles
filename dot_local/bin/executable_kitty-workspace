@@ -17,13 +17,13 @@
 
 set -euo pipefail
 
-KITTY="/Applications/kitty.app/Contents/MacOS/kitty"
+KITTY="$(command -v kitty)"
 SESSIONS_DIR="$HOME/.config/kitty/sessions"
 OC_STORAGE="$HOME/.local/share/opencode-kitty"
 
 # ── Find the kitty remote control socket ──
 
-SOCKET=$(ls /tmp/mykitty-* 2>/dev/null | head -1)
+SOCKET=$(ls ~/.local/share/kitty/control-socket-* 2>/dev/null | head -1)
 if [[ -z "$SOCKET" ]]; then
     echo "Error: No kitty socket found. Is kitty running with listen_on configured?" >&2
     exit 1
@@ -113,7 +113,7 @@ seed_opencode_sessions() {
 # ── Workspace definitions ──
 
 build_seo-data-science() {
-    local cwd="/Users/tis/MGM/git/seo-data-science"
+    local cwd="$HOME/MGM/git/seo-data-science"
 
     seed_opencode_sessions
 
@@ -132,7 +132,7 @@ build_seo-data-science() {
 }
 
 build_tsc() {
-    local cwd="/Users/tis/github/tsc"
+    local cwd="$HOME/github/tsc"
 
     seed_opencode_sessions
 
@@ -143,8 +143,8 @@ build_tsc() {
 
     # Tab 2: flowbite (two panes)
     local win2 win3
-    win2=$(add_tab "$win1" "flowbite" "/Users/tis/github/flowbite/flowbite-admin-dashboard-v2.2.0")
-    win3=$(add_vsplit "$win2" "/Users/tis/github/flowbite/flowbite-pro-marketing-ui-pages-main")
+    win2=$(add_tab "$win1" "flowbite" "$HOME/github/flowbite/flowbite-admin-dashboard-v2.2.0")
+    win3=$(add_vsplit "$win2" "$HOME/github/flowbite/flowbite-pro-marketing-ui-pages-main")
     type_cmd "$win2" "npm start"
     type_cmd "$win3" "npm start"
 
@@ -156,7 +156,7 @@ build_tsc() {
 }
 
 build_dotfiles() {
-    local cwd="/Users/tis/github/dotfiles"
+    local cwd="$HOME/github/dotfiles"
 
     seed_opencode_sessions
 

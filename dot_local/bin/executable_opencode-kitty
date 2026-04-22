@@ -34,10 +34,10 @@ done
 
 detect_workspace() {
     local socket
-    socket=$(ls /tmp/mykitty-* 2>/dev/null | head -1)
+    socket=$(ls ~/.local/share/kitty/control-socket-* 2>/dev/null | head -1)
     [[ -n "$socket" ]] || return 1
 
-    /Applications/kitty.app/Contents/MacOS/kitty @ --to=unix:"$socket" ls 2>/dev/null | python3 -c "
+    "$(command -v kitty)" @ --to=unix:"$socket" ls 2>/dev/null | python3 -c "
 import json, sys
 win_id = int(sys.argv[1])
 data = json.load(sys.stdin)

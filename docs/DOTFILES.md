@@ -182,11 +182,7 @@ Kitty's remote control socket is at `~/.local/share/kitty/control-socket` (Kitty
 SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
 ```
 
-The directory `~/.local/share/kitty/` must exist before Kitty starts. Create it if missing:
-
-```bash
-mkdir -p ~/.local/share/kitty
-```
+The directory `~/.local/share/kitty/` must exist before Kitty starts. This is handled automatically by the chezmoi `run_once_create-kitty-socket-dir.sh` script on first `chezmoi apply`.
 
 ## What's NOT Managed
 

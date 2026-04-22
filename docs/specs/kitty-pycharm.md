@@ -32,10 +32,16 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 
 | Path | Purpose | Status |
 |------|---------|--------|
-| `~/.local/bin/kitty-workspace` | Workspace launcher: focus or create project workspace (265 lines) | Experimental |
-| `~/.local/bin/opencode-kitty` | OpenCode session binding to Kitty window IDs (207 lines) | Experimental |
-| `~/.config/kitty/save-workspace.py` | F16 handler: snapshot workspace state per project (158 lines) | Experimental |
-| `~/.config/kitty/load-snapshot.py` | Snapshot parser for extra-tab restoration (221 lines) | Experimental |
+| `~/.local/bin/kitty-workspace` | Workspace launcher: focus or create project workspace | Experimental |
+| `~/.local/bin/opencode-kitty` | OpenCode session binding to Kitty window IDs | Experimental |
+| `~/.config/kitty/save-workspace.py` | F16 handler: snapshot workspace state per project | Experimental |
+| `~/.config/kitty/load-snapshot.py` | Snapshot parser for extra-tab restoration | Experimental |
+
+### Chezmoi Infrastructure
+
+| Path (chezmoi source) | Purpose |
+|----------------------|---------|
+| `run_once_create-kitty-socket-dir.sh` | Creates `~/.local/share/kitty/` on first `chezmoi apply` (required for socket) |
 
 ### Storage (created at runtime)
 
@@ -49,7 +55,7 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 
 | Dependency | Used by | Purpose |
 |-----------|---------|---------|
-| Kitty 0.43+ | All | Sessions, `save_as_session`, `tab_bar_filter`, remote control |
+| Kitty 0.43+ | All | Sessions, `save_as_session`, `tab_bar_filter`, remote control. Discovered via `command -v kitty` (bash) or `shutil.which("kitty")` (Python). |
 | `sqlite3` | opencode-kitty | Queries opencode's session database |
 | `python3` | save-workspace.py, load-snapshot.py, kitty-workspace | JSON parsing, session file generation |
 | `opencode` | opencode-kitty | `opencode db path`, `opencode --session` |
@@ -68,6 +74,8 @@ listen_on unix:~/.local/share/kitty/control-socket
 ```
 
 Kitty appends `-{PID}` to the socket path at startup (e.g., `~/.local/share/kitty/control-socket-36767`). All scripts discover the socket via glob on `~/.local/share/kitty/control-socket-*`.
+
+The socket directory (`~/.local/share/kitty/`) must exist before Kitty starts. This is handled automatically by chezmoi via `run_once_create-kitty-socket-dir.sh`, which runs `mkdir -p ~/.local/share/kitty` on first apply.
 
 `socket-only` restricts remote control to the unix socket -- programs running inside Kitty terminals cannot send remote control commands unless they connect to the socket explicitly. This is more secure than `allow_remote_control yes`.
 
@@ -91,7 +99,7 @@ Detection uses this marker to find existing workspaces and avoid duplicates. It 
 
 | Field | Value |
 |-------|-------|
-| Program | `/Users/tis/.local/bin/kitty-workspace` |
+| Program | `~/.local/bin/kitty-workspace` (expand `~` to your home directory) |
 | Arguments | `$ProjectFileDir$` |
 | Working directory | `$ProjectFileDir$` |
 
@@ -335,6 +343,20 @@ On workspace open, if a snapshot exists:
 6. **Ctrl+Shift+T in workspace**: New tab opens in project directory, not root
 7. **Multiple workspaces**: Each OS window is independent, no cross-contamination
 
+## Portability
+
+All kitty-related scripts avoid hardcoded user or machine-specific paths:
+
+| Concern | Approach |
+|---------|----------|
+| Kitty binary location | Discovered at runtime via `command -v kitty` (bash) or `shutil.which("kitty")` (Python) |
+| Home directory | `$HOME` in bash scripts; `os.path.expanduser("~")` in Python |
+| Project paths in `build_*` functions | Use `$HOME/...` rather than `/Users/tis/...` |
+| Socket directory creation | Automated by chezmoi `run_once_create-kitty-socket-dir.sh` |
+| PyCharm External Tool | User expands `~/.local/bin/kitty-workspace` to their home directory |
+
+**Note:** `open -a kitty` (used to bring Kitty to foreground) is macOS-specific. A Linux equivalent would use `wmctrl` or similar.
+
 ## Known Issues and Future Work
 
 ### Known Issues
@@ -347,5 +369,4 @@ On workspace open, if a snapshot exists:
 
 - **Periodic auto-snapshot**: launchd plist that calls `save-workspace.py` every N minutes
 - **Session switcher keybinding**: Map a key to quickly switch between workspaces (e.g., `kitty @ action goto_session`)
-- **Linux portability**: Replace `/Applications/kitty.app/Contents/MacOS/kitty` with `which kitty` and `open -a kitty` with `wmctrl` or equivalent
 - **Aerospace integration**: Auto-route workspace OS windows to specific Aerospace workspaces via `on-window-detected` rules

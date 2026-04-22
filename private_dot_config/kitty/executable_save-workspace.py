@@ -19,10 +19,11 @@ Usage:
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 
-KITTY = "/Applications/kitty.app/Contents/MacOS/kitty"
+KITTY = shutil.which("kitty")
 SESSIONS_DIR = os.path.expanduser("~/.config/kitty/sessions")
 OC_STORAGE = os.path.expanduser("~/.local/share/opencode-kitty")
 SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
@@ -147,7 +148,6 @@ def main():
     # We copy it as-is; kitty-workspace will seed from it on restore
     map_src = os.path.join(OC_STORAGE, f"{workspace}.map")
     if os.path.isfile(map_src):
-        import shutil
         map_dst = os.path.join(OC_STORAGE, f"{workspace}.map.snapshot")
         shutil.copy2(map_src, map_dst)
 

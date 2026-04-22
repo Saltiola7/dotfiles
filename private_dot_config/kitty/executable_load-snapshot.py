@@ -12,10 +12,11 @@ Usage:
 import glob
 import os
 import shlex
+import shutil
 import subprocess
 import sys
 
-KITTY = "/Applications/kitty.app/Contents/MacOS/kitty"
+KITTY = shutil.which("kitty")
 SOCKET_GLOB = os.path.expanduser("~/.local/share/kitty/control-socket-*")
 
 
