@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Check if we are inside a Tmux session
+if [ -n "$TMUX" ]; then
+    # Grab the current Tmux session name AND window name (e.g., "seo-dev-junie")
+    TMUX_CTX=$(tmux display-message -p '#S-#W')
+else
+    # Fallback if you run this outside of Tmux
+    TMUX_CTX="standalone-$(date +%s)"
+fi
+
+echo "Loading Junie context tied to Tmux tab: $TMUX_CTX"
+
+# Force Junie to use this specific Tmux tab's name as its memory bank!
+junie --session-id="$TMUX_CTX"

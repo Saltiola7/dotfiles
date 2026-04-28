@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Point Claude Code to an isolated configuration directory
+export CLAUDE_CONFIG_DIR="$HOME/.config/meridian/profiles/personal"
+
+# Prevent AWS Bedrock credentials and Bedrock models from interfering
+unset CLAUDE_CODE_USE_BEDROCK
+unset AWS_PROFILE
+unset AWS_REGION
+unset ANTHROPIC_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_HAIKU_MODEL
+
+exec claude "$@"
+
+

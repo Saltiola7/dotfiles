@@ -1,0 +1,4 @@
+#!/bin/bash
+export OPENAI_API_BASE=http://127.0.0.1:11434/v1
+export OPENAI_API_KEY=ollama
+exec aider --model openai/qwen-coder-text --no-show-model-warnings "$@"

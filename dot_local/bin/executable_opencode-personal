@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Unset AWS and Anthropic env vars so Meridian doesn't accidentally use Bedrock
+unset CLAUDE_CODE_USE_BEDROCK
+unset AWS_PROFILE
+unset AWS_REGION
+unset ANTHROPIC_MODEL
+unset ANTHROPIC_DEFAULT_SONNET_MODEL
+unset ANTHROPIC_DEFAULT_OPUS_MODEL
+unset ANTHROPIC_DEFAULT_HAIKU_MODEL
+
+# Force Meridian to use the 'personal' profile
+export MERIDIAN_DEFAULT_PROFILE="personal"
+
+# Force OpenCode to use the anthropic provider that goes through Meridian
+exec opencode --model "anthropic/claude-sonnet-4-6" "$@"
+
+
+

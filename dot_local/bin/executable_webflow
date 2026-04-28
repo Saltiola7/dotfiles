@@ -1,0 +1,10 @@
+#!/bin/zsh
+
+# Open Webflow
+open -a "/Users/tis/Applications/Chrome Apps.localized/Webflow.app"
+
+# Wait for Webflow to launch and settle
+sleep 0.2
+
+# Use osascript to send the toggle full screen shortcut to Webflow
+osascript -e 'tell application "System Events" to tell process "Webflow" to keystroke "f" using {command down, option down, shift down, control down}'
