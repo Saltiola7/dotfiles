@@ -14,7 +14,6 @@ tap "nikitabobko/tap"
 tap "petere/postgresql"
 tap "shopify/shopify"
 brew "openssl@3"
-brew "age"
 brew "libssh"
 brew "ansible"
 brew "jpeg-xl"
@@ -58,7 +57,6 @@ brew "libheif"
 brew "imagemagick"
 brew "jq"
 brew "openjdk"
-brew "kotlin"
 brew "leiningen"
 brew "libass"
 brew "libffi"
@@ -78,6 +76,7 @@ brew "netpbm"
 brew "nginx", restart_service: :changed
 brew "nmap"
 brew "node@20"
+brew "ollama"
 brew "openvino"
 brew "pandoc"
 brew "perl"
@@ -97,6 +96,7 @@ brew "rsync"
 brew "rtk"
 brew "ruby"
 brew "speedtest-cli"
+brew "sshpass"
 brew "starship"
 brew "syncthing"
 brew "tailscale"
@@ -129,10 +129,13 @@ cask "kitty"
 cask "loop"
 cask "ngrok"
 cask "obsidian"
+cask "opencode-desktop"
 cask "rustdesk"
 cask "shortcat"
 cask "speedify"
 cask "tailscale-app"
+cask "warp"
+cask "wave"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
 mas "Amphetamine", id: 937984704
@@ -147,10 +150,14 @@ mas "Mate Translate", id: 1005088137
 mas "PDF Expert", id: 1055273043
 mas "Prompt", id: 1594420480
 mas "Slack", id: 803453959
+mas "Strongbox", id: 1481853033
 mas "Telegram", id: 747648890
 mas "The Unarchiver", id: 425424353
 mas "WhatsApp", id: 310633997
 mas "Yoink", id: 457622435
 go "golang.org/x/tools/gopls"
 go "honnef.co/go/tools/cmd/staticcheck"
+uv "aider-chat", with: ["pip"]
+uv "graphifyy"
 uv "specify-cli"
+uv "xonsh[full]", with: ["xontrib-kitty"]

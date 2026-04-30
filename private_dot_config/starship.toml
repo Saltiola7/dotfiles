@@ -1,5 +1,16 @@
-[aws]
+# Move shell label to info line (before line break)
+format = """
+$all\
+$env_var_SHELL_LABEL\
+$line_break\
+$character"""
+
+[nodejs]
 disabled = true
 
-[gcloud]
+[shell]
 disabled = true
+
+[env_var.SHELL_LABEL]
+format = '[🐚 $env_value]($style) '
+style = 'white bold'

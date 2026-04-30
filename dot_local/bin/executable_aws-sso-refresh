@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# aws-sso-refresh <profile>
+#
+# Idempotent AWS SSO token refresh invoked from a launchd LaunchAgent.
+# See docs/specs/aws_creds.md in the dotfiles repo for design.
+#
+# Model:
+#   - aws sso login ALWAYS starts a fresh OIDC flow (browser-based).
+#   - If the browser's myapps.microsoft.com session cookie is live, the flow
+#     completes silently in ~2–4s (browser flash, auto-close).
+#   - If Microsoft requires fresh auth (password/MFA), elapsed time balloons
+#     to 20s+ and the user must interact.
+#   - Access token (~1h) is silently renewed by AWS SDKs during API calls
+#     using the refreshToken, so Bedrock usage doesn't hit the browser even
+#     though accessToken.expiresAt appears short.
+#
+# Behaviour:
+#   - Logs cache metadata as informational context (access token remaining,
+#     presence of refreshToken, client registration expiry).
+#   - Invokes `aws sso login`, timing the call.
+#   - Emits a macOS notification only when elapsed time exceeds the
+#     "likely required MFA" threshold, or when the command fails outright.
+#     Successful silent refreshes stay quiet.
+
+set -u
+set -o pipefail
+
+profile="${1:?usage: aws-sso-refresh <profile>}"
+
+AWS_BIN="/usr/local/bin/aws"
+CACHE_DIR="$HOME/.aws/sso/cache"
+PY="/usr/bin/python3"
+
+# Elapsed-time heuristic (seconds). Silent Microsoft-session passthrough
+# typically completes in < 8s; anything longer almost certainly involved
+# user interaction (MFA prompt).
+MFA_THRESHOLD=15
+
+log() {
+    printf '%s [aws-sso-refresh] %s\n' "$(date -Iseconds)" "$*"
+}
+
+notify() {
+    /usr/bin/osascript -e "display notification \"$1\" with title \"AWS SSO\" subtitle \"$profile\"" 2>/dev/null || true
+}
+
+# ----- Pre-check (informational; does NOT gate the login) -----
+
+access_remaining_min="unknown"
+refresh_present="unknown"
+registration_remaining_days="unknown"
+
+if [[ -d "$CACHE_DIR" ]]; then
+    token_file=""
+    for f in "$CACHE_DIR"/*.json; do
+        [[ -f "$f" ]] || continue
+        if /usr/bin/grep -l '"accessToken"' "$f" >/dev/null 2>&1; then
+            token_file="$f"
+            break
+        fi
+    done
+
+    if [[ -n "$token_file" ]]; then
+        read -r access_remaining_min refresh_present <<< "$("$PY" -c "
+import json
+from datetime import datetime, timezone
+try:
+    with open('$token_file') as fh:
+        d = json.load(fh)
+    exp = datetime.fromisoformat(d['expiresAt'].replace('Z', '+00:00'))
+    rem = int((exp - datetime.now(timezone.utc)).total_seconds() / 60)
+    has_refresh = 'yes' if d.get('refreshToken') else 'no'
+    print(rem, has_refresh)
+except Exception as e:
+    print('parse-error', 'unknown')
+" 2>/dev/null)"
+    fi
+
+    # Client registration (the other cache file) — ~90 day lifetime
+    for f in "$CACHE_DIR"/*.json; do
+        [[ -f "$f" ]] || continue
+        if ! /usr/bin/grep -q '"accessToken"' "$f" 2>/dev/null; then
+            registration_remaining_days=$("$PY" -c "
+import json
+from datetime import datetime, timezone
+try:
+    with open('$f') as fh:
+        d = json.load(fh)
+    exp = datetime.fromisoformat(d['expiresAt'].replace('Z', '+00:00'))
+    rem = int((exp - datetime.now(timezone.utc)).total_seconds() / 86400)
+    print(rem)
+except Exception:
+    print('parse-error')
+" 2>/dev/null)
+            break
+        fi
+    done
+fi
+
+log "pre-check: access=${access_remaining_min}m refresh=${refresh_present} client-reg=${registration_remaining_days}d"
+
+# ----- Invoke aws sso login with timing -----
+
+if [[ ! -x "$AWS_BIN" ]]; then
+    log "error: $AWS_BIN not found or not executable — aborting"
+    notify "aws CLI not found — SSO refresh skipped"
+    exit 1
+fi
+
+log "invoking: $AWS_BIN sso login --profile $profile"
+start_epoch=$(/bin/date +%s)
+"$AWS_BIN" sso login --profile "$profile"
+rc=$?
+end_epoch=$(/bin/date +%s)
+elapsed=$(( end_epoch - start_epoch ))
+
+if [[ $rc -ne 0 ]]; then
+    log "error: aws sso login exited $rc after ${elapsed}s"
+    notify "SSO login failed (exit $rc)"
+    exit $rc
+fi
+
+if (( elapsed >= MFA_THRESHOLD )); then
+    log "done in ${elapsed}s — MFA likely required (≥${MFA_THRESHOLD}s threshold)"
+    notify "Browser MFA completed (${elapsed}s)"
+else
+    log "done in ${elapsed}s — silent refresh (Microsoft session passthrough)"
+fi
+
+exit 0

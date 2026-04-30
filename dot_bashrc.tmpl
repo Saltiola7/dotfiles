@@ -59,6 +59,7 @@ if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
     [ -f ~/.fzf.bash ] && source ~/.fzf.bash
 
     # Starship prompt (overrides oh-my-bash prompt)
+    export SHELL_LABEL="bash ${BASH_VERSION%%(*}"
     eval "$(starship init bash)"
 fi
 

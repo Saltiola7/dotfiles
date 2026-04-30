@@ -1,0 +1,249 @@
+# Xonsh Run Control File
+# Ported from dot_common_profile.tmpl, dot_zprofile.tmpl, and dot_zshrc.tmpl
+# Syntax: xonsh (Python superset) — NOT POSIX shell
+
+import shutil
+from pathlib import Path
+
+# ── PATH Setup ────────────────────────────────────────────────────────────────
+# Homebrew (must be early for brew commands to work)
+$PATH.insert(0, '/opt/homebrew/sbin')
+$PATH.insert(0, '/opt/homebrew/bin')
+
+# Homebrew shellenv variables
+$HOMEBREW_PREFIX = '/opt/homebrew'
+$HOMEBREW_CELLAR = '/opt/homebrew/Cellar'
+$HOMEBREW_REPOSITORY = '/opt/homebrew'
+$MANPATH = ['/opt/homebrew/share/man'] + @.env.get('MANPATH', [])
+$INFOPATH = ['/opt/homebrew/share/info'] + @.env.get('INFOPATH', [])
+
+# MacPorts
+$PATH.insert(0, '/opt/local/sbin')
+$PATH.insert(0, '/opt/local/bin')
+
+# Python framework
+$PATH.insert(0, '/Library/Frameworks/Python.framework/Versions/3.12/bin')
+$PATH.insert(0, '/Library/Frameworks/Python.framework/Versions/3.13/bin')
+
+# Local bin
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.local/bin')
+
+# Cargo / Rust
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.cargo/bin')
+
+# .NET tools
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.dotnet/tools')
+
+# Volta (Node version manager)
+$VOLTA_HOME = '{{ .chezmoi.homeDir }}/.volta'
+$PATH.insert(0, $VOLTA_HOME + '/bin')
+
+# NPM global (static path to avoid slow npm subprocess at startup)
+# If this path changes, update it manually or use: $(npm config get prefix)/bin
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.volta/bin')
+
+# Ruby
+$PATH.insert(0, '/opt/homebrew/opt/ruby/bin')
+$PATH.insert(0, '/opt/homebrew/lib/ruby/gems/4.0.0/bin')
+
+# Homebrew PHP
+$PATH.insert(0, '/opt/homebrew/opt/php@8.2/bin')
+$PATH.insert(0, '/opt/homebrew/opt/php@8.2/sbin')
+
+# Homebrew Postgres
+$PATH.insert(0, '/opt/homebrew/opt/postgresql@16/bin')
+$PATH.insert(0, '/opt/homebrew/opt/postgresql@17/bin')
+$PATH.insert(0, '/opt/homebrew/opt/libpq/bin')
+
+# Antigravity
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.antigravity/antigravity/bin')
+
+# Modular / Mojo
+$MODULAR_HOME = '{{ .chezmoi.homeDir }}/.modular'
+$PATH.insert(0, '{{ .chezmoi.homeDir }}/.modular/pkg/packages.modular.com_mojo/bin')
+
+# Google Cloud SDK — add to PATH if installed
+_gcloud_path = Path('{{ .chezmoi.homeDir }}/google-cloud-sdk/bin')
+if _gcloud_path.exists():
+    $PATH.insert(0, str(_gcloud_path))
+
+# Trailing PATH entries (low priority — append)
+$PATH.append('{{ .chezmoi.homeDir }}/.cache/lm-studio/bin')
+$PATH.append('{{ .chezmoi.homeDir }}/abctl')
+$PATH.append('{{ .chezmoi.homeDir }}/Library/Application Support/JetBrains/Toolbox/scripts')
+$PATH.append('/Applications/KeePassXC.app/Contents/MacOS')
+$PATH.append('/Applications/Screaming Frog SEO Spider.app/Contents/MacOS')
+$PATH.append('/Applications/Obsidian.app/Contents/MacOS')
+
+# ── Environment Variables ─────────────────────────────────────────────────────
+$EDITOR = 'nvim'
+$VISUAL = 'nvim'
+$USE_GKE_GCLOUD_AUTH_PLUGIN = 'True'
+$PKG_CONFIG_PATH = '/opt/homebrew/opt/openblas/lib/pkgconfig'
+$CARAPACE_BRIDGES = 'zsh,fish,bash,inshellisense'
+
+# 1Password SSH agent
+$SSH_AUTH_SOCK = '{{ .chezmoi.homeDir }}/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock'
+
+# ── Xonsh Settings ───────────────────────────────────────────────────────────
+$XONSH_SHOW_TRACEBACK = True
+$XONSH_HISTORY_BACKEND = 'sqlite'
+$AUTO_CD = True
+$COMPLETIONS_CONFIRM = True
+$XONSH_HISTORY_MATCH_ANYWHERE = True
+
+# Shell label for starship prompt (zero-cost: set once, read by env_var module)
+import xonsh as _xonsh_mod
+$SHELL_LABEL = f'xonsh {_xonsh_mod.__version__}'
+
+# ── Aliases ───────────────────────────────────────────────────────────────────
+aliases |= {
+    'vim': 'nvim',
+    'python': 'python3',
+    'py': 'python3',
+    'sf': '/Applications/Screaming Frog SEO Spider.app/Contents/MacOS/ScreamingFrogSEOSpiderLauncher',
+}
+
+# ClickHouse alias (uses 1Password CLI for host)
+def _ch_alias(args, stdin=None):
+    _host = $(op read 'op://Personal/ClickHouse Cloud/host').strip()
+    $[clickhouse client --host @(_host) --secure --password @(args)]
+
+aliases['ch'] = _ch_alias
+
+# ── Secrets (lazy-loaded via 1Password CLI) ───────────────────────────────────
+# Run 'secret' to load all secrets into the current shell session.
+# Secrets are cached in memory — only one biometric prompt per session.
+_secrets_loaded = False
+
+def _load_secrets(args=None, stdin=None):
+    global _secrets_loaded
+    if _secrets_loaded:
+        print('Secrets already loaded.')
+        return 0
+
+    print('Loading secrets from 1Password...')
+    try:
+        $GEMINI_API_KEY = $(op read 'op://Personal/Gemini API Key/credential').strip()
+        $GEMINI_DEEP_RESEARCH_API_KEY = $GEMINI_API_KEY
+        $GOOGLE_GENERATIVE_AI_API_KEY = $(op read 'op://Personal/Google AI API Key/credential').strip()
+        $OPENAI_API_KEY = $(op read 'op://Personal/OpenAI API Key/credential').strip()
+        $AWS_PROFILE = $(op read 'op://Personal/AWS Bedrock/profile').strip()
+        $AWS_REGION = $(op read 'op://Personal/AWS Bedrock/region').strip()
+        $CLAUDE_CODE_USE_BEDROCK = '1'
+
+        # GCP Service Account
+        import os
+        os.makedirs(os.path.expanduser('~/.cache/gcp'), exist_ok=True)
+        _sa_path = os.path.expanduser('~/.cache/gcp/enterprise-seo-tools-sa.json')
+        with open(_sa_path, 'w') as f:
+            f.write($(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/credential'))
+        os.chmod(_sa_path, 0o600)
+        $GOOGLE_APPLICATION_CREDENTIALS = _sa_path
+        $GOOGLE_VERTEX_PROJECT = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/project').strip()
+        $GOOGLE_VERTEX_LOCATION = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/location').strip()
+        $GOOGLE_CLOUD_PROJECT = $GOOGLE_VERTEX_PROJECT
+
+        # SEO Data Science (MGM)
+        $CLICKHOUSE_HOST = $(op read 'op://Personal/ClickHouse MGM Cloud/host').strip()
+        $CLICKHOUSE_USER = $(op read 'op://Personal/ClickHouse MGM Cloud/user').strip()
+        $CLICKHOUSE_PORT = $(op read 'op://Personal/ClickHouse MGM Cloud/port').strip()
+        $CLICKHOUSE_PASSWORD = $(op read 'op://Personal/ClickHouse MGM Cloud/password').strip()
+        $SEMRUSH_API = $(op read 'op://Personal/SEMRUSH API/credential').strip()
+        $SEMRUSH_ENTERPRISE_API = $(op read 'op://Personal/SEMRUSH API/enterprise').strip()
+        $PAGESPEED_API_KEY = $(op read 'op://Personal/PageSpeed API/credential').strip()
+        $AI_STUDIO_KEY = $GOOGLE_GENERATIVE_AI_API_KEY
+        $GCS_AKAMAI_ACCESS_KEY = $(op read 'op://Personal/Akamai GCS HMAC/access_key').strip()
+        $GCS_AKAMAI_SECRET_KEY = $(op read 'op://Personal/Akamai GCS HMAC/secret_key').strip()
+        $GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC = $(op read 'op://Personal/GitHub PAT Classic/credential').strip()
+        $ATLASSIAN_API = $(op read 'op://Personal/Atlassian API Token/credential').strip()
+        $ROVODEV = $ATLASSIAN_API
+        $EMAIL = $(op read 'op://Personal/Atlassian API Token/email').strip()
+        $ATLASSIAN_URL = $(op read 'op://Personal/Atlassian API Token/url').strip()
+
+        # GWS Content Reader SA
+        _gws_path = os.path.expanduser('~/.cache/gcp/gws-content-reader-key.json')
+        with open(_gws_path, 'w') as f:
+            f.write($(op read 'op://Personal/GCP Service Account - GWS Content Reader/credential'))
+        os.chmod(_gws_path, 0o600)
+        $GWS_CONTENT_READER_CREDENTIALS = _gws_path
+
+        _secrets_loaded = True
+        print('Secrets loaded.')
+        return 0
+    except Exception as e:
+        print(f'Failed to load secrets — is 1Password unlocked?\n{e}')
+        return 1
+
+aliases['secret'] = _load_secrets
+
+# ── Interactive-only Configuration ────────────────────────────────────────────
+if $XONSH_INTERACTIVE:
+
+    # Direnv (per-directory env) — inline hook replacing xonsh-direnv xontrib
+    # which crashes on blocked .envrc (CalledProcessError on non-zero exit)
+    if shutil.which('direnv'):
+        import json as _json
+        from pathlib import PurePath as _PurePath
+
+        def _direnv_hook():
+            try:
+                _out = $(direnv export json 2>/dev/null)
+            except Exception:
+                return
+            if _out and _out.strip():
+                _changes = _json.loads(_out)
+                with __xonsh__.env.swap(UPDATE_OS_ENVIRON=True):
+                    for k, v in _changes.items():
+                        if v is None:
+                            __xonsh__.env.pop(k, None)
+                        else:
+                            __xonsh__.env[k] = v
+
+        @events.on_post_init
+        def _direnv_post_init(**kwargs):
+            _direnv_hook()
+
+        @events.on_chdir
+        def _direnv_chdir(olddir=None, newdir=None, **kwargs):
+            _cur = @.env.get('DIRENV_DIR')
+            if _cur is not None:
+                _ddir = _PurePath(_cur.lstrip('-'))
+                _new = _PurePath(newdir).resolve() if newdir else _PurePath.cwd()
+                if not set(_ddir.parts).issubset(_new.parts):
+                    _direnv_hook()
+            else:
+                _direnv_hook()
+
+        @events.on_postcommand
+        def _direnv_postcommand(**kwargs):
+            _direnv_hook()
+
+        _direnv_hook()  # initial load for current directory
+
+    # Kitty terminal integration (icat, diff, clipboard aliases + matplotlib inline)
+    if @.env.get('TERM', '') == 'xterm-kitty':
+        import warnings as _warnings
+        with _warnings.catch_warnings():
+            _warnings.filterwarnings('ignore', category=DeprecationWarning, module='xontrib_kitty')
+            xontrib load kitty
+
+    # Atuin (shell history)
+    if shutil.which('atuin'):
+        execx($(atuin init xonsh))
+
+    # Zoxide (smart cd)
+    if shutil.which('zoxide'):
+        execx($(zoxide init xonsh), 'exec', __xonsh__.ctx, filename='zoxide')
+
+    # Mise (runtime version manager)
+    if shutil.which('mise'):
+        execx($(mise activate xonsh))
+
+    # Carapace (completion engine)
+    if shutil.which('carapace'):
+        execx($(carapace _carapace xonsh))
+
+    # Starship prompt (load last so it can see all PATH/env changes)
+    if shutil.which('starship'):
+        execx($(starship init xonsh))

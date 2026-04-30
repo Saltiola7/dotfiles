@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# npm-global-packages.txt hash: {{ include "npm-global-packages.txt" | sha256sum }}
+
+if command -v npm &> /dev/null; then
+    echo "Installing global npm packages from npm-global-packages.txt..."
+    while read -r package; do
+        if [[ -n "$package" && ! "$package" =~ ^# ]]; then
+            echo "Installing $package..."
+            npm install -g "$package"
+        fi
+    done < "{{ joinPath .chezmoi.sourceDir "npm-global-packages.txt" }}"
+else
+    echo "npm not found. Skipping global npm packages installation."
+fi

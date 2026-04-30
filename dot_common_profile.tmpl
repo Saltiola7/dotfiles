@@ -103,6 +103,34 @@ secret() {
   export AWS_PROFILE="$(op read 'op://Personal/AWS Bedrock/profile')" && \
   export AWS_REGION="$(op read 'op://Personal/AWS Bedrock/region')" && \
   export CLAUDE_CODE_USE_BEDROCK=1 && \
+  # --- GCP Service Account ---
+  mkdir -p "$HOME/.cache/gcp" && \
+  op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/credential' > "$HOME/.cache/gcp/enterprise-seo-tools-sa.json" && \
+  chmod 600 "$HOME/.cache/gcp/enterprise-seo-tools-sa.json" && \
+  export GOOGLE_APPLICATION_CREDENTIALS="$HOME/.cache/gcp/enterprise-seo-tools-sa.json" && \
+  export GOOGLE_VERTEX_PROJECT="$(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/project')" && \
+  export GOOGLE_VERTEX_LOCATION="$(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/location')" && \
+  export GOOGLE_CLOUD_PROJECT="$GOOGLE_VERTEX_PROJECT" && \
+  # --- SEO Data Science (MGM) ---
+  export CLICKHOUSE_HOST="$(op read 'op://Personal/ClickHouse MGM Cloud/host')" && \
+  export CLICKHOUSE_USER="$(op read 'op://Personal/ClickHouse MGM Cloud/user')" && \
+  export CLICKHOUSE_PORT="$(op read 'op://Personal/ClickHouse MGM Cloud/port')" && \
+  export CLICKHOUSE_PASSWORD="$(op read 'op://Personal/ClickHouse MGM Cloud/password')" && \
+  export SEMRUSH_API="$(op read 'op://Personal/SEMRUSH API/credential')" && \
+  export SEMRUSH_ENTERPRISE_API="$(op read 'op://Personal/SEMRUSH API/enterprise')" && \
+  export PAGESPEED_API_KEY="$(op read 'op://Personal/PageSpeed API/credential')" && \
+  export AI_STUDIO_KEY="$GOOGLE_GENERATIVE_AI_API_KEY" && \
+  export GCS_AKAMAI_ACCESS_KEY="$(op read 'op://Personal/Akamai GCS HMAC/access_key')" && \
+  export GCS_AKAMAI_SECRET_KEY="$(op read 'op://Personal/Akamai GCS HMAC/secret_key')" && \
+  export GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC="$(op read 'op://Personal/GitHub PAT Classic/credential')" && \
+  export ATLASSIAN_API="$(op read 'op://Personal/Atlassian API Token/credential')" && \
+  export ROVODEV="$ATLASSIAN_API" && \
+  export EMAIL="$(op read 'op://Personal/Atlassian API Token/email')" && \
+  export ATLASSIAN_URL="$(op read 'op://Personal/Atlassian API Token/url')" && \
+  # --- GWS Content Reader SA (materialized for file-path consumers) ---
+  op read 'op://Personal/GCP Service Account - GWS Content Reader/credential' > "$HOME/.cache/gcp/gws-content-reader-key.json" && \
+  chmod 600 "$HOME/.cache/gcp/gws-content-reader-key.json" && \
+  export GWS_CONTENT_READER_CREDENTIALS="$HOME/.cache/gcp/gws-content-reader-key.json" && \
   _SECRETS_LOADED=1 && \
   echo "Secrets loaded." || echo "Failed to load secrets — is 1Password unlocked?"
 }

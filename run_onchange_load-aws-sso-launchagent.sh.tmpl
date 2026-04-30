@@ -1,0 +1,40 @@
+#!/bin/bash
+# Load the AWS SSO LaunchAgent. Re-runs whenever the plist or wrapper changes.
+#
+# plist hash:   {{ include "private_Library/LaunchAgents/com.mgm.aws-sso-login.plist.tmpl" | sha256sum }}
+# wrapper hash: {{ include "dot_local/bin/executable_aws-sso-refresh" | sha256sum }}
+
+set -u
+
+# Darwin-only: silently exit on other OSes so `chezmoi apply` stays green.
+if [[ "$(uname)" != "Darwin" ]]; then
+    exit 0
+fi
+
+PLIST="$HOME/Library/LaunchAgents/com.mgm.aws-sso-login.plist"
+LABEL="com.mgm.aws-sso-login"
+LOG_DIR="$HOME/Library/Logs"
+
+# Ensure the log directory exists (plist points StandardOutPath here).
+mkdir -p "$LOG_DIR"
+
+if [[ ! -f "$PLIST" ]]; then
+    echo "[aws-sso-launchagent] plist not yet installed at $PLIST — skipping"
+    exit 0
+fi
+
+# Unload if already loaded, ignoring errors (fresh machine: not loaded yet).
+if /bin/launchctl list | /usr/bin/grep -q "$LABEL"; then
+    echo "[aws-sso-launchagent] unloading existing agent"
+    /bin/launchctl unload "$PLIST" 2>/dev/null || true
+fi
+
+echo "[aws-sso-launchagent] loading $PLIST"
+if /bin/launchctl load "$PLIST"; then
+    echo "[aws-sso-launchagent] loaded; next runs at 08:00 / 15:59 / 22:45 local"
+else
+    rc=$?
+    echo "[aws-sso-launchagent] warning: launchctl load exited $rc (chezmoi apply continues)"
+fi
+
+exit 0

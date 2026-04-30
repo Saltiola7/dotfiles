@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Catppuccin Mocha Lavender theme for Zen Browser
+# This script deploys theme files to all Zen Browser profiles.
+# It re-runs automatically when any theme file changes.
+#
+# userChrome.css hash: {{ include "zen-catppuccin-mocha/userChrome.css" | sha256sum }}
+# userContent.css hash: {{ include "zen-catppuccin-mocha/userContent.css" | sha256sum }}
+# zen-logo-mocha.svg hash: {{ include "zen-catppuccin-mocha/zen-logo-mocha.svg" | sha256sum }}
+
+{{ if eq .chezmoi.os "darwin" -}}
+ZEN_PROFILES="$HOME/Library/Application Support/zen/Profiles"
+THEME_DIR="{{ joinPath .chezmoi.sourceDir "zen-catppuccin-mocha" }}"
+
+if [ ! -d "$ZEN_PROFILES" ]; then
+    echo "Zen Browser profiles directory not found at $ZEN_PROFILES. Skipping."
+    exit 0
+fi
+
+found=0
+for profile in "$ZEN_PROFILES"/*/; do
+    [ -d "$profile" ] || continue
+    echo "Installing Catppuccin Mocha Lavender to: $profile"
+    mkdir -p "$profile/chrome"
+    cp "$THEME_DIR/userChrome.css" "$profile/chrome/userChrome.css"
+    cp "$THEME_DIR/userContent.css" "$profile/chrome/userContent.css"
+    cp "$THEME_DIR/zen-logo-mocha.svg" "$profile/chrome/zen-logo-mocha.svg"
+    found=$((found + 1))
+done
+
+if [ "$found" -eq 0 ]; then
+    echo "No Zen Browser profiles found. Skipping."
+else
+    echo "Catppuccin Mocha Lavender installed to $found profile(s)."
+    echo "Restart Zen Browser to apply the theme."
+fi
+{{ else -}}
+echo "Zen Browser theme installation is only supported on macOS. Skipping."
+{{ end -}}

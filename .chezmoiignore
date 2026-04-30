@@ -1,5 +1,7 @@
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
+Library/LaunchAgents/com.mgm.aws-sso-login.plist
+.local/bin/aws-sso-refresh
 {{ end }}
 docs/
 tests/
@@ -9,3 +11,5 @@ uv.lock
 README.md
 **/.DS_Store
 **/__pycache__/
+zen-catppuccin-mocha/
+interactive_installers.sh

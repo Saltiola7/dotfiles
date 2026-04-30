@@ -1,0 +1,20 @@
+#!/bin/bash
+# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+# Runs before other chezmoi scripts to ensure Homebrew packages are installed.
+# Re-runs automatically when the Brewfile changes.
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "Skipping brew bundle on non-macOS." >&2
+exit 0
+{{ end -}}
+
+if ! command -v brew &>/dev/null; then
+    echo "Homebrew not found. Install it first: https://brew.sh" >&2
+    exit 0
+fi
+
+echo "Running brew bundle..."
+brew bundle --file="{{ .chezmoi.sourceDir }}/Brewfile" || {
+    echo "brew bundle completed with some failures (this is normal for MAS apps)." >&2
+    exit 0
+}
