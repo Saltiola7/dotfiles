@@ -182,3 +182,51 @@ launchctl list | grep com.mgm.aws-sso-login
 # 4. Token is valid after refresh
 aws sts get-caller-identity --profile BedrockDeveloperAccess-302432775606
 ```
+
+## SketchyBar Integration
+
+**Added:** 2026-05-01
+
+The SketchyBar status bar includes an AWS Bedrock token indicator that provides real-time visibility and automatic recovery.
+
+### Indicator States
+
+| Color | Label | Meaning |
+|---|---|---|
+| Green `#a6e3a1` | `15:59 ~6h` | Active. Activated at 15:59, ~6h estimated remaining. |
+| Yellow `#f9e2af` | `15:59 ~3h` | Getting low (2-4h remaining) |
+| Peach `#fab387` | `15:59 ~1h` | Low (1-2h remaining) |
+| Red `#f38ba8` | `15:59 ~30m` | Very low (<1h remaining) |
+| Yellow `#f9e2af` | `renew...` | Auto-recovery in progress |
+| Green `#a6e3a1` | `renewed` | Silent recovery succeeded |
+| Red `#f38ba8` | `auth` | Microsoft session expired, Zen Browser opened for manual re-auth |
+| Gray `#6c7086` | `off` | Outside work hours (00:00-08:00) |
+
+### Architecture: launchd + SketchyBar
+
+```
+launchd (proactive, scheduled):
+  08:00, 15:59, 22:45 → aws-sso-refresh → aws sso login
+
+SketchyBar (reactive, every 60s):
+  aws sts get-caller-identity
+    ├─ Success → parse log for login time → show countdown
+    └─ Failure → token expired
+         ├─ 00:00-08:00 → show "off", no recovery
+         └─ 08:00-00:00 → try silent aws sso login (10s timeout)
+              ├─ Success → show "renewed"
+              └─ Failure → Microsoft session expired:
+                   1. Open myapps.microsoft.com in Zen Browser
+                   2. Trigger 1Password autofill (Cmd+\) after 3s
+                   3. macOS notification: "Manual auth required"
+                   4. Show "auth" (red)
+```
+
+**No overlap:** launchd handles proactive scheduled refreshes at fixed times. SketchyBar handles reactive recovery when the token actually expires between scheduled runs. The STS probe is the source of truth — the 8-hour countdown is an estimate that the probe corrects.
+
+### Files
+
+| Path | Purpose |
+|---|---|
+| `private_dot_config/sketchybar/items/executable_aws_bedrock.sh` | SketchyBar item definition |
+| `private_dot_config/sketchybar/plugins/executable_aws_bedrock.sh` | STS probe + log parsing + auto-recovery logic |
