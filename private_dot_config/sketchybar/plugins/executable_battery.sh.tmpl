@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+{{ if ne .machine_type "mac-mini" }}
+source "$CONFIG_DIR/icons.sh"
+
+PERCENTAGE="$(pmset -g batt | grep -Eo "\d+%" | cut -d% -f1)"
+CHARGING="$(pmset -g batt | grep 'AC Power')"
+
+if [ -n "$CHARGING" ]; then
+    ICON="$ICON_BATTERY_CHARGING"
+    COLOR="0xffa6e3a1"  # green
+elif [ "$PERCENTAGE" -gt 75 ]; then
+    ICON="$ICON_BATTERY_100"
+    COLOR="0xffa6e3a1"  # green
+elif [ "$PERCENTAGE" -gt 50 ]; then
+    ICON="$ICON_BATTERY_75"
+    COLOR="0xfff9e2af"  # yellow
+elif [ "$PERCENTAGE" -gt 25 ]; then
+    ICON="$ICON_BATTERY_50"
+    COLOR="0xfffab387"  # peach
+elif [ "$PERCENTAGE" -gt 10 ]; then
+    ICON="$ICON_BATTERY_25"
+    COLOR="0xfff38ba8"  # red
+else
+    ICON="$ICON_BATTERY_0"
+    COLOR="0xfff38ba8"  # red
+fi
+
+sketchybar --set $NAME \
+    icon="$ICON" \
+    icon.color="$COLOR" \
+    label="${PERCENTAGE}%"
+{{ end }}

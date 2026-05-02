@@ -9,10 +9,22 @@ after-login-command = []
 # You can use it to add commands that run after AeroSpace startup.
 # 'after-startup-command' is run after 'after-login-command'
 # Available commands : https://nikitabobko.github.io/AeroSpace/commands
-after-startup-command = []
+after-startup-command = [
+    # Start SketchyBar (has built-in duplicate detection)
+    'exec-and-forget sketchybar',
+    # Start JankyBorders with Catppuccin Mocha colors
+    'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0xff45475a width=5.0',
+    # Start sketchybar-toggle (smooth native menu bar on hover)
+    'exec-and-forget sketchybar-toggle',
+]
+
+# Notify SketchyBar about workspace changes
+exec-on-workspace-change = ['/bin/bash', '-c',
+    'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE'
+]
 
 # Start AeroSpace at login
-start-at-login = false
+start-at-login = true
 
 # Normalizations. See: https://nikitabobko.github.io/AeroSpace/guide#normalization
 {{ if eq .machine_type "mac-mini" -}}
@@ -70,12 +82,12 @@ automatically-unhide-macos-hidden-apps = true
 #                 See:
 #                 https://nikitabobko.github.io/AeroSpace/guide#assign-workspaces-to-monitors
 [gaps]
-    inner.horizontal = 0
-    inner.vertical =   0
-    outer.left =       0
-    outer.bottom =     0
-    outer.top =        0
-    outer.right =      0
+    inner.horizontal = 5
+    inner.vertical =   5
+    outer.left =       5
+    outer.bottom =     5
+    outer.top =        42  # Space for SketchyBar (27) + y_offset (5) + margin below bar (5) + JankyBorders width (5)
+    outer.right =      5
 
 # 'main' binding mode declaration
 # See: https://nikitabobko.github.io/AeroSpace/guide#binding-modes
@@ -130,9 +142,6 @@ automatically-unhide-macos-hidden-apps = true
     ctrl-shift-alt-5 = 'workspace 5'
     ctrl-shift-alt-6 = 'workspace 6'
     ctrl-shift-alt-7 = 'workspace 7'
-    ctrl-shift-alt-8 = 'workspace 8'
-    ctrl-shift-alt-9 = 'workspace 9'
-    ctrl-shift-alt-0 = 'workspace 0'
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#move-node-to-workspace
     shift-ctrl-alt-cmd-1 = 'move-node-to-workspace 1' #old alt-shift
@@ -142,9 +151,6 @@ automatically-unhide-macos-hidden-apps = true
     shift-ctrl-alt-cmd-5 = 'move-node-to-workspace 5'
     shift-ctrl-alt-cmd-6 = 'move-node-to-workspace 6'
     shift-ctrl-alt-cmd-7 = 'move-node-to-workspace 7'
-    shift-ctrl-alt-cmd-8 = 'move-node-to-workspace 8'
-    shift-ctrl-alt-cmd-9 = 'move-node-to-workspace 9'
-    shift-ctrl-alt-cmd-0 = 'move-node-to-workspace 0'
 
     # See: https://nikitabobko.github.io/AeroSpace/commands#focus
     alt-n = 'focus left'

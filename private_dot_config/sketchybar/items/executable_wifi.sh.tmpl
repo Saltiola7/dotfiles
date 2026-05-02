@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/icons.sh"
+
+sketchybar --add item wifi right \
+    --set wifi \
+        icon=$ICON_WIFI \
+        icon.color=$TEAL \
+        label.font="$FONT:Regular:14.0" \
+        update_freq=10 \
+        script="$PLUGIN_DIR/wifi.sh" \
+        click_script="open 'x-apple.systempreferences:com.apple.wifi-settings-extension'" \
+    --subscribe wifi wifi_change system_woke

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+source "$CONFIG_DIR/icons.sh"
+
+ICON_ETH="󰈀"
+
+{{ if eq .machine_type "mac-mini" -}}
+# Mac Mini: check Ethernet first (en0), fall back to WiFi (en1)
+ETH_STATUS="$(ifconfig en0 2>/dev/null | grep 'status: active')"
+if [ -n "$ETH_STATUS" ]; then
+    IP="$(ifconfig en0 2>/dev/null | grep 'inet ' | awk '{print $2}')"
+    sketchybar --set $NAME icon="$ICON_ETH" label="$IP"
+else
+    SSID="$(networksetup -getairportnetwork en1 2>/dev/null | sed 's/^Current Wi-Fi Network: //')"
+    if [ -z "$SSID" ] || [[ "$SSID" == *"not associated"* ]]; then
+        sketchybar --set $NAME icon="$ICON_WIFI_OFF" label="Off"
+    else
+        sketchybar --set $NAME icon="$ICON_WIFI" label="$SSID"
+    fi
+fi
+{{- else -}}
+# Laptop: detect WiFi interface dynamically
+WIFI_IF="$(networksetup -listallhardwareports 2>/dev/null | awk '/Wi-Fi/{getline; print $2}')"
+WIFI_IF="${WIFI_IF:-en0}"
+SSID="$(networksetup -getairportnetwork "$WIFI_IF" 2>/dev/null | sed 's/^Current Wi-Fi Network: //')"
+
+if [ -z "$SSID" ] || [[ "$SSID" == *"not associated"* ]]; then
+    sketchybar --set $NAME icon="$ICON_WIFI_OFF" label="Off"
+else
+    sketchybar --set $NAME icon="$ICON_WIFI" label="$SSID"
+fi
+{{- end }}

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+{{ if ne .machine_type "mac-mini" }}
+source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/icons.sh"
+
+sketchybar --add item battery right \
+    --set battery \
+        icon.color=$GREEN \
+        label.font="$FONT:Bold:14.0" \
+        update_freq=120 \
+        script="$PLUGIN_DIR/battery.sh" \
+    --subscribe battery system_woke power_source_change
+{{ end }}

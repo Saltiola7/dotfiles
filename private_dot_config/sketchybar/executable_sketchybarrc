@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+source "$CONFIG_DIR/colors.sh"
+source "$CONFIG_DIR/icons.sh"
+
+FONT="Monofur Nerd Font"
+PLUGIN_DIR="$CONFIG_DIR/plugins"
+ITEM_DIR="$CONFIG_DIR/items"
+
+export FONT PLUGIN_DIR ITEM_DIR
+
+##### Bar Appearance #####
+sketchybar --bar \
+    height=27 \
+    blur_radius=30 \
+    position=top \
+    sticky=on \
+    topmost=window \
+    padding_left=10 \
+    padding_right=10 \
+    color=$BAR_COLOR \
+    border_color=$BAR_BORDER_COLOR \
+    border_width=0 \
+    shadow=off \
+    corner_radius=10 \
+    margin=5 \
+    y_offset=5
+
+##### Default Values #####
+sketchybar --default \
+    icon.font="$FONT:Bold:16.0" \
+    icon.color=$ICON_COLOR \
+    icon.padding_left=4 \
+    icon.padding_right=4 \
+    label.font="$FONT:Regular:14.0" \
+    label.color=$LABEL_COLOR \
+    label.padding_left=4 \
+    label.padding_right=4 \
+    background.color=$TRANSPARENT \
+    background.corner_radius=5 \
+    background.height=22 \
+    padding_left=2 \
+    padding_right=2
+
+##### Left Side #####
+source "$ITEM_DIR/apple.sh"
+source "$ITEM_DIR/spaces.sh"
+source "$ITEM_DIR/front_app.sh"
+
+##### Center #####
+source "$ITEM_DIR/media.sh"
+source "$ITEM_DIR/clockify.sh"
+
+##### Right Side #####
+source "$ITEM_DIR/clock.sh"
+source "$ITEM_DIR/battery.sh"
+source "$ITEM_DIR/aws_bedrock.sh"
+source "$ITEM_DIR/brew.sh"
+source "$ITEM_DIR/docker.sh"
+source "$ITEM_DIR/volume.sh"
+source "$ITEM_DIR/wifi.sh"
+source "$ITEM_DIR/disk.sh"
+source "$ITEM_DIR/cpu.sh"
+source "$ITEM_DIR/memory.sh"
+
+##### Force refresh #####
+sketchybar --update
