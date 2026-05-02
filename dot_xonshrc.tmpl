@@ -111,6 +111,19 @@ def _ch_alias(args, stdin=None):
 
 aliases['ch'] = _ch_alias
 
+# ── GCP credential hygiene ────────────────────────────────────────────────────
+# Remove stale SA key files from previous sessions (e.g. shell killed via SIGKILL
+# where the atexit handler couldn't fire). Runs at every shell startup — before secret.
+def _cleanup_gcp_cache():
+    import os
+    for _f in ('enterprise-seo-tools-sa.json', 'gws-content-reader-key.json'):
+        try:
+            os.remove(os.path.expanduser(f'~/.cache/gcp/{_f}'))
+        except FileNotFoundError:
+            pass
+
+_cleanup_gcp_cache()
+
 # ── Secrets (lazy-loaded via 1Password CLI) ───────────────────────────────────
 # Run 'secret' to load all secrets into the current shell session.
 # Secrets are cached in memory — only one biometric prompt per session.
@@ -143,6 +156,11 @@ def _load_secrets(args=None, stdin=None):
         $GOOGLE_VERTEX_PROJECT = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/project').strip()
         $GOOGLE_VERTEX_LOCATION = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/location').strip()
         $GOOGLE_CLOUD_PROJECT = $GOOGLE_VERTEX_PROJECT
+        $GOOGLE_PROJECT = $GOOGLE_VERTEX_PROJECT
+
+        # gcloud CLI auth — session-scoped, no credentials persisted to gcloud's store
+        $CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE = _sa_path
+        $CLOUDSDK_ACTIVE_CONFIG_NAME = 'sa-dev-admin'
 
         # SEO Data Science (MGM)
         $CLICKHOUSE_HOST = $(op read 'op://Personal/ClickHouse MGM Cloud/host').strip()
@@ -167,6 +185,10 @@ def _load_secrets(args=None, stdin=None):
             f.write($(op read 'op://Personal/GCP Service Account - GWS Content Reader/credential'))
         os.chmod(_gws_path, 0o600)
         $GWS_CONTENT_READER_CREDENTIALS = _gws_path
+
+        # Register cleanup on shell exit
+        import atexit
+        atexit.register(_cleanup_gcp_cache)
 
         _secrets_loaded = True
         print('Secrets loaded.')
