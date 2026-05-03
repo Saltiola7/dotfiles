@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Provision and start the SketchyBar + AeroSpace + JankyBorders + sketchybar-toggle stack.
+# Re-runs when any of the key config files change.
+#
+# sketchybarrc hash: {{ include "private_dot_config/sketchybar/executable_sketchybarrc" | sha256sum }}
+# aerospace hash:    {{ include "dot_aerospace.toml.tmpl" | sha256sum }}
+
+{{ if ne .chezmoi.os "darwin" -}}
+echo "[sketchybar-stack] Skipping on non-macOS."
+exit 0
+{{ end -}}
+
+set -eu
+
+# ── 1. Install sketchybar-app-font (not available via Homebrew) ──
+FONT_PATH="$HOME/Library/Fonts/sketchybar-app-font.ttf"
+FONT_VERSION="v2.0.28"
+if [ ! -f "$FONT_PATH" ]; then
+    echo "[sketchybar-stack] Installing sketchybar-app-font ${FONT_VERSION}..."
+    curl -fsSL "https://github.com/kvndrsslr/sketchybar-app-font/releases/download/${FONT_VERSION}/sketchybar-app-font.ttf" \
+        -o "$FONT_PATH" || {
+        echo "[sketchybar-stack] Warning: failed to download sketchybar-app-font. App icons may be broken." >&2
+    }
+else
+    echo "[sketchybar-stack] sketchybar-app-font already installed."
+fi
+
+# ── 2. Start/restart SketchyBar via brew services ──
+if command -v sketchybar &>/dev/null; then
+    if brew services list | grep -q "^sketchybar.*started"; then
+        echo "[sketchybar-stack] Reloading SketchyBar..."
+        sketchybar --reload
+    else
+        echo "[sketchybar-stack] Starting SketchyBar service..."
+        brew services start sketchybar
+    fi
+else
+    echo "[sketchybar-stack] sketchybar not found. Run 'brew bundle' first." >&2
+fi
+
+# ── 3. Ensure AeroSpace is running (it cascades borders + sketchybar-toggle) ──
+if [ -d "/Applications/AeroSpace.app" ]; then
+    if ! pgrep -xq "AeroSpace"; then
+        echo "[sketchybar-stack] Starting AeroSpace..."
+        open -a AeroSpace
+        # Give it a moment to run after-startup-command (starts borders + sketchybar-toggle)
+        sleep 2
+    else
+        echo "[sketchybar-stack] AeroSpace already running."
+        # AeroSpace is running but sketchybar-toggle may have died — ensure it's alive
+        if ! pgrep -xq "sketchybar-toggle"; then
+            if command -v sketchybar-toggle &>/dev/null; then
+                echo "[sketchybar-stack] Restarting sketchybar-toggle..."
+                nohup sketchybar-toggle > /dev/null 2>&1 &
+                disown
+            fi
+        fi
+        # Same for borders
+        if ! pgrep -xq "borders"; then
+            if command -v borders &>/dev/null; then
+                echo "[sketchybar-stack] Restarting JankyBorders..."
+                nohup borders active_color=0xffcba6f7 inactive_color=0xff45475a width=5.0 > /dev/null 2>&1 &
+                disown
+            fi
+        fi
+    fi
+else
+    echo "[sketchybar-stack] AeroSpace.app not found. Install it first." >&2
+fi
+
+echo "[sketchybar-stack] Done."
