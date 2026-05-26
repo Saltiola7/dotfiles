@@ -99,13 +99,44 @@ fi
 
 log "pre-check: access=${access_remaining_min}m refresh=${refresh_present} client-reg=${registration_remaining_days}d"
 
-# ----- Invoke aws sso login with timing -----
+# ----- STS probe gate -----
+#
+# Source of truth for "do we need a browser flow at all?" is whether STS
+# accepts the current refresh token. If `aws sts get-caller-identity` succeeds,
+# the SDK chain (Bedrock etc.) will keep working and a fresh `aws sso login`
+# would only force an unnecessary browser tab — which is exactly what we
+# want to avoid when the Microsoft session is no longer silent.
+#
+# We still want to refresh proactively *before* the refresh token actually
+# dies, so we honor the schedule but skip when the session is comfortably
+# alive (≥ REFRESH_BUFFER_MIN remaining on accessToken AND STS works).
+# When refresh is below buffer or STS fails, we run the login.
+
+REFRESH_BUFFER_MIN=30  # if access token has > this many minutes left, skip login
 
 if [[ ! -x "$AWS_BIN" ]]; then
     log "error: $AWS_BIN not found or not executable — aborting"
     notify "aws CLI not found — SSO refresh skipped"
     exit 1
 fi
+
+# Only consider skipping if pre-check returned a real number for access remaining.
+if [[ "$access_remaining_min" =~ ^-?[0-9]+$ ]] && (( access_remaining_min > REFRESH_BUFFER_MIN )); then
+    if "$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1; then
+        log "skip: STS alive and access token has ${access_remaining_min}m remaining (> ${REFRESH_BUFFER_MIN}m buffer) — no login needed"
+        # Trigger SketchyBar so the indicator reflects the live session
+        if command -v sketchybar &>/dev/null; then
+            sketchybar --trigger aws_sso_refreshed 2>/dev/null || true
+        fi
+        exit 0
+    else
+        log "STS probe failed despite ${access_remaining_min}m on access token — proceeding with login"
+    fi
+else
+    log "access token below ${REFRESH_BUFFER_MIN}m buffer (or unparseable) — proceeding with login"
+fi
+
+# ----- Invoke aws sso login with timing -----
 
 log "invoking: $AWS_BIN sso login --profile $profile"
 start_epoch=$(/bin/date +%s)
@@ -125,6 +156,46 @@ if (( elapsed >= MFA_THRESHOLD )); then
     notify "Browser MFA completed (${elapsed}s)"
 else
     log "done in ${elapsed}s — silent refresh (Microsoft session passthrough)"
+fi
+
+# ----- Post-login: record login time + warm CLI cache + trigger SketchyBar -----
+
+# Record login epoch for SketchyBar 8h countdown
+/bin/date +%s > /tmp/sketchybar_aws_login_epoch
+log "post-login: login epoch recorded"
+
+# Warm the CLI credential cache so both CLI and SDKs have fresh credentials
+"$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1 && \
+    log "post-login: CLI cache warmed" || \
+    log "post-login: CLI cache warming failed"
+
+# Log the new SSO token expiry for observability
+if [[ -d "$CACHE_DIR" ]]; then
+    for f in "$CACHE_DIR"/*.json; do
+        [[ -f "$f" ]] || continue
+        if /usr/bin/grep -q '"accessToken"' "$f" 2>/dev/null; then
+            new_expiry=$("$PY" -c "
+import json
+from datetime import datetime, timezone
+try:
+    with open('$f') as fh:
+        d = json.load(fh)
+    exp = datetime.fromisoformat(d['expiresAt'].replace('Z', '+00:00'))
+    rem = int((exp - datetime.now(timezone.utc)).total_seconds() / 60)
+    print(f'{d[\"expiresAt\"]} ({rem}m remaining)')
+except Exception as e:
+    print(f'parse-error: {e}')
+" 2>/dev/null)
+            log "post-login: SSO token expiresAt=$new_expiry"
+            break
+        fi
+    done
+fi
+
+# Trigger SketchyBar to update the AWS indicator immediately
+if command -v sketchybar &>/dev/null; then
+    sketchybar --trigger aws_sso_refreshed 2>/dev/null && \
+        log "post-login: SketchyBar indicator refreshed" || true
 fi
 
 exit 0

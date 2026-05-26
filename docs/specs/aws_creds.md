@@ -67,9 +67,7 @@ The calendar form is used because "only during 08:00–23:00" is a hard requirem
 
 ## Token Validity Check
 
-The wrapper reads `~/.aws/sso/cache/*.json` and logs informational metadata — it does **not** gate the login call on any expiry check. Because `accessToken.expiresAt` fluctuates on a 1-hour cadence independent of whether the browser would actually pop, it's not a reliable predictor and has been demoted to pure observability.
-
-What the wrapper logs as a pre-check line:
+The wrapper reads `~/.aws/sso/cache/*.json` and logs informational metadata, then **uses STS as a gate** to decide whether to invoke `aws sso login`:
 
 ```
 pre-check: access=<min>m refresh=<yes|no> client-reg=<days>d
@@ -79,9 +77,25 @@ pre-check: access=<min>m refresh=<yes|no> client-reg=<days>d
 - `refresh=<yes|no>` — whether a refresh token exists in the cache. `yes` means the SDK can still silently renew access tokens for Bedrock calls.
 - `client-reg=<days>d` — days remaining on the client registration (~90 day lifetime). If this ever gets close to zero, `aws sso login` will re-register automatically.
 
+### STS gate (added 2026-05-26)
+
+Original design ran `aws sso login` unconditionally on every scheduled slot, relying on the Microsoft session cookie to keep the browser flow silent. In practice the Microsoft session expires often enough that "silent" turned into "browser tab pops three times a day" — visible to the user and frequently failing with `pending authorization expired` because no human was present to approve.
+
+The wrapper now gates on `aws sts get-caller-identity`:
+
+| Pre-check state | STS probe | Action |
+|---|---|---|
+| `access > 30m` remaining | succeeds | **skip login**, trigger SketchyBar, exit 0 |
+| `access > 30m` remaining | fails | proceed with login (cache stale despite parse) |
+| `access ≤ 30m` or unparseable | n/a | proceed with login (refresh token nearing expiry) |
+
+The 30-minute buffer ensures we still rotate the refresh token *before* it dies, but only when rotation is actually due. STS is the source of truth for "session alive"; the access-token-minutes check protects against the case where STS happens to succeed on a token that's about to flip over.
+
+The proactive schedule (08:00 / 15:59 / 22:45) is unchanged — slots stay aligned to the 8h refresh token lifetime — but most slots are now no-ops when the SDK is already healthy.
+
 ### Browser-interaction detection (post-hoc)
 
-Because the SSO cache doesn't expose the refresh token's actual expiry, the wrapper **cannot predict** whether `aws sso login` will require user interaction. Instead it measures elapsed wall-clock time of the command:
+Because the SSO cache doesn't expose the refresh token's actual expiry, when the wrapper *does* invoke `aws sso login` it cannot predict whether user interaction is required. It measures elapsed wall-clock time of the command:
 
 | Elapsed | Interpretation | Notification |
 |---------|---------------|--------------|
@@ -95,9 +109,11 @@ The 15-second threshold is a heuristic. A silent OIDC flow on a warm machine com
 
 ### During a working day
 
-- **08:00** fires → wrapper logs cache state → `aws sso login` likely requires MFA (Microsoft session rolled overnight) → elapsed ≥15s → notification pops → user taps MFA → fresh refresh token established.
-- **15:59** fires → elapsed typically 2–4s → silent log line, no notification → refresh token rotated with ~8h validity.
-- **22:45** fires → same as 15:59 → refresh token extends into early next morning.
+With the STS gate in place:
+
+- **08:00** fires → STS probe likely fails (refresh token expired overnight) → `aws sso login` runs → may require MFA if Microsoft session also rolled → fresh refresh token established.
+- **15:59** fires → STS probe likely succeeds (refresh token still alive from 08:00 grant) → **skip**, no browser, no login.
+- **22:45** fires → same: STS succeeds, skip. If the 08:00 token is finally near expiry, the access-token-minutes check forces a real login as backstop.
 - **Overnight**: AWS SDK continues to silently renew access tokens from the refresh token for Bedrock API calls until the refresh token itself expires. Microsoft session rolls at its own cadence.
 
 ### If the Mac is asleep at a scheduled time
