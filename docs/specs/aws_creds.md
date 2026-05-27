@@ -83,13 +83,16 @@ Original design ran `aws sso login` unconditionally on every scheduled slot, rel
 
 The wrapper now gates on `aws sts get-caller-identity`:
 
-| Pre-check state | STS probe | Action |
-|---|---|---|
-| `access > 30m` remaining | succeeds | **skip login**, trigger SketchyBar, exit 0 |
-| `access > 30m` remaining | fails | proceed with login (cache stale despite parse) |
-| `access ≤ 30m` or unparseable | n/a | proceed with login (refresh token nearing expiry) |
+| STS probe | Action |
+|---|---|
+| succeeds | **skip login**, trigger SketchyBar, exit 0 |
+| fails | proceed with `aws sso login` |
 
-The 30-minute buffer ensures we still rotate the refresh token *before* it dies, but only when rotation is actually due. STS is the source of truth for "session alive"; the access-token-minutes check protects against the case where STS happens to succeed on a token that's about to flip over.
+#### Why STS is the only authority
+
+An earlier revision combined STS with an "access token minutes remaining > 30m" guard, intending to proactively rotate the refresh token before it died. That guard was removed because the cached `accessToken.expiresAt` reflects the **short-lived (~1h) access token**, not the refresh token. On an idle machine where no SDK calls have happened for hours, the cached field can show negative minutes (e.g. `access=-372m`) while the refresh token is still healthy. The old guard sent those cases to the login branch and popped a browser unnecessarily.
+
+Invoking `aws sts get-caller-identity` forces the SDK to either silently mint a new access token from the refresh token (proving liveness) or fail outright (proving the refresh token is genuinely dead). It is therefore both necessary and sufficient as the gate.
 
 The proactive schedule (08:00 / 15:59 / 22:45) is unchanged — slots stay aligned to the 8h refresh token lifetime — but most slots are now no-ops when the SDK is already healthy.
 
@@ -113,7 +116,7 @@ With the STS gate in place:
 
 - **08:00** fires → STS probe likely fails (refresh token expired overnight) → `aws sso login` runs → may require MFA if Microsoft session also rolled → fresh refresh token established.
 - **15:59** fires → STS probe likely succeeds (refresh token still alive from 08:00 grant) → **skip**, no browser, no login.
-- **22:45** fires → same: STS succeeds, skip. If the 08:00 token is finally near expiry, the access-token-minutes check forces a real login as backstop.
+- **22:45** fires → same: STS succeeds, skip. If the refresh token has actually died by now (rare; refresh tokens are ~8h and 22:45 is < 8h after 15:59), STS fails and a real login runs as backstop.
 - **Overnight**: AWS SDK continues to silently renew access tokens from the refresh token for Bedrock API calls until the refresh token itself expires. Microsoft session rolls at its own cadence.
 
 ### If the Mac is asleep at a scheduled time

@@ -102,17 +102,20 @@ log "pre-check: access=${access_remaining_min}m refresh=${refresh_present} clien
 # ----- STS probe gate -----
 #
 # Source of truth for "do we need a browser flow at all?" is whether STS
-# accepts the current refresh token. If `aws sts get-caller-identity` succeeds,
-# the SDK chain (Bedrock etc.) will keep working and a fresh `aws sso login`
-# would only force an unnecessary browser tab — which is exactly what we
-# want to avoid when the Microsoft session is no longer silent.
+# accepts the current refresh token. If `aws sts get-caller-identity`
+# succeeds, the SDK silently minted a fresh access token from the refresh
+# token, proving the SSO session is alive — `aws sso login` would only
+# force an unnecessary browser tab.
 #
-# We still want to refresh proactively *before* the refresh token actually
-# dies, so we honor the schedule but skip when the session is comfortably
-# alive (≥ REFRESH_BUFFER_MIN remaining on accessToken AND STS works).
-# When refresh is below buffer or STS fails, we run the login.
-
-REFRESH_BUFFER_MIN=30  # if access token has > this many minutes left, skip login
+# The cached `accessToken.expiresAt` reflects the SHORT-LIVED access token
+# (~1h) and is NOT a reliable indicator of refresh-token health: an idle
+# machine with no recent SDK calls can show -300m on access while the
+# refresh token is still valid for hours. STS is therefore the only
+# authority on "should we login?".
+#
+# Decision matrix:
+#   STS rc=0  → session alive → SKIP login
+#   STS rc≠0  → refresh token dead → run `aws sso login`
 
 if [[ ! -x "$AWS_BIN" ]]; then
     log "error: $AWS_BIN not found or not executable — aborting"
@@ -120,21 +123,21 @@ if [[ ! -x "$AWS_BIN" ]]; then
     exit 1
 fi
 
-# Only consider skipping if pre-check returned a real number for access remaining.
-if [[ "$access_remaining_min" =~ ^-?[0-9]+$ ]] && (( access_remaining_min > REFRESH_BUFFER_MIN )); then
-    if "$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1; then
-        log "skip: STS alive and access token has ${access_remaining_min}m remaining (> ${REFRESH_BUFFER_MIN}m buffer) — no login needed"
-        # Trigger SketchyBar so the indicator reflects the live session
-        if command -v sketchybar &>/dev/null; then
-            sketchybar --trigger aws_sso_refreshed 2>/dev/null || true
-        fi
-        exit 0
-    else
-        log "STS probe failed despite ${access_remaining_min}m on access token — proceeding with login"
+if "$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1; then
+    log "skip: STS alive (refresh token valid) — no login needed"
+    # If we have no login epoch yet (first run after manual login flow),
+    # record now so SketchyBar's countdown starts.
+    if [[ ! -f /tmp/sketchybar_aws_login_epoch ]]; then
+        /bin/date +%s > /tmp/sketchybar_aws_login_epoch
+        log "skip: recorded fresh login epoch for SketchyBar countdown"
     fi
-else
-    log "access token below ${REFRESH_BUFFER_MIN}m buffer (or unparseable) — proceeding with login"
+    if command -v sketchybar &>/dev/null; then
+        sketchybar --trigger aws_sso_refreshed 2>/dev/null || true
+    fi
+    exit 0
 fi
+
+log "STS probe failed — refresh token expired, proceeding with login"
 
 # ----- Invoke aws sso login with timing -----
 
