@@ -1,0 +1,72 @@
+# Mole whitelist — paths protected from `mo clean`
+# Format: absolute paths (~ and $HOME expanded), globs supported
+# Docs: https://github.com/tw93/Mole
+# NOTE: Custom whitelist replaces Mole defaults, so we include them here
+
+# Mole defaults (from DEFAULT_WHITELIST_PATTERNS)
+~/Library/Caches/ms-playwright*
+~/.cache/huggingface*
+~/.m2/repository/*
+~/.gradle/caches/*
+~/.gradle/daemon/*
+~/.ollama/models/*
+~/Library/Caches/org.R-project.R/R/renv/*
+~/Library/Caches/pypoetry/virtualenvs*
+~/Library/Caches/JetBrains*
+~/Library/Caches/com.jetbrains.toolbox*
+~/Library/Caches/tealdeer/tldr-pages
+~/Library/Application Support/JetBrains*
+~/Library/Caches/com.apple.finder
+~/Library/Mobile Documents*
+
+# Docker / Container infrastructure
+~/.colima
+~/.colima/*
+~/.docker
+~/.docker/*
+~/.orbstack
+~/.orbstack/*
+
+# OpenCode / AI agent sessions & config
+~/.opencode
+~/.opencode/*
+~/.config/opencode
+~/.config/opencode/*
+~/.claude
+~/.claude/*
+~/.agents
+~/.agents/*
+
+# Credentials & auth
+~/.ssh
+~/.ssh/*
+~/.gnupg
+~/.gnupg/*
+~/.aws
+~/.aws/*
+~/.azure
+~/.azure/*
+~/.kube
+~/.kube/*
+
+# Shell history & state
+~/.atuin
+~/.atuin/*
+~/.zsh_history
+~/.zsh_sessions
+~/.zsh_sessions/*
+~/.bash_history
+
+# Infrastructure state (stateful, not rebuildable)
+~/.local
+~/.local/*
+~/.prefect
+~/.prefect/*
+~/.duckdb
+~/.duckdb/*
+~/.pulumi
+~/.pulumi/*
+~/.terraform.d
+~/.terraform.d/*
+~/.vagrant.d
+~/.vagrant.d/*

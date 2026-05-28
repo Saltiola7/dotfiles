@@ -1,0 +1,8 @@
+# Mole optimize whitelist — tasks to skip during `mo optimize`
+# Format: task identifiers (one per line), comments with #
+# Run `mo optimize --whitelist` to see available tasks
+# Docs: https://github.com/tw93/Mole
+
+# Skip these potentially disruptive tasks
+disk_verify
+spotlight_index_optimize
