@@ -11,7 +11,7 @@ export FONT PLUGIN_DIR ITEM_DIR
 
 ##### Bar Appearance #####
 sketchybar --bar \
-    height=27 \
+    height=25 \
     blur_radius=30 \
     position=top \
     sticky=on \
@@ -22,7 +22,7 @@ sketchybar --bar \
     border_color=$BAR_BORDER_COLOR \
     border_width=0 \
     shadow=off \
-    corner_radius=10 \
+    corner_radius=6 \
     margin=5 \
     y_offset=5
 
@@ -32,13 +32,15 @@ sketchybar --default \
     icon.color=$ICON_COLOR \
     icon.padding_left=4 \
     icon.padding_right=4 \
+    icon.y_offset=-1 \
     label.font="$FONT:Regular:14.0" \
     label.color=$LABEL_COLOR \
     label.padding_left=4 \
     label.padding_right=4 \
+    label.y_offset=-1 \
     background.color=$TRANSPARENT \
     background.corner_radius=5 \
-    background.height=22 \
+    background.height=20 \
     padding_left=2 \
     padding_right=2
 

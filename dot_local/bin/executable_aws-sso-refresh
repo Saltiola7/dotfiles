@@ -99,13 +99,47 @@ fi
 
 log "pre-check: access=${access_remaining_min}m refresh=${refresh_present} client-reg=${registration_remaining_days}d"
 
-# ----- Invoke aws sso login with timing -----
+# ----- STS probe gate -----
+#
+# Source of truth for "do we need a browser flow at all?" is whether STS
+# accepts the current refresh token. If `aws sts get-caller-identity`
+# succeeds, the SDK silently minted a fresh access token from the refresh
+# token, proving the SSO session is alive — `aws sso login` would only
+# force an unnecessary browser tab.
+#
+# The cached `accessToken.expiresAt` reflects the SHORT-LIVED access token
+# (~1h) and is NOT a reliable indicator of refresh-token health: an idle
+# machine with no recent SDK calls can show -300m on access while the
+# refresh token is still valid for hours. STS is therefore the only
+# authority on "should we login?".
+#
+# Decision matrix:
+#   STS rc=0  → session alive → SKIP login
+#   STS rc≠0  → refresh token dead → run `aws sso login`
 
 if [[ ! -x "$AWS_BIN" ]]; then
     log "error: $AWS_BIN not found or not executable — aborting"
     notify "aws CLI not found — SSO refresh skipped"
     exit 1
 fi
+
+if "$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1; then
+    log "skip: STS alive (refresh token valid) — no login needed"
+    # If we have no login epoch yet (first run after manual login flow),
+    # record now so SketchyBar's countdown starts.
+    if [[ ! -f /tmp/sketchybar_aws_login_epoch ]]; then
+        /bin/date +%s > /tmp/sketchybar_aws_login_epoch
+        log "skip: recorded fresh login epoch for SketchyBar countdown"
+    fi
+    if command -v sketchybar &>/dev/null; then
+        sketchybar --trigger aws_sso_refreshed 2>/dev/null || true
+    fi
+    exit 0
+fi
+
+log "STS probe failed — refresh token expired, proceeding with login"
+
+# ----- Invoke aws sso login with timing -----
 
 log "invoking: $AWS_BIN sso login --profile $profile"
 start_epoch=$(/bin/date +%s)
@@ -125,6 +159,46 @@ if (( elapsed >= MFA_THRESHOLD )); then
     notify "Browser MFA completed (${elapsed}s)"
 else
     log "done in ${elapsed}s — silent refresh (Microsoft session passthrough)"
+fi
+
+# ----- Post-login: record login time + warm CLI cache + trigger SketchyBar -----
+
+# Record login epoch for SketchyBar 8h countdown
+/bin/date +%s > /tmp/sketchybar_aws_login_epoch
+log "post-login: login epoch recorded"
+
+# Warm the CLI credential cache so both CLI and SDKs have fresh credentials
+"$AWS_BIN" sts get-caller-identity --profile "$profile" >/dev/null 2>&1 && \
+    log "post-login: CLI cache warmed" || \
+    log "post-login: CLI cache warming failed"
+
+# Log the new SSO token expiry for observability
+if [[ -d "$CACHE_DIR" ]]; then
+    for f in "$CACHE_DIR"/*.json; do
+        [[ -f "$f" ]] || continue
+        if /usr/bin/grep -q '"accessToken"' "$f" 2>/dev/null; then
+            new_expiry=$("$PY" -c "
+import json
+from datetime import datetime, timezone
+try:
+    with open('$f') as fh:
+        d = json.load(fh)
+    exp = datetime.fromisoformat(d['expiresAt'].replace('Z', '+00:00'))
+    rem = int((exp - datetime.now(timezone.utc)).total_seconds() / 60)
+    print(f'{d[\"expiresAt\"]} ({rem}m remaining)')
+except Exception as e:
+    print(f'parse-error: {e}')
+" 2>/dev/null)
+            log "post-login: SSO token expiresAt=$new_expiry"
+            break
+        fi
+    done
+fi
+
+# Trigger SketchyBar to update the AWS indicator immediately
+if command -v sketchybar &>/dev/null; then
+    sketchybar --trigger aws_sso_refreshed 2>/dev/null && \
+        log "post-login: SketchyBar indicator refreshed" || true
 fi
 
 exit 0

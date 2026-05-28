@@ -67,9 +67,7 @@ The calendar form is used because "only during 08:00–23:00" is a hard requirem
 
 ## Token Validity Check
 
-The wrapper reads `~/.aws/sso/cache/*.json` and logs informational metadata — it does **not** gate the login call on any expiry check. Because `accessToken.expiresAt` fluctuates on a 1-hour cadence independent of whether the browser would actually pop, it's not a reliable predictor and has been demoted to pure observability.
-
-What the wrapper logs as a pre-check line:
+The wrapper reads `~/.aws/sso/cache/*.json` and logs informational metadata, then **uses STS as a gate** to decide whether to invoke `aws sso login`:
 
 ```
 pre-check: access=<min>m refresh=<yes|no> client-reg=<days>d
@@ -79,9 +77,28 @@ pre-check: access=<min>m refresh=<yes|no> client-reg=<days>d
 - `refresh=<yes|no>` — whether a refresh token exists in the cache. `yes` means the SDK can still silently renew access tokens for Bedrock calls.
 - `client-reg=<days>d` — days remaining on the client registration (~90 day lifetime). If this ever gets close to zero, `aws sso login` will re-register automatically.
 
+### STS gate (added 2026-05-26)
+
+Original design ran `aws sso login` unconditionally on every scheduled slot, relying on the Microsoft session cookie to keep the browser flow silent. In practice the Microsoft session expires often enough that "silent" turned into "browser tab pops three times a day" — visible to the user and frequently failing with `pending authorization expired` because no human was present to approve.
+
+The wrapper now gates on `aws sts get-caller-identity`:
+
+| STS probe | Action |
+|---|---|
+| succeeds | **skip login**, trigger SketchyBar, exit 0 |
+| fails | proceed with `aws sso login` |
+
+#### Why STS is the only authority
+
+An earlier revision combined STS with an "access token minutes remaining > 30m" guard, intending to proactively rotate the refresh token before it died. That guard was removed because the cached `accessToken.expiresAt` reflects the **short-lived (~1h) access token**, not the refresh token. On an idle machine where no SDK calls have happened for hours, the cached field can show negative minutes (e.g. `access=-372m`) while the refresh token is still healthy. The old guard sent those cases to the login branch and popped a browser unnecessarily.
+
+Invoking `aws sts get-caller-identity` forces the SDK to either silently mint a new access token from the refresh token (proving liveness) or fail outright (proving the refresh token is genuinely dead). It is therefore both necessary and sufficient as the gate.
+
+The proactive schedule (08:00 / 15:59 / 22:45) is unchanged — slots stay aligned to the 8h refresh token lifetime — but most slots are now no-ops when the SDK is already healthy.
+
 ### Browser-interaction detection (post-hoc)
 
-Because the SSO cache doesn't expose the refresh token's actual expiry, the wrapper **cannot predict** whether `aws sso login` will require user interaction. Instead it measures elapsed wall-clock time of the command:
+Because the SSO cache doesn't expose the refresh token's actual expiry, when the wrapper *does* invoke `aws sso login` it cannot predict whether user interaction is required. It measures elapsed wall-clock time of the command:
 
 | Elapsed | Interpretation | Notification |
 |---------|---------------|--------------|
@@ -95,9 +112,11 @@ The 15-second threshold is a heuristic. A silent OIDC flow on a warm machine com
 
 ### During a working day
 
-- **08:00** fires → wrapper logs cache state → `aws sso login` likely requires MFA (Microsoft session rolled overnight) → elapsed ≥15s → notification pops → user taps MFA → fresh refresh token established.
-- **15:59** fires → elapsed typically 2–4s → silent log line, no notification → refresh token rotated with ~8h validity.
-- **22:45** fires → same as 15:59 → refresh token extends into early next morning.
+With the STS gate in place:
+
+- **08:00** fires → STS probe likely fails (refresh token expired overnight) → `aws sso login` runs → may require MFA if Microsoft session also rolled → fresh refresh token established.
+- **15:59** fires → STS probe likely succeeds (refresh token still alive from 08:00 grant) → **skip**, no browser, no login.
+- **22:45** fires → same: STS succeeds, skip. If the refresh token has actually died by now (rare; refresh tokens are ~8h and 22:45 is < 8h after 15:59), STS fails and a real login runs as backstop.
 - **Overnight**: AWS SDK continues to silently renew access tokens from the refresh token for Bedrock API calls until the refresh token itself expires. Microsoft session rolls at its own cadence.
 
 ### If the Mac is asleep at a scheduled time
@@ -230,3 +249,21 @@ SketchyBar (reactive, every 60s):
 |---|---|
 | `private_dot_config/sketchybar/items/executable_aws_bedrock.sh` | SketchyBar item definition |
 | `private_dot_config/sketchybar/plugins/executable_aws_bedrock.sh` | STS probe + log parsing + auto-recovery logic |
+
+## Manual refresh
+
+From any terminal:
+
+```bash
+awslogin   # alias for ~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606
+```
+
+**Always prefer `awslogin` over raw `aws sso login`.** The wrapper:
+
+- Probes STS first and skips the browser when the session is alive.
+- Writes `/tmp/sketchybar_aws_login_epoch` so the bar countdown resets immediately on success.
+- Triggers SketchyBar to update the indicator without waiting for the 60s tick.
+
+Running `aws sso login --profile …` directly bypasses the last two — the bar can lag up to 60s behind a successful login.
+
+The alias is defined in `dot_common_profile.tmpl` next to other aliases.
