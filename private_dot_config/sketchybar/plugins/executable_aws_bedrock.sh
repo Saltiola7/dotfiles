@@ -132,7 +132,28 @@ touch "$BROWSER_LOCKFILE"
 
 open -a "Zen" "https://myapps.microsoft.com" 2>/dev/null
 
-# Best-effort 1Password autofill
+# Best-effort 1Password autofill + submit
+#
+# Sequence (verified against Zen profile bindings — see
+# ~/Library/Application Support/zen/Profiles/<profile>/extension-settings.json,
+# which shows _execute_browser_action => Alt+Period for 1Password):
+#
+#   1. Wait for the Microsoft sign-in page to render.
+#   2. Activate Zen so keystrokes land in the browser, not SketchyBar.
+#   3. Alt+Period — opens the 1Password browser-action picker with
+#      the top suggestion highlighted. (1Password extension binding
+#      in Zen; Cmd+\ is a desktop-app shortcut and does NOT work via
+#      the Firefox extension.)
+#   4. Enter — activates the highlighted suggestion. Per 1Password
+#      Firefox extension docs, the default action for a Login item
+#      with a focused page is to fill the form fields.
+#   5. Wait ~1s for the picker to close and form focus to return.
+#   6. Enter — submits the Microsoft "Enter password" form.
+#
+# Edge cases NOT handled (by design):
+#   - "Pick an account" page that appears after explicit logout. The
+#     user clicks the account manually in that rare flow.
+#   - MFA prompt. User completes MFA manually.
 (
     sleep 8
     /usr/bin/osascript -e '
@@ -141,6 +162,8 @@ open -a "Zen" "https://myapps.microsoft.com" 2>/dev/null
     tell application "System Events"
         keystroke "." using option down
         delay 1.5
+        key code 36
+        delay 1.0
         key code 36
     end tell
     ' 2>/dev/null
