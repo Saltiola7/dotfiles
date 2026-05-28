@@ -249,3 +249,21 @@ SketchyBar (reactive, every 60s):
 |---|---|
 | `private_dot_config/sketchybar/items/executable_aws_bedrock.sh` | SketchyBar item definition |
 | `private_dot_config/sketchybar/plugins/executable_aws_bedrock.sh` | STS probe + log parsing + auto-recovery logic |
+
+## Manual refresh
+
+From any terminal:
+
+```bash
+awslogin   # alias for ~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606
+```
+
+**Always prefer `awslogin` over raw `aws sso login`.** The wrapper:
+
+- Probes STS first and skips the browser when the session is alive.
+- Writes `/tmp/sketchybar_aws_login_epoch` so the bar countdown resets immediately on success.
+- Triggers SketchyBar to update the indicator without waiting for the 60s tick.
+
+Running `aws sso login --profile …` directly bypasses the last two — the bar can lag up to 60s behind a successful login.
+
+The alias is defined in `dot_common_profile.tmpl` next to other aliases.
