@@ -33,6 +33,7 @@ plugins=(
 
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
     source "$OSH/oh-my-bash.sh"
+    unset -f mo 2>/dev/null  # oh-my-bash ships Mustache engine as mo(); remove so Mole CLI works
 fi
 
 # --- Tool integrations (guarded from IntelliJ terminal scanner) ---

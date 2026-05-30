@@ -1,0 +1,7 @@
+# Mole Purge Paths — project directories to scan for build artifacts
+# Edit this file to customize, or run: mo purge --paths
+# One path per line (supports ~ for home directory)
+
+~/GitHub
+~/Library/CloudStorage
+~/github
