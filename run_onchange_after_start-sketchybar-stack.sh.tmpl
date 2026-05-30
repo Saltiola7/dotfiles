@@ -15,15 +15,18 @@ set -eu
 
 # ── 1. Install sketchybar-app-font (not available via Homebrew) ──
 FONT_PATH="$HOME/Library/Fonts/sketchybar-app-font.ttf"
-FONT_VERSION="v2.0.28"
-if [ ! -f "$FONT_PATH" ]; then
+FONT_VERSION="v2.0.62"
+FONT_VERSION_FILE="$HOME/Library/Fonts/.sketchybar-app-font-version"
+if [ ! -f "$FONT_PATH" ] || [ "$(cat "$FONT_VERSION_FILE" 2>/dev/null)" != "$FONT_VERSION" ]; then
     echo "[sketchybar-stack] Installing sketchybar-app-font ${FONT_VERSION}..."
     curl -fsSL "https://github.com/kvndrsslr/sketchybar-app-font/releases/download/${FONT_VERSION}/sketchybar-app-font.ttf" \
-        -o "$FONT_PATH" || {
+        -o "$FONT_PATH" && {
+        echo "$FONT_VERSION" > "$FONT_VERSION_FILE"
+    } || {
         echo "[sketchybar-stack] Warning: failed to download sketchybar-app-font. App icons may be broken." >&2
     }
 else
-    echo "[sketchybar-stack] sketchybar-app-font already installed."
+    echo "[sketchybar-stack] sketchybar-app-font ${FONT_VERSION} already installed."
 fi
 
 # ── 2. Start/restart SketchyBar via brew services ──
