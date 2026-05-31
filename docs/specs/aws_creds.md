@@ -236,12 +236,31 @@ SketchyBar (reactive, every 60s):
               ├─ Success → show "renewed"
               └─ Failure → Microsoft session expired:
                    1. Open myapps.microsoft.com in Zen Browser
-                   2. Trigger 1Password autofill (Cmd+\) after 3s
-                   3. macOS notification: "Manual auth required"
-                   4. Show "auth" (red)
+                   2. After 8s: 1Password autofill (Alt+. → Enter → Enter)
+                   3. After 30s MFA wait: background `aws sso login --profile X`
+                   4. On success: refresh epoch, warm STS, fire `aws_sso_refreshed`
+                   5. macOS notification: "AWS SSO restored automatically"
+                   6. Initial bar state: "auth" (red); flips green on bg success
 ```
 
 **No overlap:** launchd handles proactive scheduled refreshes at fixed times. SketchyBar handles reactive recovery when the token actually expires between scheduled runs. The STS probe is the source of truth — the 8-hour countdown is an estimate that the probe corrects.
+
+### Recovery flow internals
+
+When the silent `aws sso login` (10s timeout) fails, the plugin enters the Microsoft-session-expired branch. The branch dispatches a background subshell that handles the slow flow without blocking the main plugin pass:
+
+| Step | Wait | Action |
+|---|---|---|
+| 1 | 8s | After opening Zen at `myapps.microsoft.com`, wait for the page to render. |
+| 2 | — | Activate Zen, send Alt+Period (1Password picker), Enter (fill), 1.0s, Enter (submit). |
+| 3 | 30s | Wait for Microsoft MFA + page settle. |
+| 4 | — | Run `aws sso login --profile $AWS_PROFILE` in the background. Browser is MS-authed by now, so the OIDC URL completes through "Allow access" without re-prompting credentials. |
+| 5 | — | On success: delete `$BROWSER_LOCKFILE`, write `$LOGIN_EPOCH_FILE`, warm STS, post a notification, fire `sketchybar --trigger aws_sso_refreshed` so the bar flips green within 1s. |
+| 6 | — | On failure: leave `$BROWSER_LOCKFILE` in place; the 10-minute TTL prevents tight retry loops. |
+
+The 30-second wait is a fixed heuristic covering typical Microsoft Authenticator approval latency. The autofill keystroke sequence handles only the password-entry page; the "Pick an account" page (rare, only after explicit logout) requires a manual click.
+
+`$BROWSER_LOCKFILE` (`/tmp/sketchybar_aws_browser_lock`) has a 10-minute TTL and is removed only on background success. While present, the section-3 lockfile gate keeps the bar at red `"auth"` and prevents repeat browser openings.
 
 ### Files
 
