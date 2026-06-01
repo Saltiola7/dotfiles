@@ -1,0 +1,18 @@
+#!/bin/bash
+# Installs graphify skill for OpenCode after graphifyy package is available.
+# Re-runs when Brewfile changes (which declares uv "graphifyy" version).
+#
+# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+
+set -e
+
+if ! command -v graphify &>/dev/null; then
+    echo "[chezmoi] graphify not found. Skipping skill install." >&2
+    echo "[chezmoi] Run 'brew bundle' first to install graphifyy via uv." >&2
+    exit 0
+fi
+
+echo "[chezmoi] Installing graphify skill for OpenCode..."
+graphify install --platform opencode
+
+echo "[chezmoi] Graphify skill installed."
