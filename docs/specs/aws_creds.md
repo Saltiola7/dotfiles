@@ -235,32 +235,44 @@ SketchyBar (reactive, every 60s):
          └─ 08:00-00:00 → try silent aws sso login (10s timeout)
               ├─ Success → show "renewed"
               └─ Failure → Microsoft session expired:
-                   1. Open myapps.microsoft.com in Zen Browser
-                   2. After 8s: 1Password autofill (Alt+. → Enter → Enter)
-                   3. After 30s MFA wait: background `aws sso login --profile X`
+                   1. Background `aws sso login --profile X` (opens OIDC URL in Zen)
+                   2. After 3s: 1Password autofill (Alt+. → Enter → Enter)
+                   3. aws sso login polls its callback; exits when MS+AWS auth complete
                    4. On success: refresh epoch, warm STS, fire `aws_sso_refreshed`
                    5. macOS notification: "AWS SSO restored automatically"
-                   6. Initial bar state: "auth" (red); flips green on bg success
+                   6. Bar: red "auth" → green within 1s of bg success
 ```
 
 **No overlap:** launchd handles proactive scheduled refreshes at fixed times. SketchyBar handles reactive recovery when the token actually expires between scheduled runs. The STS probe is the source of truth — the 8-hour countdown is an estimate that the probe corrects.
 
 ### Recovery flow internals
 
-When the silent `aws sso login` (10s timeout) fails, the plugin enters the Microsoft-session-expired branch. The branch dispatches a background subshell that handles the slow flow without blocking the main plugin pass:
+When the silent `aws sso login` (10s timeout) fails, the plugin enters the Microsoft-session-expired branch. It dispatches a single-flow background subshell driven by `aws sso login`'s own OIDC polling, so there are no fixed waits beyond a brief page-render delay.
 
 | Step | Wait | Action |
 |---|---|---|
-| 1 | 8s | After opening Zen at `myapps.microsoft.com`, wait for the page to render. |
-| 2 | — | Activate Zen, send Alt+Period (1Password picker), Enter (fill), 1.0s, Enter (submit). |
-| 3 | 30s | Wait for Microsoft MFA + page settle. |
-| 4 | — | Run `aws sso login --profile $AWS_PROFILE` in the background. Browser is MS-authed by now, so the OIDC URL completes through "Allow access" without re-prompting credentials. |
+| 1 | — | Background-start `aws sso login --profile $AWS_PROFILE`. The CLI generates an OIDC URL and calls `open` on it; Zen handles the URL and redirects through AWS SSO portal → Microsoft Entra → MS sign-in if the MS session is dead. |
+| 2 | 3s | Wait for the OIDC redirect chain to land on the MS sign-in page. |
+| 3 | — | Activate Zen. Send Alt+Period (1Password picker), Enter (fill MS form), 1.0s, Enter (submit). |
+| 4 | — | `aws sso login` keeps polling its OIDC callback. As soon as MS auth completes (and the user clicks "Allow access" if prompted), the CLI exits 0. Default polling timeout is ~10 minutes, ample for MFA. |
 | 5 | — | On success: delete `$BROWSER_LOCKFILE`, write `$LOGIN_EPOCH_FILE`, warm STS, post a notification, fire `sketchybar --trigger aws_sso_refreshed` so the bar flips green within 1s. |
-| 6 | — | On failure: leave `$BROWSER_LOCKFILE` in place; the 10-minute TTL prevents tight retry loops. |
+| 6 | — | On failure (non-zero exit): leave `$BROWSER_LOCKFILE` in place; the 10-minute TTL prevents tight retry loops. |
 
-The 30-second wait is a fixed heuristic covering typical Microsoft Authenticator approval latency. The autofill keystroke sequence handles only the password-entry page; the "Pick an account" page (rare, only after explicit logout) requires a manual click.
+**Why `aws sso login` is started first.** The CLI owns the browser tab — calling `open` on its own OIDC URL means Zen lands directly on the Microsoft sign-in page (or AWS "Allow access" if MS session is still valid). An older revision opened `myapps.microsoft.com` separately and then ran `aws sso login` afterward; that produced two distinct auth journeys back-to-back for one logical login. The current single-flow design uses the CLI's own browser-opening behavior so there is exactly one tab.
+
+**Why there is no fixed MFA wait.** `aws sso login` polls its OIDC callback for ~10 minutes by default. As soon as MS auth + AWS "Allow access" complete, the callback fires and the CLI exits. A blind `sleep 30` was an earlier mistake that added pure dead time even when MS session was still valid (auth completes in 2-4s in that case). The new flow reads progress from the CLI itself via `wait "$AWS_LOGIN_PID"`.
+
+The autofill keystroke sequence handles only the password-entry page; the "Pick an account" page (rare, only after explicit `aws sso logout`) requires a manual click. MFA latency is bounded by the user's Authenticator approval speed, not by a fixed timer.
 
 `$BROWSER_LOCKFILE` (`/tmp/sketchybar_aws_browser_lock`) has a 10-minute TTL and is removed only on background success. While present, the section-3 lockfile gate keeps the bar at red `"auth"` and prevents repeat browser openings.
+
+### Expected user-visible recovery time
+
+| Scenario | Time from STS-failure detection to bar going green |
+|---|---|
+| MS session still valid (cookie alive) | ~5–10 seconds |
+| MFA approval needed | ~10–30 seconds, bounded by user MFA tap latency |
+| User AFK during recovery | bounded by `aws sso login`'s ~10min polling timeout, then the 10-minute lockfile cooldown |
 
 ### Files
 

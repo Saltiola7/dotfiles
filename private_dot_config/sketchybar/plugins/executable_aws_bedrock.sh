@@ -128,39 +128,33 @@ rm -f "$RECOVERY_LOCKFILE"
 # ── 5. Silent recovery failed → Microsoft session expired ──
 touch "$BROWSER_LOCKFILE"
 
-/usr/bin/osascript -e 'display notification "Microsoft session expired. Opening Zen Browser for authentication." with title "AWS SSO" subtitle "Auto-login + AWS SSO will run in background"' 2>/dev/null
+/usr/bin/osascript -e 'display notification "Microsoft session expired. Opening Zen for authentication." with title "AWS SSO" subtitle "1Password autofill + AWS SSO will run automatically"' 2>/dev/null
 
-open -a "Zen" "https://myapps.microsoft.com" 2>/dev/null
-
-# Background flow: log in to Microsoft, then re-run `aws sso login`.
+# Single-flow recovery:
 #
-# Step 1: best-effort 1Password autofill + Enter on the Microsoft sign-in page.
-#   Sequence (verified against Zen profile bindings — see
-#   ~/Library/Application Support/zen/Profiles/<profile>/extension-settings.json,
-#   which shows _execute_browser_action => Alt+Period for 1Password):
-#
-#     1. Wait for the Microsoft sign-in page to render.
-#     2. Activate Zen so keystrokes land in the browser, not SketchyBar.
-#     3. Alt+Period — opens the 1Password browser-action picker with
-#        the top suggestion highlighted. (Cmd+\ is desktop-app only.)
-#     4. Enter — activates the highlighted suggestion → fills form fields.
-#     5. Wait ~1s for the picker to close and form focus to return.
-#     6. Enter — submits the Microsoft "Enter password" form.
-#
-# Step 2: after Microsoft auth completes (fixed wait covering MFA), run
-# `aws sso login --profile X` in the background. This is REQUIRED — the
-# Microsoft sign-in alone does NOT establish AWS credentials. `aws sso
-# login` opens its own OIDC URL in Zen which, since Zen is now MS-authed,
-# completes through to "Allow access" with at most one click.
-#
-# Step 3: SketchyBar's next 60s tick sees STS alive → goes green
-# (or instant via the aws_sso_refreshed trigger fired below).
+# 1. Start `aws sso login` in the background. It opens its own OIDC URL in
+#    the default browser (Zen). Zen redirects through AWS SSO portal →
+#    Microsoft Entra → MS sign-in if the MS session is dead.
+# 2. Wait ~3s for the OIDC redirect chain to land on the MS sign-in page.
+# 3. Fire 1Password autofill keystrokes (Alt+Period → Enter → Enter) to
+#    populate and submit the MS form. Note: 1Password binding in Zen is
+#    Alt+Period (Cmd+\ is desktop-app only — see
+#    ~/Library/Application Support/zen/Profiles/<p>/extension-settings.json).
+# 4. `aws sso login` keeps polling its OIDC callback. As soon as MS auth
+#    + AWS "Allow access" complete, the CLI exits 0. Default CLI timeout
+#    is ~10 minutes — plenty for slow MFA approvals.
+# 5. On success: clean up lockfile, refresh login epoch, warm STS, post
+#    notification, fire aws_sso_refreshed trigger so the bar flips green
+#    within 1 second.
 #
 # Edge cases NOT handled (by design):
 #   - "Pick an account" page after explicit logout — user clicks manually.
-#   - MFA prompt — fixed 30s wait covers typical Authenticator approval.
+#   - MFA prompt — covered by aws sso login's own ~10min polling.
 (
-    sleep 8
+    "$AWS_BIN" sso login --profile "$AWS_PROFILE" >/tmp/sketchybar_aws_bg_login.log 2>&1 &
+    AWS_LOGIN_PID=$!
+
+    sleep 3
     /usr/bin/osascript -e '
     tell application "Zen" to activate
     delay 0.5
@@ -173,11 +167,7 @@ open -a "Zen" "https://myapps.microsoft.com" 2>/dev/null
     end tell
     ' 2>/dev/null
 
-    # Wait for Microsoft auth + MFA to complete, then kick off AWS SSO login.
-    # Browser is MS-authed by now → `aws sso login` opens OIDC URL in Zen,
-    # which redirects through to "Allow access" without re-prompting creds.
-    sleep 30
-    "$AWS_BIN" sso login --profile "$AWS_PROFILE" >/tmp/sketchybar_aws_bg_login.log 2>&1
+    wait "$AWS_LOGIN_PID"
     if [ $? -eq 0 ]; then
         rm -f "$BROWSER_LOCKFILE"
         date +%s > "$LOGIN_EPOCH_FILE"
