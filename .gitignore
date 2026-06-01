@@ -8,8 +8,6 @@ __pycache__/
 .venv/
 uv.lock
 .aider*
-.sisyphus/
-.omo/
 .opencode/plugins/graphify.js
 .opencode/opencode.json
 .opencode/package.json

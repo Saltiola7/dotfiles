@@ -2,6 +2,7 @@
 
 **Status:** Experimental (v1, initial implementation)
 **Created:** 2026-04-20
+**Last updated:** 2026-06-01
 
 ## Overview
 
@@ -79,6 +80,87 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 | `sqlite3` (stdlib) | kitty-query.py | Queries opencode's session database (parameterized queries, no SQL injection) |
 | `opencode` | opencode-kitty | `opencode db path`, `opencode --session` |
 | OpenCode SQLite DB | kitty-query.py | Session lookup (`~/.local/share/opencode/opencode.db`) |
+
+## Behavior Scenarios
+
+### Feature: Workspace Launch
+
+**Scenario: First hotkey press creates workspace**
+- Given Kitty is running with remote control socket available
+- And no workspace OS window exists for the target project
+- When the user presses the PyCharm hotkey for that project
+- Then a new OS window is created tagged with `workspace=<project_name>`
+- And base tabs are built per `build_*` function (or generic fallback)
+- And server panes have commands pre-typed (not auto-executed)
+- And the opencode tab launches with session resumption
+
+**Scenario: Second hotkey press focuses existing workspace**
+- Given a workspace OS window already exists for the target project
+- When the user presses the PyCharm hotkey for that project
+- Then the existing OS window is focused (brought to front)
+- And no duplicate workspace is created
+
+**Scenario: Kitty not running**
+- Given Kitty is not running
+- When the user presses the PyCharm hotkey
+- Then Kitty is launched via `open -a kitty`
+- And the script waits up to 15s for the remote control socket
+- And the workspace is built in the new Kitty instance
+- And the default startup OS window is closed after build completes
+
+**Scenario: Concurrent hotkey presses (lock prevents race)**
+- Given the workspace lock `/tmp/kitty-workspace.lock` exists and is fresh (<30s)
+- When a second hotkey invocation starts
+- Then it exits immediately without creating anything
+
+### Feature: Snapshot Save/Restore
+
+**Scenario: Save workspace state (F16)**
+- Given the user is focused in a workspace OS window
+- When F16 is pressed
+- Then `save-workspace.py` captures all tabs, panes, commands, and working directories
+- And writes `{workspace}.snapshot.conf`
+- And copies the opencode map file to `.map.snapshot`
+
+**Scenario: Restore from snapshot on workspace open**
+- Given a snapshot file exists for the target workspace
+- When the workspace is created (first hotkey press)
+- Then base `build_*` tabs are created first
+- And `restore_extra_tabs` adds non-base tabs from the snapshot
+- And opencode sessions are seeded from the map snapshot
+
+### Feature: OpenCode Session Resumption
+
+**Scenario: Resume existing bound session**
+- Given opencode-kitty starts in a pane
+- And a binding exists in the `.map` file for this window ID
+- And the bound session still exists in the OpenCode database
+- When session resolution runs
+- Then opencode launches with `--session <bound_id>`
+
+**Scenario: Pick seeded session**
+- Given no direct binding exists for this window ID
+- And a `.seed` file exists with unbound session IDs
+- When session resolution runs
+- Then the first unbound seeded session is picked
+- And a new binding is written to the `.map` file
+- And the seed entry is consumed
+
+**Scenario: Fall back to most recent unbound session**
+- Given no direct binding and no seed file
+- When session resolution runs
+- Then the OpenCode database is queried for the most recent unbound session matching the project directory
+- And if found, a new binding is written and the session is resumed
+
+**Scenario: Fresh session (no history)**
+- Given no binding, no seed, and no unbound sessions in DB
+- When session resolution runs
+- Then opencode launches without `--session` (creates new session)
+
+**Scenario: Stale bindings are purged**
+- Given the `.map` file contains window IDs that no longer exist in `kitty @ ls`
+- When opencode-kitty starts (or workspace opens)
+- Then stale bindings are removed from the `.map` file before resolution
 
 ## Architecture
 
