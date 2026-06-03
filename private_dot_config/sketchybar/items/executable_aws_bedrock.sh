@@ -38,7 +38,7 @@ sketchybar --add item aws_bedrock.terminal popup.aws_bedrock \
 # Popup: toggle poller on/off
 sketchybar --add item aws_bedrock.toggle popup.aws_bedrock \
     --set aws_bedrock.toggle \
-        icon="󰂯  Toggle Poller" \
+        icon="󰑖  Toggle Poller" \
         icon.color=$YELLOW \
         icon.padding_left=10 \
         icon.font="$FONT:Bold:14.0" \
