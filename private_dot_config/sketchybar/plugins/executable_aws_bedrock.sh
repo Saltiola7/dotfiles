@@ -5,6 +5,7 @@ AWS_BIN="/usr/local/bin/aws"
 LOGIN_EPOCH_FILE="/tmp/sketchybar_aws_login_epoch"
 RECOVERY_LOCKFILE="/tmp/sketchybar_aws_recovery_lock"
 BROWSER_LOCKFILE="/tmp/sketchybar_aws_browser_lock"
+POLLER_DISABLED_FILE="/tmp/sketchybar_aws_poller_disabled"
 SESSION_ESTIMATE_HOURS=8  # Tune this if sessions consistently die earlier/later
 
 # ── 0. Handle mouse events for popup ──
@@ -13,9 +14,22 @@ if [ "$SENDER" = "mouse.exited.global" ]; then
     exit 0
 fi
 
-# ── 1. STS Probe: single source of truth ──
+# ── 0.5. Poller disabled check ──
+if [ -f "$POLLER_DISABLED_FILE" ]; then
+    sketchybar --set $NAME icon.color="0xff6c7086" label="paused" label.color="0xff6c7086" drawing=on
+    exit 0
+fi
+
+# ── 1. STS Probe: single source of truth (with retry) ──
 STS_OUTPUT=$("$AWS_BIN" sts get-caller-identity --profile "$AWS_PROFILE" 2>&1)
 STS_RC=$?
+
+# Retry once after 2s if first probe fails (transient network blip / throttle)
+if [ $STS_RC -ne 0 ]; then
+    sleep 2
+    STS_OUTPUT=$("$AWS_BIN" sts get-caller-identity --profile "$AWS_PROFILE" 2>&1)
+    STS_RC=$?
+fi
 
 # ── 2. STS works — session is alive ──
 if [ $STS_RC -eq 0 ]; then
@@ -102,6 +116,12 @@ HOUR=$(date +%H)
 if [ "$HOUR" -lt 8 ]; then
     sketchybar --set $NAME icon.color="0xff6c7086" label="off" label.color="0xff6c7086" drawing=on
     rm -f "$RECOVERY_LOCKFILE" "$BROWSER_LOCKFILE"
+    exit 0
+fi
+
+# ── PID guard: don't start recovery if aws sso login already running ──
+if pgrep -f "aws sso login.*$AWS_PROFILE" >/dev/null 2>&1; then
+    sketchybar --set $NAME icon.color="0xfff9e2af" label="login..." label.color="0xfff9e2af" drawing=on
     exit 0
 fi
 
