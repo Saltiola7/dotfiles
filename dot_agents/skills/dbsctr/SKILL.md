@@ -20,6 +20,19 @@ artifacts rather than creating duplicates.
 **Critical: Read the project's AGENTS.md** for project-specific adaptations before starting any phase.
 The project AGENTS.md defines which patterns to use for error handling, contracts, domain types, and testing.
 
+**Domain Modules (progressive disclosure):** When a task touches a foundational domain, read the
+corresponding module BEFORE starting Phase 1. These modules extend Phases 1 and 4 with domain-specific
+contracts, patterns, and worked examples. Load only what applies:
+
+| Domain signal | Module to read |
+|---|---|
+| Data pipelines, ETL, orchestration, warehouse, streaming | `modules/data.md` |
+| Infrastructure-as-Code, cloud resources, IaC, deployment, scaling | `modules/cloud.md` |
+| ML model training/serving, LLM calls, embeddings, eval, features | `modules/ml.md` |
+
+Multiple modules may apply (e.g., ML pipeline = data + ml; infra for ML platform = cloud + ml).
+When in doubt, load the module — the cost is one extra file read; the cost of missing it is sloppy contracts.
+
 ---
 
 ## Phase 1: Domain
