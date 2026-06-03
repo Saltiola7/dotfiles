@@ -18,7 +18,7 @@ Both contexts coexist on the same machine without interfering. Switching is a ma
 |------|---------|
 | `dot_local/bin/executable_opencode-personal` | Wrapper: unsets Bedrock env, sets Meridian profile, launches OpenCode against the Anthropic provider |
 | `dot_local/bin/executable_claude-personal` | Wrapper: unsets Bedrock env, sets `CLAUDE_CONFIG_DIR` to the personal profile, launches Claude Code |
-| `private_dot_config/opencode/opencode.json` | OpenCode config — declares Bedrock (work, default), Anthropic-via-Meridian, LM Studio, and Google providers; loads `opencode-with-claude` plugin |
+| `private_dot_config/opencode/opencode.json.tmpl` | OpenCode config — declares Bedrock (work, default), Anthropic-via-Meridian, LM Studio, Moonshot, and Google providers; loads `opencode-with-claude` plugin |
 | `private_dot_config/meridian/profiles.json.tmpl` | Meridian profile registry — points the `personal` profile at an isolated `CLAUDE_CONFIG_DIR` (templated on `{{ "{{ .chezmoi.homeDir }}" }}`) |
 | `private_dot_config/meridian/sdk-features.json` | Meridian SDK feature toggles for OpenCode: memory, auto-dream, full CLAUDE.md |
 | `npm-global-packages.txt` | Plain text list of npm packages installed globally |

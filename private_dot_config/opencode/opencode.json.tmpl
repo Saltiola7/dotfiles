@@ -1,6 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-with-claude"],
+  "plugin": [
+    "opencode-with-claude"
+  ],
   "provider": {
     "anthropic": {
       "options": {
@@ -23,6 +25,24 @@
       }
     },
     "google": {},
+    "moonshotai": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Moonshot (Kimi)",
+      "options": {
+        "baseURL": "https://api.moonshot.ai/v1",
+        "apiKey": "{env:MOONSHOT_API_KEY}"
+      },
+      "models": {
+        "kimi-k2-turbo-preview": {
+          "name": "Kimi K2 Turbo (preview)",
+          "limit": { "context": 256000, "output": 8192 }
+        },
+        "moonshot-v1-32k": {
+          "name": "Moonshot v1 32k",
+          "limit": { "context": 32000, "output": 4096 }
+        }
+      }
+    },
     "lmstudio": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "LM Studio (local)",
@@ -32,17 +52,11 @@
       "models": {
         "google/gemma-4-31b": {
           "name": "Gemma 4 31B (local)",
-          "limit": {
-            "context": 32768,
-            "output": 8192
-          }
+          "limit": { "context": 32768, "output": 8192 }
         },
         "qwen/qwen3-coder-next": {
           "name": "Qwen3 Coder Next (local)",
-          "limit": {
-            "context": 32768,
-            "output": 8192
-          }
+          "limit": { "context": 32768, "output": 8192 }
         }
       }
     }

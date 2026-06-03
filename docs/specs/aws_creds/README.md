@@ -2,6 +2,7 @@
 
 **Status:** Stable
 **Created:** 2026-04-28
+**Last updated:** 2026-06-01
 
 ## Overview
 
@@ -235,13 +236,44 @@ SketchyBar (reactive, every 60s):
          └─ 08:00-00:00 → try silent aws sso login (10s timeout)
               ├─ Success → show "renewed"
               └─ Failure → Microsoft session expired:
-                   1. Open myapps.microsoft.com in Zen Browser
-                   2. Trigger 1Password autofill (Cmd+\) after 3s
-                   3. macOS notification: "Manual auth required"
-                   4. Show "auth" (red)
+                   1. Background `aws sso login --profile X` (opens OIDC URL in Zen)
+                   2. After 3s: 1Password autofill (Alt+. → Enter → Enter)
+                   3. aws sso login polls its callback; exits when MS+AWS auth complete
+                   4. On success: refresh epoch, warm STS, fire `aws_sso_refreshed`
+                   5. macOS notification: "AWS SSO restored automatically"
+                   6. Bar: red "auth" → green within 1s of bg success
 ```
 
 **No overlap:** launchd handles proactive scheduled refreshes at fixed times. SketchyBar handles reactive recovery when the token actually expires between scheduled runs. The STS probe is the source of truth — the 8-hour countdown is an estimate that the probe corrects.
+
+### Recovery flow internals
+
+When the silent `aws sso login` (10s timeout) fails, the plugin enters the Microsoft-session-expired branch. It dispatches a single-flow background subshell driven by `aws sso login`'s own OIDC polling, so there are no fixed waits beyond a brief page-render delay.
+
+| Step | Wait | Action |
+|---|---|---|
+| 1 | — | Background-start `aws sso login --profile $AWS_PROFILE`. The CLI generates an OIDC URL and calls `open` on it; Zen handles the URL and redirects through AWS SSO portal → Microsoft Entra → MS sign-in if the MS session is dead. |
+| 2 | 3s | Wait for the OIDC redirect chain to land on the MS sign-in page. |
+| 3 | — | Activate Zen. Send Alt+Period (1Password picker), Enter (fill MS form), 1.0s, Enter (submit). |
+| 4 | — | `aws sso login` keeps polling its OIDC callback. As soon as MS auth completes (and the user clicks "Allow access" if prompted), the CLI exits 0. Default polling timeout is ~10 minutes, ample for MFA. |
+| 5 | — | On success: delete `$BROWSER_LOCKFILE`, write `$LOGIN_EPOCH_FILE`, warm STS, post a notification, fire `sketchybar --trigger aws_sso_refreshed` so the bar flips green within 1s. |
+| 6 | — | On failure (non-zero exit): leave `$BROWSER_LOCKFILE` in place; the 10-minute TTL prevents tight retry loops. |
+
+**Why `aws sso login` is started first.** The CLI owns the browser tab — calling `open` on its own OIDC URL means Zen lands directly on the Microsoft sign-in page (or AWS "Allow access" if MS session is still valid). An older revision opened `myapps.microsoft.com` separately and then ran `aws sso login` afterward; that produced two distinct auth journeys back-to-back for one logical login. The current single-flow design uses the CLI's own browser-opening behavior so there is exactly one tab.
+
+**Why there is no fixed MFA wait.** `aws sso login` polls its OIDC callback for ~10 minutes by default. As soon as MS auth + AWS "Allow access" complete, the callback fires and the CLI exits. A blind `sleep 30` was an earlier mistake that added pure dead time even when MS session was still valid (auth completes in 2-4s in that case). The new flow reads progress from the CLI itself via `wait "$AWS_LOGIN_PID"`.
+
+The autofill keystroke sequence handles only the password-entry page; the "Pick an account" page (rare, only after explicit `aws sso logout`) requires a manual click. MFA latency is bounded by the user's Authenticator approval speed, not by a fixed timer.
+
+`$BROWSER_LOCKFILE` (`/tmp/sketchybar_aws_browser_lock`) has a 10-minute TTL and is removed only on background success. While present, the section-3 lockfile gate keeps the bar at red `"auth"` and prevents repeat browser openings.
+
+### Expected user-visible recovery time
+
+| Scenario | Time from STS-failure detection to bar going green |
+|---|---|
+| MS session still valid (cookie alive) | ~5–10 seconds |
+| MFA approval needed | ~10–30 seconds, bounded by user MFA tap latency |
+| User AFK during recovery | bounded by `aws sso login`'s ~10min polling timeout, then the 10-minute lockfile cooldown |
 
 ### Files
 
@@ -267,3 +299,169 @@ awslogin   # alias for ~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-30243
 Running `aws sso login --profile …` directly bypasses the last two — the bar can lag up to 60s behind a successful login.
 
 The alias is defined in `dot_common_profile.tmpl` next to other aliases.
+
+## Domain
+
+### Bounded Context
+
+AWS SSO credential lifecycle management — proactive refresh (launchd), reactive recovery (SketchyBar), and manual refresh (shell alias).
+
+Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Password (autofill), Microsoft Entra ID (upstream IdP).
+
+### Entities
+
+- **SSOSession** — the AWS SSO session containing access token + refresh token, identified by cache file path
+- **RecoveryAttempt** — a single invocation of the background recovery flow, gated by lockfiles
+
+### Value Objects
+
+- **STSProbeResult** — success/failure of `aws sts get-caller-identity`
+- **LockfileState** — presence + age of browser/recovery lockfiles
+- **BarIndicator** — color + label text representing current credential state
+
+### Domain Events
+
+- `STSProbeFailed` — refresh token is dead, recovery needed
+- `SilentLoginSucceeded` — 10s timeout login worked (MS session valid)
+- `SilentLoginFailed` — MS session expired, interactive recovery needed
+- `RecoveryStarted` — bg `aws sso login` launched, lockfile created
+- `RecoveryCompleted` — bg login exited 0, bar goes green
+- `RecoveryFailed` — bg login exited non-zero, lockfile TTL prevents retry
+- `ScheduledRefreshFired` — launchd slot triggered (08:00/15:59/22:45)
+
+### Ubiquitous Language
+
+| Term | Definition |
+|------|-----------|
+| STS probe | `aws sts get-caller-identity` — forces SDK to use refresh token or fail |
+| refresh token | ~8h token in SSO cache; only `aws sso login` renews it |
+| access token | ~1h token; SDK renews silently from refresh token |
+| silent login | `timeout 10 aws sso login` — succeeds only if MS session is alive |
+| recovery flow | Full interactive: bg `aws sso login` + 1Password autofill + MFA |
+| browser lockfile | `/tmp/sketchybar_aws_browser_lock` — 10min TTL, gates recovery retries |
+| login epoch | `/tmp/sketchybar_aws_login_epoch` — unix timestamp of last successful login |
+| bar tick | SketchyBar plugin runs every 60s (`update_freq=60`) |
+
+## Behavior Scenarios
+
+### Feature: Proactive Scheduled Refresh (launchd)
+
+**Scenario: STS alive at scheduled slot**
+- Given the launchd agent fires at 15:59
+- And `aws sts get-caller-identity` succeeds
+- When `aws-sso-refresh` runs
+- Then it skips `aws sso login` entirely
+- And triggers SketchyBar update
+- And exits 0
+
+**Scenario: STS dead at first slot of day**
+- Given the launchd agent fires at 08:00
+- And `aws sts get-caller-identity` fails (refresh token expired overnight)
+- When `aws-sso-refresh` runs
+- Then it invokes `aws sso login --profile BedrockDeveloperAccess-302432775606`
+- And the browser opens for Microsoft auth + MFA
+
+### Feature: Reactive Recovery (SketchyBar plugin)
+
+**Scenario: STS alive during work hours**
+- Given the bar tick fires between 08:00-00:00
+- And `aws sts get-caller-identity` succeeds
+- When the plugin evaluates
+- Then bar shows green with countdown (e.g., "7h59m")
+- And no recovery action is taken
+
+**Scenario: STS dead, silent login succeeds**
+- Given the bar tick fires between 08:00-00:00
+- And `aws sts get-caller-identity` fails
+- And Microsoft session cookie is still valid in Zen
+- When the plugin attempts `timeout 10 aws sso login`
+- Then the login completes within 10s (OIDC callback fires)
+- And bar shows green "renewed"
+
+**Scenario: STS dead, silent login fails, recovery launched**
+- Given the bar tick fires between 08:00-00:00
+- And `aws sts get-caller-identity` fails
+- And `timeout 10 aws sso login` fails (MS session expired)
+- And no browser lockfile exists (or TTL expired)
+- When the plugin enters the recovery branch
+- Then it backgrounds `aws sso login --profile X` (opens OIDC URL in Zen)
+- And waits 3s for page render
+- And fires 1Password autofill (Alt+Period → Enter → Enter)
+- And `aws sso login` polls OIDC callback (~10min timeout)
+- And bar shows red "auth"
+
+**Scenario: Recovery succeeds (MFA approved)**
+- Given a recovery attempt is running (`aws sso login` polling)
+- When the user approves MFA in Microsoft Authenticator
+- Then `aws sso login` exits 0
+- And browser lockfile is deleted
+- And login epoch file is updated
+- And STS is warmed
+- And macOS notification fires: "AWS SSO restored automatically"
+- And `sketchybar --trigger aws_sso_refreshed` fires
+- And bar flips green within 1s
+
+**Scenario: Recovery fails (timeout or error)**
+- Given a recovery attempt is running
+- When `aws sso login` exits non-zero (polling timeout, network error)
+- Then browser lockfile remains (10min TTL)
+- And bar stays red "auth"
+- And no retry until lockfile TTL expires
+
+**Scenario: Lockfile prevents duplicate recovery**
+- Given browser lockfile exists and is less than 10 minutes old
+- When the bar tick fires and STS fails
+- Then no recovery is attempted
+- And bar stays red "auth"
+
+**Scenario: Outside work hours**
+- Given the bar tick fires between 00:00-08:00
+- And `aws sts get-caller-identity` fails
+- When the plugin evaluates
+- Then bar shows gray "off"
+- And no recovery action is taken
+
+### Feature: Manual Refresh (shell alias)
+
+**Scenario: awslogin when STS alive**
+- Given user runs `awslogin` in terminal
+- And STS probe succeeds
+- When `aws-sso-refresh` runs
+- Then it prints "session alive" and skips login
+- And writes login epoch
+- And triggers SketchyBar
+
+**Scenario: awslogin when STS dead**
+- Given user runs `awslogin` in terminal
+- And STS probe fails
+- When `aws-sso-refresh` runs
+- Then it invokes `aws sso login` (opens browser)
+- And waits for auth completion
+- And writes login epoch on success
+- And triggers SketchyBar
+
+## Contracts & Invariants
+
+### Function: aws-sso-refresh (wrapper script)
+- **Pre:** `$1` (profile name) is provided and exists in `~/.aws/config`
+- **Pre:** `aws` CLI is available at `/usr/local/bin/aws`
+- **Post:** On skip (STS alive): login epoch updated, SketchyBar triggered, exit 0
+- **Post:** On login success: new refresh token in SSO cache, login epoch updated, exit 0
+- **Post:** On login failure: exit non-zero, no epoch update
+
+### Function: executable_aws_bedrock.sh (SketchyBar plugin)
+- **Pre:** `$AWS_PROFILE` environment variable set in plugin context
+- **Pre:** SketchyBar is running and `aws_bedrock` item exists
+- **Post:** Bar label always reflects current state (countdown, "renew...", "auth", "off", "renewed")
+- **Post:** At most one recovery subshell running at a time (browser lockfile gate)
+- **Post:** On recovery success: epoch + STS warm + trigger fire all happen atomically in success branch
+
+### Module: Recovery Flow (section 5 of plugin)
+- **Invariant:** Browser lockfile exists IFF a recovery attempt is in progress or recently failed (10min TTL)
+- **Invariant:** Only one `aws sso login` background process runs at a time per lockfile
+- **Invariant:** Recovery branch never fires outside 08:00-00:00
+- **Invariant:** 1Password autofill keystrokes fire only after `sleep 3` page-render delay
+
+### Module: Countdown Display
+- **Invariant:** Countdown is based on `login_epoch + 8h - now`, never on `accessToken.expiresAt`
+- **Invariant:** Color thresholds: green (>4h), yellow (2-4h), peach (1-2h), red (<1h)

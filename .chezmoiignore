@@ -13,3 +13,27 @@ README.md
 **/__pycache__/
 zen-catppuccin-mocha/
 interactive_installers.sh
+
+# Lock-managed agent skills (produced by run_onchange_install-skills.sh)
+.agents/skills/caveman
+.agents/skills/caveman-commit
+.agents/skills/caveman-compress
+.agents/skills/caveman-help
+.agents/skills/caveman-review
+.agents/skills/compress
+.agents/skills/find-skills
+.agents/skills/marimo-pair
+.agents/skills/graphify
+
+# Graphify-managed (produced by run_onchange_install-graphify.sh)
+.config/opencode/skills
+
+# OpenCode runtime artifacts
+.config/opencode/node_modules
+.config/opencode/package.json
+.config/opencode/package-lock.json
+.config/opencode/bun.lock
+.config/opencode/.gitignore
+
+# Claude Code (not using)
+.claude
