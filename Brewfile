@@ -138,7 +138,6 @@ cask "rustdesk"
 cask "shortcat"
 cask "speedify"
 cask "tailscale-app"
-cask "warp"
 cask "wave"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
