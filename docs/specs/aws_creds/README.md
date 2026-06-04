@@ -315,32 +315,40 @@ Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Pa
 
 ### Value Objects
 
-- **STSProbeResult** — success/failure of `aws sts get-caller-identity`
+- **STSProbeResult** — success/failure of `aws sts get-caller-identity` (after retry if first attempt fails)
 - **LockfileState** — presence + age of browser/recovery lockfiles
 - **BarIndicator** — color + label text representing current credential state
+- **PollerState** — enabled/disabled; persisted to `/tmp/sketchybar_aws_poller_disabled` (presence = disabled)
 
 ### Domain Events
 
-- `STSProbeFailed` — refresh token is dead, recovery needed
+- `STSProbeRetried` — first STS probe failed, retrying after 2s backoff
+- `STSProbeFailed` — both STS attempts failed, refresh token is dead, recovery needed
 - `SilentLoginSucceeded` — 10s timeout login worked (MS session valid)
 - `SilentLoginFailed` — MS session expired, interactive recovery needed
+- `DuplicateLoginDetected` — `pgrep` found existing `aws sso login` process, skipping recovery
 - `RecoveryStarted` — bg `aws sso login` launched, lockfile created
 - `RecoveryCompleted` — bg login exited 0, bar goes green
 - `RecoveryFailed` — bg login exited non-zero, lockfile TTL prevents retry
 - `ScheduledRefreshFired` — launchd slot triggered (08:00/15:59/22:45)
+- `PollerToggled` — user toggled poller on/off via popup menu
 
 ### Ubiquitous Language
 
 | Term | Definition |
 |------|-----------|
 | STS probe | `aws sts get-caller-identity` — forces SDK to use refresh token or fail |
+| STS retry | If first STS probe fails, wait 2s and try once more before declaring session dead |
+| PID guard | `pgrep -f "aws sso login"` check — prevents concurrent OIDC flows fighting over callback port |
 | refresh token | ~8h token in SSO cache; only `aws sso login` renews it |
 | access token | ~1h token; SDK renews silently from refresh token |
 | silent login | `timeout 10 aws sso login` — succeeds only if MS session is alive |
 | recovery flow | Full interactive: bg `aws sso login` + 1Password autofill + MFA |
 | browser lockfile | `/tmp/sketchybar_aws_browser_lock` — 10min TTL, gates recovery retries |
 | login epoch | `/tmp/sketchybar_aws_login_epoch` — unix timestamp of last successful login |
-| bar tick | SketchyBar plugin runs every 60s (`update_freq=60`) |
+| bar tick | SketchyBar plugin runs every 60s (`update_freq=60`) when poller enabled |
+| poller | 60s STS check cycle in SketchyBar plugin; can be toggled on/off via popup |
+| poller disabled file | `/tmp/sketchybar_aws_poller_disabled` — presence means poller is off |
 
 ## Behavior Scenarios
 
@@ -369,6 +377,23 @@ Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Pa
 - When the plugin evaluates
 - Then bar shows green with countdown (e.g., "7h59m")
 - And no recovery action is taken
+
+**Scenario: STS transient failure, retry succeeds**
+- Given the bar tick fires between 08:00-00:00
+- And the first `aws sts get-caller-identity` call fails (network blip, throttle)
+- When the plugin retries after 2s
+- And the second STS probe succeeds
+- Then bar shows green with countdown
+- And no recovery action is taken
+
+**Scenario: STS dead, but aws sso login already running (PID guard)**
+- Given the bar tick fires between 08:00-00:00
+- And both STS probes fail (session genuinely dead)
+- And `pgrep -f "aws sso login"` finds an existing process (from LaunchAgent or prior recovery)
+- When the plugin evaluates
+- Then bar shows yellow "login..."
+- And no new `aws sso login` process is started
+- And no browser is opened
 
 **Scenario: STS dead, silent login succeeds**
 - Given the bar tick fires between 08:00-00:00
@@ -421,6 +446,31 @@ Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Pa
 - Then bar shows gray "off"
 - And no recovery action is taken
 
+### Feature: Poller Toggle (popup menu)
+
+**Scenario: User disables poller**
+- Given the poller is currently enabled (`update_freq=60`)
+- When user clicks "Toggle Poller" in the popup menu
+- Then `/tmp/sketchybar_aws_poller_disabled` file is created
+- And `update_freq` is set to 0 (no recurring execution)
+- And bar shows gray "paused"
+- And popup closes
+
+**Scenario: User re-enables poller**
+- Given the poller is currently disabled (disable file exists, `update_freq=0`)
+- When user clicks "Toggle Poller" in the popup menu
+- Then `/tmp/sketchybar_aws_poller_disabled` file is removed
+- And `update_freq` is set to 60
+- And an immediate STS check runs (via `aws_sso_refreshed` trigger)
+- And popup closes
+
+**Scenario: Poller disabled, bar tick fires**
+- Given the poller disabled file exists
+- When the plugin is invoked (by event or manual trigger)
+- Then bar shows gray "paused"
+- And no STS probe is made
+- And no recovery is attempted
+
 ### Feature: Manual Refresh (shell alias)
 
 **Scenario: awslogin when STS alive**
@@ -452,16 +502,29 @@ Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Pa
 ### Function: executable_aws_bedrock.sh (SketchyBar plugin)
 - **Pre:** `$AWS_PROFILE` environment variable set in plugin context
 - **Pre:** SketchyBar is running and `aws_bedrock` item exists
-- **Post:** Bar label always reflects current state (countdown, "renew...", "auth", "off", "renewed")
-- **Post:** At most one recovery subshell running at a time (browser lockfile gate)
+- **Post:** Bar label always reflects current state (countdown, "renew...", "auth", "off", "renewed", "paused", "login...")
+- **Post:** At most one recovery subshell running at a time (browser lockfile gate + PID guard)
 - **Post:** On recovery success: epoch + STS warm + trigger fire all happen atomically in success branch
+
+### Module: STS Probe (section 1 of plugin)
+- **Invariant:** STS is never declared failed after a single attempt — always retry once after 2s
+- **Invariant:** Only after both probes fail does the plugin enter the recovery path
+
+### Module: PID Guard (before recovery sections)
+- **Invariant:** If `pgrep -f "aws sso login"` finds a running process, no new `aws sso login` is started
+- **Invariant:** PID guard check happens before both silent recovery (section 4) and full recovery (section 5)
 
 ### Module: Recovery Flow (section 5 of plugin)
 - **Invariant:** Browser lockfile exists IFF a recovery attempt is in progress or recently failed (10min TTL)
-- **Invariant:** Only one `aws sso login` background process runs at a time per lockfile
+- **Invariant:** Only one `aws sso login` background process runs at a time per lockfile + PID guard
 - **Invariant:** Recovery branch never fires outside 08:00-00:00
 - **Invariant:** 1Password autofill keystrokes fire only after `sleep 3` page-render delay
 
+### Module: Poller Toggle
+- **Invariant:** `/tmp/sketchybar_aws_poller_disabled` presence = poller off, `update_freq=0`
+- **Invariant:** When poller disabled, plugin shows "paused" and exits immediately — no STS call, no recovery
+- **Invariant:** Toggle click atomically flips file + `update_freq` in a single `click_script`
+
 ### Module: Countdown Display
 - **Invariant:** Countdown is based on `login_epoch + 8h - now`, never on `accessToken.expiresAt`
-- **Invariant:** Color thresholds: green (>4h), yellow (2-4h), peach (1-2h), red (<1h)
+- **Invariant:** Color thresholds: green (>=3h), yellow (>=1.5h), peach (>=45m), red (<45m)

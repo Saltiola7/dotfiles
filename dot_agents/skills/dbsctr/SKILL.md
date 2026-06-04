@@ -20,6 +20,19 @@ artifacts rather than creating duplicates.
 **Critical: Read the project's AGENTS.md** for project-specific adaptations before starting any phase.
 The project AGENTS.md defines which patterns to use for error handling, contracts, domain types, and testing.
 
+**Domain Modules (progressive disclosure):** When a task touches a foundational domain, read the
+corresponding module BEFORE starting Phase 1. These modules extend Phases 1 and 4 with domain-specific
+contracts, patterns, and worked examples. Load only what applies:
+
+| Domain signal | Module to read |
+|---|---|
+| Data pipelines, ETL, orchestration, warehouse, streaming | `modules/data.md` |
+| Infrastructure-as-Code, cloud resources, IaC, deployment, scaling | `modules/cloud.md` |
+| ML model training/serving, LLM calls, embeddings, eval, features | `modules/ml.md` |
+
+Multiple modules may apply (e.g., ML pipeline = data + ml; infra for ML platform = cloud + ml).
+When in doubt, load the module — the cost is one extra file read; the cost of missing it is sloppy contracts.
+
 ---
 
 ## Phase 1: Domain
@@ -35,6 +48,19 @@ The project AGENTS.md defines which patterns to use for error handling, contract
 6. Write domain types using the project's conventions:
    - Check project AGENTS.md for domain type patterns (Django models, Pydantic, dataclasses, etc.)
    - Structure only — no logic yet
+7. Identify external data sources and sinks as named domain concepts:
+   - Each source the system reads from (files, APIs, webhooks, queues) gets a name in the ubiquitous language
+   - Each sink the system writes to (output files, downstream APIs, caches) gets a name
+   - For multi-hop pipelines, sketch the full chain using arrow notation:
+     ```
+     source: raw_events (Kafka topic)
+       → transform: deduplicate + validate schema
+       → intermediate: validated_events (staging table)
+       → transform: enrich with user profile join
+       → serve: enriched_events (production table)
+       freshness: source updates continuously; serve ≤ 5min behind source
+     ```
+   - Document expected schema shape informally here — formal contracts come in Phase 4
 
 **Artifact:** If a spec exists in `docs/specs/`, update its domain sections. If no spec exists,
 create one using the project's `docs/specs/_template_spec.md`.
@@ -168,11 +194,39 @@ enforce correctness beyond what tests cover.
 1. For each function from Phase 3, define preconditions (what must be true before calling)
 2. Define postconditions (what must be true after the function returns)
 3. Define class/module invariants (what must ALWAYS be true)
-4. Implement contracts using the project's validation tools:
+4. For each external data boundary (identified in Phase 1), define **data contracts**:
+   - **Source schema**: Declare expected fields/columns, types, and nullability as code
+   - **Table-level invariants**: Uniqueness constraints, referential integrity, value ranges
+   - **Freshness bounds**: Maximum acceptable age for time-partitioned or cached data
+   - **Volume bounds**: Expected row counts or payload sizes with tolerance bands (e.g., ±50% of 7-day avg)
+   - **Materialization strategy**: How outputs are written (see vocabulary below)
+   - **Lineage**: Source → transform → output mapping using column-level notation
+5. Implement contracts using the project's validation tools:
    - Check project AGENTS.md for contract implementation patterns
    - Django projects: model `clean()`, `constraints`, validators, serializer validation
    - Data pipelines: assertions, Pydantic validation
    - Service layer: assertions in function bodies
+   - External data boundaries (files, APIs, webhooks, queues):
+     * Declare source schema as a dataclass, TypedDict, or Pydantic model in `_domain.py`
+     * Add load-time assertions that run BEFORE transform logic (row counts, nulls, types)
+     * For tabular data: validate uniqueness keys, referential links between sources
+     * For time-partitioned data: assert freshness (max age since last partition/update)
+     * For API responses: validate shape against schema before deserializing into domain types
+   - Lineage notation (use in spec docs and code comments):
+     * Arrow syntax: `source.column → transform_fn() → output.column`
+     * Fan-in: `[source_a.col, source_b.col] → join_on(key) → output.col`
+     * Derived: `source.col → DERIVED(formula) → output.col`
+   - Materialization vocabulary (choose one per output):
+     * **Full-refresh**: DROP + recreate. Use when table is small or logic changes often.
+     * **Incremental append**: INSERT new rows only. Use for immutable event streams.
+     * **Incremental merge**: UPSERT by key. Use when source rows can be updated.
+     * **Partition-replace**: Replace one partition (e.g., day). Use for gap-fill/backfill patterns.
+     * **Materialized view**: DB engine handles incremental. Use when transform is simple SQL.
+     * **Snapshot (SCD)**: Track historical changes. Use for slowly-changing dimensions.
+   - For each output, document alongside its materialization strategy:
+     * **Idempotency**: Can you re-run safely? What guarantees does the strategy provide?
+     * **Backfill**: How to reprocess historical data? (date range param, full replay, etc.)
+     * **Failure recovery**: If write fails mid-way, what state is the output in? How to resume?
 
 **Artifact:** Two outputs:
 1. Contracts section added to the spec in `docs/specs/` (documentation)
@@ -193,12 +247,44 @@ enforce correctness beyond what tests cover.
 - **Invariant:** page_count >= 0
 - **Invariant:** status is COMPLETE only if page_count > 0
 - **Invariant:** started_at <= completed_at when both are set
+
+### Data Contract: event_feed (API source)
+- **Schema:** event_type (str, required), payload (dict, required), timestamp (ISO8601 str, required)
+- **Uniqueness:** event_id is unique across all received events
+- **Invariant:** event_type ∈ ALLOWED_EVENT_TYPES
+- **Invariant:** timestamp parses to datetime within ±24h of server time
+- **Freshness:** Last event received ≤ 5 minutes ago (health check)
+- **Materialization:** Append-only to event log table
+- **Idempotency:** Safe to re-deliver (deduplicate on event_id)
+- **Failure recovery:** Append is atomic per batch; partial failure leaves prior batches intact
+
+### Data Contract: analytics_cache (tabular source)
+- **Schema:** doc_id (str, not null), metric_name (str, not null), value (float, nullable),
+  partition_date (date, not null)
+- **Uniqueness:** (doc_id, metric_name) is unique per partition_date
+- **Referential:** Every row's doc_id exists in documents source
+- **Freshness:** Latest partition_date ≤ 7 days from today
+- **Volume:** 500K–2M rows/day; tolerance ±50% of 7-day rolling avg; action: warn, don't halt
+- **Materialization:** Partition-replace per pipeline run (keyed on date)
+- **Idempotency:** Safe to re-run — replaces entire partition
+- **Backfill:** Pass date_range param to reprocess historical partitions
+- **Failure recovery:** Incomplete partition is invisible until swap; old partition remains on failure
+
+### Lineage: metric_summary output
+- `analytics_cache.value → avg_by_doc() → metric_summary.mean_value`
+- `[analytics_cache.doc_id, documents.title] → join_on(doc_id) → metric_summary.doc_title`
+- `analytics_cache.partition_date → MAX() → metric_summary.last_seen`
 ```
 
 **TodoWrite items:**
 - Define preconditions for each function
 - Define postconditions for each function
 - Define class/module invariants
+- Define source schemas for external data inputs (as typed code artifacts)
+- Add table-level invariants (uniqueness, referential integrity, value ranges)
+- Define freshness bounds for time-sensitive sources
+- Document materialization strategy for each output (full-refresh / append / merge-on-key)
+- Document lineage using arrow notation (source.col → transform → output.col)
 - Implement contracts using project's validation tools
 - Document contracts in spec
 
@@ -207,6 +293,16 @@ enforce correctness beyond what tests cover.
 - Preconditions validate inputs; postconditions validate outputs
 - Contracts should be cheap to evaluate — no heavy computation
 - Use the project's idiomatic validation tools, not raw assertions everywhere
+- Data contracts apply at ALL external data boundaries — files, APIs, webhooks, queues, caches
+- Source schemas MUST be declared as code (dataclass, TypedDict, or Pydantic model), not just prose
+- Table-level assertions run at load time, BEFORE any transform logic executes
+- Freshness contracts prevent silently stale data from propagating through pipelines
+- Lineage documentation uses arrow notation and lives in the spec alongside function contracts
+- Materialization strategy is explicit per output — never implicit "whatever the framework does"
+- Volume contracts catch silent data loss — a pipeline that returns 0 rows is worse than one that errors
+- Pipeline logic MUST be environment-agnostic. Environment differences (dev/staging/prod) handled
+  ONLY by: connection config (env vars), table name suffixes/prefixes, and skip/include flags for
+  expensive operations. Never branch on environment inside transform logic.
 
 ---
 
@@ -293,7 +389,7 @@ Before moving to the next phase, verify:
 |-----------|-------|
 | Domain → Behavior | All scenarios use domain terms verbatim |
 | Behavior → Spec | Every function maps to at least one scenario |
-| Spec → Contract | Every function has preconditions and postconditions |
+| Spec → Contract | Every function has pre/postconditions; every external data source has a schema contract with lineage |
 | Contract → Test | Every test references a behavior scenario |
 | Test → Refactor | All tests are green before refactoring begins |
 | Refactor → Done | All tests still green, ubiquitous language consistent |

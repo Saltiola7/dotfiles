@@ -2,6 +2,16 @@
 
 All notable changes to the AWS SSO credential automation.
 
+## [2026-06-03]
+
+### Fixed
+- **False recovery trigger**: Added STS retry (2s backoff) before declaring session dead. Transient network blips or AWS throttling no longer trigger full browser recovery when session has hours remaining.
+- **Concurrent OIDC race**: Added `pgrep -f "aws sso login"` PID guard before both silent and full recovery. If LaunchAgent already running a login, plugin shows "login..." and exits — no duplicate OIDC flows fighting over callback port.
+
+### Added
+- **Poller toggle**: New popup menu item "Toggle Poller" — click creates/removes `/tmp/sketchybar_aws_poller_disabled`, flips `update_freq` between 60 and 0. When disabled, bar shows gray "paused" and makes no STS calls.
+- **Poller disabled check**: Top-of-plugin gate — if disable file exists, immediately show "paused" and exit. No STS, no recovery, no network calls.
+
 ## [2026-06-01]
 
 ### Changed
