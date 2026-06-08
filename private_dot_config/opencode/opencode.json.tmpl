@@ -1,22 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": [
-    "opencode-with-claude"
-  ],
   "provider": {
-    "anthropic": {
-      "options": {
-        "baseURL": "http://127.0.0.1:3456",
-        "apiKey": "dummy"
-      }
-    },
-    "amazon-bedrock": {
-      "models": {
-        "global.anthropic.claude-opus-4-8-v1": {
-          "name": "Claude Opus 4.8 (global)"
-        }
-      }
-    },
     "google": {},
     "moonshotai": {
       "npm": "@ai-sdk/openai-compatible",
@@ -54,6 +38,6 @@
       }
     }
   },
-  "model": "amazon-bedrock/global.anthropic.claude-opus-4-8-v1",
-  "small_model": "amazon-bedrock/global.anthropic.claude-opus-4-8-v1"
+  "model": "amazon-bedrock/anthropic.claude-opus-4-8",
+  "small_model": "amazon-bedrock/anthropic.claude-opus-4-8"
 }
