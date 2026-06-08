@@ -93,22 +93,55 @@ alias ch="clickhouse client --host \"\$(op read 'op://Personal/ClickHouse Cloud/
 export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
 
 # --- GCP credential hygiene ---
-# Remove stale SA key files from previous sessions (e.g. shell killed via SIGKILL
-# where the EXIT trap couldn't fire). Runs at every shell startup — before secret().
+# Clean up STALE SA key state from previous sessions (e.g. shell killed via
+# SIGKILL where the EXIT trap couldn't fire). Runs at every shell startup —
+# before secret().
 #
-# CRITICAL: also unset the env vars that point at these files. A child shell
-# (or any OpenCode subagent inheriting our env) that finds GOOGLE_APPLICATION_CREDENTIALS
-# exported but the file missing will fail at SDK init with:
-#   "The file at <path> does not exist… ENOENT … lstat …"
-# (Vertex AI Node SDK calls lstatSync on the env-pointed path eagerly.)
-# Unsetting lets the SDK fall back to gcloud ADC, which gracefully no-ops
-# if no auth is available.
+# CRITICAL: do NOT delete a freshly-provisioned key. `mise run shell`/`flow`/etc.
+# materialize the SA file via setup-sa and inject GOOGLE_APPLICATION_CREDENTIALS,
+# THEN spawn an interactive bash which sources this file. If startup cleanup
+# unconditionally rm'd the file, it would delete the very credential the parent
+# task just created — leaving the env var pointing at a missing file (the exact
+# failure mode that broke `mise run shell` + kubectl/gke-gcloud-auth-plugin).
+#
+# Rule:
+#   - If GOOGLE_APPLICATION_CREDENTIALS is set AND the file EXISTS → a parent
+#     provisioned it on purpose. Leave file + env vars untouched.
+#   - If the env var is set but the file is MISSING → genuine stale state from a
+#     dead session. Unset the env vars (so SDKs fall back to ADC and gcloud uses
+#     its on-disk config) but there is nothing to rm.
+#   - If no env var is set → best-effort rm of any orphaned cache files.
+#
+# Why unset the CLOUDSDK_* vars too: the `secret` script pins gcloud to the
+# sa-dev-admin named config (CLOUDSDK_ACTIVE_CONFIG_NAME) + file override. A
+# surviving pin with a missing file makes every gcloud call (and the
+# gke-gcloud-auth-plugin, which shells out to `gcloud config config-helper`)
+# fail with "Failed to load credential file". Clearing them lets gcloud resolve
+# its on-disk active config normally.
 __cleanup_gcp_cache() {
-  rm -f "$HOME/.cache/gcp/enterprise-seo-tools-sa.json" \
-       "$HOME/.cache/gcp/gws-content-reader-key.json" 2>/dev/null
-  unset GOOGLE_APPLICATION_CREDENTIALS \
-        GWS_CONTENT_READER_CREDENTIALS \
-        CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE
+  local sa="$HOME/.cache/gcp/enterprise-seo-tools-sa.json"
+  local gws="$HOME/.cache/gcp/gws-content-reader-key.json"
+
+  if [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+    if [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
+      # Parent provisioned a live credential — do not touch it.
+      return 0
+    fi
+    # Env points at a missing file → stale. Unset, do not rm.
+    unset GOOGLE_APPLICATION_CREDENTIALS \
+          GWS_CONTENT_READER_CREDENTIALS \
+          CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE \
+          CLOUDSDK_ACTIVE_CONFIG_NAME \
+          CLOUDSDK_CORE_ACCOUNT
+    return 0
+  fi
+
+  # No env var set → remove any orphaned cache files from a dead session.
+  rm -f "$sa" "$gws" 2>/dev/null
+  unset GWS_CONTENT_READER_CREDENTIALS \
+        CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE \
+        CLOUDSDK_ACTIVE_CONFIG_NAME \
+        CLOUDSDK_CORE_ACCOUNT
 }
 __cleanup_gcp_cache
 
