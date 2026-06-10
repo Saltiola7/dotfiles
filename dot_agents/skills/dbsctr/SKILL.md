@@ -21,16 +21,18 @@ artifacts rather than creating duplicates.
 The project AGENTS.md defines which patterns to use for error handling, contracts, domain types, and testing.
 
 **Domain Modules (progressive disclosure):** When a task touches a foundational domain, read the
-corresponding module BEFORE starting Phase 1. These modules extend Phases 1 and 4 with domain-specific
+corresponding module BEFORE starting Phase 1. These modules extend the relevant phases with domain-specific
 contracts, patterns, and worked examples. Load only what applies:
 
 | Domain signal | Module to read |
 |---|---|
 | Data pipelines, ETL, orchestration, warehouse, streaming | `modules/data.md` |
+| Self-service analytics **agent**, semantic-layer routing, question→entity mapping, reference docs for non-expert consumers | `modules/data.md` + `modules/analytics_references.md` |
 | Infrastructure-as-Code, cloud resources, IaC, deployment, scaling | `modules/cloud.md` |
 | ML model training/serving, LLM calls, embeddings, eval, features | `modules/ml.md` |
 
-Multiple modules may apply (e.g., ML pipeline = data + ml; infra for ML platform = cloud + ml).
+Multiple modules may apply (e.g., ML pipeline = data + ml; infra for ML platform = cloud + ml;
+analytics agent = data + analytics_references).
 When in doubt, load the module — the cost is one extra file read; the cost of missing it is sloppy contracts.
 
 ---
@@ -387,6 +389,7 @@ Before moving to the next phase, verify:
 
 | From → To | Check |
 |-----------|-------|
+| Start → Domain | Applicable domain module(s) loaded if any signal in the routing table matched |
 | Domain → Behavior | All scenarios use domain terms verbatim |
 | Behavior → Spec | Every function maps to at least one scenario |
 | Spec → Contract | Every function has pre/postconditions; every external data source has a schema contract with lineage |
