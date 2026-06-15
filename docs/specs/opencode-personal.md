@@ -2,6 +2,7 @@
 
 **Status:** Stable
 **Created:** 2026-04-27
+**Last updated:** 2026-06-15
 
 ## Overview
 
@@ -12,21 +13,80 @@ This shell uses Claude Code in two contexts:
 
 Both contexts coexist on the same machine without interfering. Switching is a matter of which command you type.
 
+## Domain
+
+### Bounded Context
+
+**OpenCode Provider Configuration** — manages the set of AI providers and models available in the
+OpenCode TUI, including compression layers and local model routing.
+
+Adjacent contexts: AWS Bedrock auth (SSO-managed, external), LM Studio (local inference server,
+external), Headroom compression proxy (local service, managed by this context).
+
+### Entities
+
+- **Provider** — named AI provider registered in `opencode.json`; has an id, npm package, baseURL, and a model registry
+- **Compressed Provider** — a Provider whose baseURL points at the Headroom proxy instead of a cloud API directly
+- **HeadroomProxy** — the local headroom-ai proxy process; runs at `127.0.0.1:8787`; backend = Bedrock; always-on via launchd
+- **LaunchAgent** — macOS launchd user agent managing the HeadroomProxy lifecycle
+- **ModelEntry** — a named model within a provider's registry, with context/output limits
+
+### Value Objects
+
+- **ProxyEndpoint** — `http://127.0.0.1:8787/v1` — the stable local address of HeadroomProxy
+- **ModelId** — the exact string opencode sends as the `model` field (e.g. `global.anthropic.claude-sonnet-4-6`); must match what Bedrock accepts verbatim
+- **CompressionMode** — `optimize | audit | passthrough`; controls headroom-ai pipeline aggressiveness
+- **SavingsRatio** — float 0–1; ratio of tokens saved vs uncompressed baseline; observable at `GET /stats`
+
+### Domain Events
+
+- `HeadroomProxyStarted` — launchd launched headroom-ai proxy; `/health` returns 200
+- `HeadroomProxyStopped` — proxy process exited (SSO expiry, crash, manual stop)
+- `CompressionToggled` — user switched between `amazon-bedrock/*` (raw) and `headroom/*` (compressed) model in opencode TUI
+- `SSOTokenExpired` — `AWS_PROFILE` SSO cache expired; HeadroomProxy returns 403/5xx to opencode
+- `LocalModelRegistryUpdated` — LM Studio model entries in opencode.json refreshed to match running server
+
+### Ubiquitous Language
+
+| Term | Definition |
+|------|-----------|
+| **compression toggle** | Switching opencode's active model between a raw Bedrock provider entry and a headroom-prefixed entry to enable/disable compression |
+| **raw model** | Model entry under `amazon-bedrock` provider — routes native Bedrock SDK, no compression |
+| **compressed model** | Model entry under `headroom` provider — routes via HeadroomProxy; same underlying LLM, compressed context |
+| **HeadroomProxy** | The `headroom proxy --backend bedrock` process running at :8787; compresses Anthropic-format requests before forwarding to Bedrock via SigV4 |
+| **LaunchAgent** | `~/Library/LaunchAgents/ai.headroom.proxy.plist` — the always-on launchd definition for HeadroomProxy |
+| **SSO profile** | `BedrockDeveloperAccess-302432775606` — the AWS named profile used by both native Bedrock and HeadroomProxy |
+| **local model** | Model served by LM Studio on `:1234`; registered under `lmstudio` provider in opencode.json |
+| **model-id passthrough** | HeadroomProxy forwards the `model` field in the request body to Bedrock unchanged; no translation table |
+| **savings ratio** | Fraction of tokens compressed away; visible at `http://127.0.0.1:8787/stats` |
+
 ## File Map
 
 | Path | Purpose |
 |------|---------|
 | `dot_local/bin/executable_opencode-personal` | Wrapper: unsets Bedrock env, sets Meridian profile, launches OpenCode against the Anthropic provider |
 | `dot_local/bin/executable_claude-personal` | Wrapper: unsets Bedrock env, sets `CLAUDE_CONFIG_DIR` to the personal profile, launches Claude Code |
-| `private_dot_config/opencode/opencode.json.tmpl` | OpenCode config — declares Bedrock (work, default), Anthropic-via-Meridian, LM Studio, Moonshot, and Google providers; loads `opencode-with-claude` plugin |
+| `private_dot_config/opencode/opencode.json.tmpl` | OpenCode config — declares Bedrock (work, default), Anthropic-via-Meridian, LM Studio, Moonshot, Google, and Headroom providers; loads `opencode-with-claude` plugin |
 | `private_dot_config/meridian/profiles.json.tmpl` | Meridian profile registry — points the `personal` profile at an isolated `CLAUDE_CONFIG_DIR` (templated on `{{ "{{ .chezmoi.homeDir }}" }}`) |
 | `private_dot_config/meridian/sdk-features.json` | Meridian SDK feature toggles for OpenCode: memory, auto-dream, full CLAUDE.md |
+| `Library/LaunchAgents/ai.headroom.proxy.plist` | LaunchAgent definition: always-on HeadroomProxy, `--backend bedrock --region us-west-2`, env `AWS_PROFILE` |
 | `npm-global-packages.txt` | Plain text list of npm packages installed globally |
 | `run_onchange_install-npm-globals.sh.tmpl` | Chezmoi run-on-change script that `npm install -g`s anything in the package list when the file's hash changes |
 
 ## Architecture
 
 ```
+opencode TUI
+  ├─ amazon-bedrock/global.*       → native Bedrock SDK (raw, uncompressed)
+  ├─ headroom/global.*             → @ai-sdk/anthropic → http://127.0.0.1:8787/v1/messages
+  │                                      │
+  │                               HeadroomProxy (launchd, optimize, --backend bedrock)
+  │                                      │  compress → SigV4 via AWS_PROFILE SSO
+  │                                      ▼
+  │                               AWS Bedrock (global.anthropic.claude-*)
+  ├─ lmstudio/*                    → @ai-sdk/openai-compatible → http://127.0.0.1:1234/v1
+  └─ (personal contexts below)    → opencode-with-claude / Meridian → Anthropic Claude Pro
+
 ┌──────────────────────┐                       ┌────────────────┐
 │  opencode-personal   │  unset BEDROCK env    │     opencode   │
 │  (wrapper script)    │ ────────────────────▶ │     (TUI)      │
