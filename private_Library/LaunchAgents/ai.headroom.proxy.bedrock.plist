@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>ai.headroom.proxy.bedrock</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/tis/.local/bin/headroom</string>
+    <string>proxy</string>
+    <string>--backend</string>
+    <string>bedrock</string>
+    <string>--bedrock-profile</string>
+    <string>BedrockDeveloperAccess-302432775606</string>
+    <string>--region</string>
+    <string>us-west-2</string>
+    <string>--port</string>
+    <string>8787</string>
+    <string>--no-ccr-inject-tool</string>
+    <string>--no-ccr-marker</string>
+    <string>--no-ccr-proactive-expansion</string>
+    <string>--no-telemetry</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>/Users/tis</string>
+    <key>PATH</key>
+    <string>/Users/tis/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/tis/.headroom/proxy-bedrock.out.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/tis/.headroom/proxy-bedrock.err.log</string>
+</dict>
+</plist>
