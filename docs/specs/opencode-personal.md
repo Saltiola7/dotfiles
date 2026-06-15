@@ -256,8 +256,20 @@ These toggles are read lazily on every Meridian request, so editing the file tak
 After the first apply on a new machine:
 
 ```bash
+# Personal context auth
 claude-personal auth login    # one-time browser OAuth for personal profile
 opencode-personal             # verify it boots and answers a turn
+
+# Headroom setup (one-time per machine)
+pipx install --python python3.13 "headroom-ai[proxy,ml,code]"
+pipx inject headroom-ai boto3       # required for Bedrock backend
+mkdir -p ~/.headroom
+launchctl load ~/Library/LaunchAgents/ai.headroom.proxy.bedrock.plist
+launchctl load ~/Library/LaunchAgents/ai.headroom.proxy.lmstudio.plist
+
+# Verify
+curl -s http://127.0.0.1:8787/health | python3 -c "import sys,json; h=json.load(sys.stdin); print(h['status'], h['config']['backend'])"
+curl -s http://127.0.0.1:8788/health | python3 -c "import sys,json; h=json.load(sys.stdin); print(h['status'], h['config']['openai_api_url'])"
 ```
 
 ## Spec: Config Stubs
