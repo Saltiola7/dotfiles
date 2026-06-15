@@ -27,13 +27,48 @@
         "baseURL": "http://127.0.0.1:1234/v1"
       },
       "models": {
-        "google/gemma-4-31b": {
-          "name": "Gemma 4 31B (local)",
-          "limit": { "context": 32768, "output": 8192 }
+        "mistralai/devstral-small-2-2512": {
+          "name": "Devstral Small 2 (MLX 4bit, local)",
+          "limit": { "context": 65536, "output": 8192 }
         },
-        "qwen/qwen3-coder-next": {
-          "name": "Qwen3 Coder Next (local)",
-          "limit": { "context": 32768, "output": 8192 }
+        "qwen/qwen3.6-35b-a3b": {
+          "name": "Qwen3.6 35B A3B (MLX 4bit, local)",
+          "limit": { "context": 32768, "output": 16384 }
+        }
+      }
+    },
+    "headroom": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "Headroom → Bedrock (compressed)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8787/v1",
+        "apiKey": "dummy"
+      },
+      "models": {
+        "global.anthropic.claude-sonnet-4-6": {
+          "name": "Sonnet 4.6 (compressed)",
+          "limit": { "context": 200000, "output": 64000 }
+        },
+        "global.anthropic.claude-opus-4-8": {
+          "name": "Opus 4.8 (compressed)",
+          "limit": { "context": 200000, "output": 32000 }
+        }
+      }
+    },
+    "headroom-lmstudio": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Headroom → LM Studio (compressed)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8788/v1"
+      },
+      "models": {
+        "mistralai/devstral-small-2-2512": {
+          "name": "Devstral Small 2 (compressed, local)",
+          "limit": { "context": 65536, "output": 8192 }
+        },
+        "qwen/qwen3.6-35b-a3b": {
+          "name": "Qwen3.6 35B A3B (compressed, local)",
+          "limit": { "context": 32768, "output": 16384 }
         }
       }
     }
