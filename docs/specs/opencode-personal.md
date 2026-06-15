@@ -116,6 +116,79 @@ opencode TUI
                                                   (Claude Pro)
 ```
 
+## Behavior Scenarios
+
+### Feature: Compression Toggle (Bedrock models)
+
+**Scenario: User enables compression for Bedrock model**
+- Given HeadroomProxy is running at `127.0.0.1:8787` (LaunchAgent active)
+- And opencode shows both `amazon-bedrock/global.anthropic.claude-sonnet-4-6` and `headroom/global.anthropic.claude-sonnet-4-6` in model picker
+- When user selects `headroom/global.anthropic.claude-sonnet-4-6`
+- Then opencode routes requests via `@ai-sdk/anthropic` to `http://127.0.0.1:8787/v1/messages`
+- And HeadroomProxy compresses context before forwarding to Bedrock
+- And savings ratio becomes observable at `GET http://127.0.0.1:8787/stats`
+- And opencode persists model choice in `~/.local/state/opencode/model.json` across restarts
+
+**Scenario: User disables compression (switches back to raw)**
+- Given user has `headroom/global.anthropic.claude-sonnet-4-6` active
+- When user selects `amazon-bedrock/global.anthropic.claude-sonnet-4-6` in model picker
+- Then opencode routes requests via native Bedrock SDK directly
+- And no HeadroomProxy involvement — proxy can be down without impact
+
+**Scenario: HeadroomProxy not running, user selects compressed model**
+- Given LaunchAgent is stopped or SSO token expired
+- When opencode sends request to `http://127.0.0.1:8787/v1/messages`
+- Then opencode receives connection refused or 5xx
+- And user sees an error in TUI (not a silent hang)
+- And raw Bedrock models remain fully functional
+
+### Feature: Compression Toggle (LM Studio models)
+
+**Scenario: User enables compression for local LM Studio model**
+- Given LM Studio server running at `127.0.0.1:1234`
+- And HeadroomProxy running at `127.0.0.1:8787` with `--openai-api-url http://127.0.0.1:1234/v1`
+- And opencode shows both `lmstudio/mistralai/devstral-small-2-2512` (raw) and `headroom-lmstudio/mistralai/devstral-small-2-2512` (compressed)
+- When user selects compressed variant
+- Then opencode routes via `@ai-sdk/openai-compatible` to `http://127.0.0.1:8787/v1`
+- And HeadroomProxy compresses context then forwards to LM Studio
+- And model-id passthrough delivers `mistralai/devstral-small-2-2512` to LM Studio unchanged
+
+**Scenario: User uses raw LM Studio model (no compression)**
+- Given LM Studio server running at `127.0.0.1:1234`
+- When user selects `lmstudio/mistralai/devstral-small-2-2512`
+- Then opencode routes directly to LM Studio via `http://127.0.0.1:1234/v1`
+- And HeadroomProxy state irrelevant
+
+### Feature: LM Studio Model Registry Refresh
+
+**Scenario: opencode model list matches running LM Studio server**
+- Given LM Studio serves `mistralai/devstral-small-2-2512` and `qwen/qwen3.6-35b-a3b` (verified via `/v1/models`)
+- When `chezmoi apply` deploys updated `opencode.json.tmpl`
+- Then both model IDs appear in opencode model picker under `lmstudio` provider
+- And context/output limits match spec recommendations (devstral: 65536/8192, qwen: 32768/16384)
+
+### Feature: HeadroomProxy Always-On Service
+
+**Scenario: LaunchAgent starts HeadroomProxy on login**
+- Given `~/Library/LaunchAgents/ai.headroom.proxy.plist` loaded in launchd
+- And valid SSO token in `~/.aws/sso/cache` (user ran `aws sso login --profile BedrockDeveloperAccess-302432775606`)
+- When user logs in to macOS session
+- Then LaunchAgent starts `headroom proxy --backend bedrock --region us-west-2`
+- And `GET http://127.0.0.1:8787/health` returns 200
+
+**Scenario: LaunchAgent restarts proxy after crash**
+- Given KeepAlive=true in plist
+- When HeadroomProxy process exits unexpectedly
+- Then launchd restarts it within seconds
+- And `/health` returns 200 again
+
+**Scenario: SSO token expires mid-session**
+- Given HeadroomProxy running with expired SSO cache
+- When opencode sends request via compressed model
+- Then HeadroomProxy returns error (403 or 5xx from Bedrock)
+- And user sees error in TUI
+- And fix is: `aws sso login --profile BedrockDeveloperAccess-302432775606` then requests resume
+
 The `opencode-with-claude` npm package bundles `@rynfar/meridian` and starts an embedded proxy in-process when OpenCode launches. The proxy is bound to a local port, lives only as long as the OpenCode process, and is configured per-process via env vars set by the wrapper.
 
 ## Why Two Wrappers
