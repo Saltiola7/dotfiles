@@ -246,7 +246,162 @@ claude-personal auth login    # one-time browser OAuth for personal profile
 opencode-personal             # verify it boots and answers a turn
 ```
 
+## Spec: Config Stubs
+
+### opencode.json.tmpl — headroom provider (Bedrock upstream)
+
+```jsonc
+"headroom": {
+  "npm": "@ai-sdk/anthropic",
+  "name": "Headroom → Bedrock (compressed)",
+  "options": { "baseURL": "http://127.0.0.1:8787/v1", "apiKey": "dummy" },
+  "models": {
+    "global.anthropic.claude-sonnet-4-6": {
+      "name": "Sonnet 4.6 (compressed)",
+      "limit": { "context": 200000, "output": 64000 }
+    },
+    "global.anthropic.claude-opus-4-8": {
+      "name": "Opus 4.8 (compressed)",
+      "limit": { "context": 200000, "output": 32000 }
+    }
+  }
+}
+```
+
+Behaviors: "User enables compression for Bedrock model", "User disables compression"
+
+### opencode.json.tmpl — headroom-lmstudio provider (LM Studio upstream)
+
+```jsonc
+"headroom-lmstudio": {
+  "npm": "@ai-sdk/openai-compatible",
+  "name": "Headroom → LM Studio (compressed)",
+  "options": { "baseURL": "http://127.0.0.1:8787/v1" },
+  "models": {
+    "mistralai/devstral-small-2-2512": {
+      "name": "Devstral Small 2 (compressed, local)",
+      "limit": { "context": 65536, "output": 8192 }
+    },
+    "qwen/qwen3.6-35b-a3b": {
+      "name": "Qwen3.6 35B A3B (compressed, local)",
+      "limit": { "context": 32768, "output": 16384 }
+    }
+  }
+}
+```
+
+Behaviors: "User enables compression for local LM Studio model"
+
+### opencode.json.tmpl — lmstudio provider (updated model registry)
+
+```jsonc
+"lmstudio": {
+  "npm": "@ai-sdk/openai-compatible",
+  "name": "LM Studio (local)",
+  "options": { "baseURL": "http://127.0.0.1:1234/v1" },
+  "models": {
+    "mistralai/devstral-small-2-2512": {
+      "name": "Devstral Small 2 (MLX 4bit, local)",
+      "limit": { "context": 65536, "output": 8192 }
+    },
+    "qwen/qwen3.6-35b-a3b": {
+      "name": "Qwen3.6 35B A3B (MLX 4bit, local)",
+      "limit": { "context": 32768, "output": 16384 }
+    }
+  }
+}
+```
+
+Behaviors: "opencode model list matches running LM Studio server"
+
+### LaunchAgent plist — `~/Library/LaunchAgents/ai.headroom.proxy.plist`
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>          <string>ai.headroom.proxy</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/path/to/headroom</string>   <!-- resolved at apply time -->
+    <string>proxy</string>
+    <string>--backend</string>           <string>bedrock</string>
+    <string>--bedrock-profile</string>   <string>BedrockDeveloperAccess-302432775606</string>
+    <string>--region</string>            <string>us-west-2</string>
+    <string>--port</string>              <string>8787</string>
+    <string>--openai-api-url</string>    <string>http://127.0.0.1:1234/v1</string>
+    <string>--no-ccr-inject-tool</string>
+    <string>--no-telemetry</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HEADROOM_MODE</key>  <string>token</string>
+    <key>PATH</key>           <string>/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string>
+  </dict>
+  <key>RunAtLoad</key>     <true/>
+  <key>KeepAlive</key>     <true/>
+  <key>StandardOutPath</key>  <string>/Users/tis/.headroom/proxy.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/tis/.headroom/proxy.err.log</string>
+</dict>
+</plist>
+```
+
+Key flags:
+- `--bedrock-profile` — uses SSO profile directly; no AWS_PROFILE env needed in plist
+- `--openai-api-url http://127.0.0.1:1234/v1` — routes `/v1/chat/completions` to LM Studio
+- `--no-ccr-inject-tool` — opencode is not an MCP client; don't inject `headroom_retrieve` tool
+- `--no-telemetry` — local-first, no phoning home
+
+Behaviors: "LaunchAgent starts HeadroomProxy on login", "LaunchAgent restarts proxy after crash"
+
+## Contracts & Invariants
+
+### Provider: headroom (Bedrock upstream)
+- **Pre:** HeadroomProxy running at `127.0.0.1:8787` (`GET /health` = 200)
+- **Pre:** SSO token valid in `~/.aws/sso/cache` for `BedrockDeveloperAccess-302432775606`
+- **Post:** `/v1/messages` returns 200 with valid Anthropic-format response body
+- **Invariant:** `apiKey: "dummy"` accepted by proxy; never forwarded to Bedrock
+- **Invariant:** `model` field in request body passed through to Bedrock unchanged (model-id passthrough)
+
+### Provider: headroom-lmstudio (LM Studio upstream)
+- **Pre:** LM Studio server running at `127.0.0.1:1234`
+- **Pre:** HeadroomProxy running at `127.0.0.1:8787` with `--openai-api-url http://127.0.0.1:1234/v1`
+- **Post:** `/v1/chat/completions` returns 200 with valid OpenAI-format response body
+- **Invariant:** `model` field passed through to LM Studio unchanged; must match an ID from `/v1/models`
+
+### Provider: lmstudio (raw)
+- **Invariant:** model IDs in `opencode.json` are a subset of IDs returned by `GET http://127.0.0.1:1234/v1/models`
+- **Invariant:** `context` limit ≤ model's native context window (devstral: 256768, qwen3-a3b: 32768)
+
+### LaunchAgent: ai.headroom.proxy
+- **Invariant:** `Label` = `ai.headroom.proxy` (matches `launchctl` unload/load command)
+- **Invariant:** `ProgramArguments[0]` = absolute path to `headroom` binary (resolved at apply time)
+- **Invariant:** `KeepAlive = true` (proxy must restart on crash)
+- **Invariant:** log dirs `~/.headroom/` created before LaunchAgent loaded
+- **Freshness:** SSO token must be refreshed by user periodically (`aws sso login --profile BedrockDeveloperAccess-302432775606`); no automated refresh
+- **Failure recovery:** if proxy exits due to expired SSO, launchd restarts it; restart loop is harmless (fails fast) until SSO renewed
+
+### Data Contract: HeadroomProxy `/health` endpoint
+- **Schema:** `{"status": "ok"}` — any non-200 or missing body = proxy not ready
+- **Freshness:** check before routing compressed model requests; stale = proxy down
+- **Invariant:** responds within 1s on a healthy process
+
+### Lineage
+- `opencode request (messages[]) → HeadroomProxy compress → Bedrock /invoke → opencode response`
+- `opencode request (messages[]) → HeadroomProxy compress → LM Studio /v1/chat/completions → opencode response`
+- `opencode request (messages[]) → amazon-bedrock SDK (native SigV4) → Bedrock /invoke → opencode response`  ← raw path, no headroom
+
 ## Gotchas
+
+**HeadroomProxy CCR tool injection.** By default headroom injects a `headroom_retrieve` MCP tool into every response. opencode is not an MCP client — this causes tool-call errors. Always pass `--no-ccr-inject-tool`.
+
+**Single proxy, two upstreams.** One headroom process handles both Bedrock (Anthropic `/v1/messages`) and LM Studio (OpenAI `/v1/chat/completions`) via `--openai-api-url`. Route is determined by request path, not model name.
+
+**SSO token expiry.** HeadroomProxy holds no SSO refresh logic. When token expires, proxy returns Bedrock 403. Fix: `aws sso login --profile BedrockDeveloperAccess-302432775606`. launchd restart loop is harmless until renewed.
+
+**LM Studio must be running for compressed local models.** `headroom-lmstudio/*` models error if LM Studio server is off, even if HeadroomProxy is up. Raw `lmstudio/*` models have same requirement.
 
 **Don't run `meridian setup`.** It rewrites `~/.config/opencode/opencode.json` to add a Nix-store-style absolute path to the Meridian-bundled plugin. That conflicts with the chezmoi-managed config (which loads `opencode-with-claude` instead) and produces drift on every `chezmoi diff`. The two plugins overlap — `opencode-with-claude` already embeds Meridian.
 
@@ -259,6 +414,35 @@ opencode-personal             # verify it boots and answers a turn
 ## Verification
 
 ```bash
+# HeadroomProxy health
+curl -s http://127.0.0.1:8787/health
+# → {"status":"ok"}
+
+# Compression stats
+curl -s http://127.0.0.1:8787/stats | python3 -m json.tool
+
+# Smoke test: Bedrock via headroom (Anthropic-format)
+curl -s http://127.0.0.1:8787/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: dummy" \
+  -d '{"model":"global.anthropic.claude-sonnet-4-6","max_tokens":32,"messages":[{"role":"user","content":"reply ok"}]}'
+# → {"content":[{"text":"ok",...}],...}
+
+# Smoke test: LM Studio via headroom (OpenAI-format)
+curl -s http://127.0.0.1:8787/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"mistralai/devstral-small-2-2512","max_tokens":32,"messages":[{"role":"user","content":"reply ok"}]}'
+# → {"choices":[{"message":{"content":"ok"}}],...}
+
+# LM Studio models available
+curl -s http://127.0.0.1:1234/v1/models | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin)['data']]"
+# → mistralai/devstral-small-2-2512
+# → qwen/qwen3.6-35b-a3b
+
+# LaunchAgent status
+launchctl list ai.headroom.proxy
+# → PID column non-zero = running
+
 # Work context (default shell)
 claude auth status
 # → loggedIn: true, apiProvider: bedrock
