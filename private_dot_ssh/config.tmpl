@@ -7,6 +7,11 @@ Include {{ .chezmoi.homeDir }}/.colima/ssh_config
 # This won't be added again if you remove it.
 Include {{ .chezmoi.homeDir }}/.orbstack/ssh/config
 
+# Mac mini (Tailscale) — herdr remote target: `herdr --remote mac-mini`
+Host mac-mini
+  HostName 100.73.117.118
+  User tis
+
 Host *
   IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
   StrictHostKeyChecking ask
