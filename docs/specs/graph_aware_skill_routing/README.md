@@ -98,7 +98,59 @@ Adjacent contexts:
 
 ## Behavior Scenarios
 
-TBD in Phase 2.
+### Feature: Graph Context Gate
+
+**Scenario: Discovery consults existing Graph Snapshot**
+- Given a repository has a Graph Snapshot
+- When the Discovery skill starts a new requirements interview
+- Then the Discovery skill consults graph context for relevant domains and relationships before broad questioning
+- And the Discovery skill still asks the required Discovery questions before writing files
+
+**Scenario: DBSCTR consults existing Graph Snapshot**
+- Given a repository has a Graph Snapshot
+- When the DBSCTR skill starts Phase 1 Domain for an implementation task
+- Then the DBSCTR skill consults graph context for bounded context, adjacent contexts, and likely files
+- And the DBSCTR skill performs Source Verification before using graph context in artifacts or implementation
+
+**Scenario: Graph context is unavailable**
+- Given a repository has no Graph Snapshot
+- When Discovery or DBSCTR starts
+- Then the skill uses Silent Fallback and continues with Grep, Glob, and Read
+- And the skill does not ask the user to build a graph for v1
+
+**Scenario: Graph context is weak or stale**
+- Given a Graph Query Result has no useful match or conflicts with Source Truth
+- When a skill evaluates the Graph Query Result
+- Then the skill treats Source Truth as authoritative
+- And the skill continues with Silent Fallback
+
+### Feature: Impact Check
+
+**Scenario: Existing code is about to change**
+- Given a task modifies an existing code area, skill workflow, or spec
+- When implementation is about to begin
+- Then the DBSCTR skill runs an Impact Check when a Graph Snapshot exists
+- And the DBSCTR skill verifies affected files with Source Verification before editing
+
+**Scenario: Impact Check cannot run**
+- Given Graphify is unavailable or Impact Check fails
+- When implementation is about to begin
+- Then the DBSCTR skill records no blocker
+- And the DBSCTR skill continues with Source Verification using Grep, Glob, and Read
+
+### Feature: Git Hook Refresh
+
+**Scenario: Graphify git hook is installed**
+- Given Graphify CLI is available in the repository
+- When the approved v1 setup runs
+- Then `graphify hook install` installs Graphify-managed git hooks
+- And hook failures must not change skill behavior; skills still use Graph Snapshot only when present
+
+**Scenario: Scout remains indirect**
+- Given no editable scout prompt or config is discovered
+- When graph-aware routing is implemented
+- Then scout direct integration remains out of scope
+- And DBSCTR and Discovery carry the graph-aware behavior for v1
 
 ## Contracts & Invariants
 
