@@ -184,6 +184,7 @@ Adjacent contexts:
 - **Post:** `graphify hook status` has been checked and reported.
 - **Invariant:** Hook setup must not edit Graphify package internals.
 - **Invariant:** Hook setup must not introduce OpenCode plugin hooks in v1.
+- **Invariant:** Hook-generated `graphify-out/` artifacts are generated state and should not appear as untracked worktree noise.
 
 ## Skill Instruction Interfaces
 

@@ -12,3 +12,4 @@ uv.lock
 .opencode/opencode.json
 .opencode/package.json
 .opencode/package-lock.json
+graphify-out/
