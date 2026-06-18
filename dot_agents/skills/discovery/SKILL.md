@@ -14,6 +14,21 @@ Discovery is Phase 0 of the development pipeline. It produces the inputs that DB
 Never skip Discovery for new features or initiatives. For bug fixes and small changes to
 existing features, Discovery is optional — the existing spec provides sufficient context.
 
+## Graph Context Gate
+
+Before broad source search or writing Discovery artifacts, check whether `graphify-out/graph.json`
+exists in the repository. If it exists:
+
+- Run `graphify query "<feature, domain, or user request>" --budget 2000` to identify likely bounded
+  contexts, adjacent domains, existing specs, source files, and relationships.
+- Use graph context to target Grep, Glob, and Read. Do not treat graph output as source truth.
+- Verify useful graph findings with source files before including them in the interview summary,
+  README.md, BACKLOG.md, or CHANGELOG.md.
+- If graph output is empty, weak, stale, conflicting, or Graphify fails, silently fall back to Grep,
+  Glob, and Read.
+- Do not ask the user to build a graph for v1 unless the task is specifically about Graphify.
+- Do not modify Graphify package internals or add OpenCode plugin hooks for v1.
+
 ## When to Run Discovery
 
 **Required:**

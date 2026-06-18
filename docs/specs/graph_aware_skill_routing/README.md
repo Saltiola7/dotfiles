@@ -154,7 +154,36 @@ Adjacent contexts:
 
 ## Contracts & Invariants
 
-TBD in Phase 4.
+### Module: Discovery Graph Context Gate
+- **Pre:** Discovery is required or explicitly requested.
+- **Pre:** Graph Snapshot is optional; absence must not block Discovery.
+- **Post:** When Graph Snapshot exists, Discovery has attempted graph context before broad source search or artifact writing.
+- **Post:** Discovery artifacts only use graph findings after Source Verification.
+- **Invariant:** Discovery must still ask required interview questions before writing files.
+- **Invariant:** Discovery must use Silent Fallback when graph context is unavailable, weak, stale, or failing.
+
+### Module: DBSCTR Graph Context Gate
+- **Pre:** DBSCTR is required or explicitly requested.
+- **Pre:** Graph Snapshot is optional; absence must not block any DBSCTR phase.
+- **Post:** When Graph Snapshot exists, DBSCTR has attempted graph context before Phase 1 Domain source discovery.
+- **Post:** DBSCTR uses graph context to target Source Verification, not to replace it.
+- **Invariant:** Source Truth overrides every Graph Query Result.
+- **Invariant:** Graphify failures are non-blocking unless the user explicitly asks to debug Graphify itself.
+
+### Module: DBSCTR Impact Check
+- **Pre:** Task modifies an existing code area, skill workflow, or spec.
+- **Pre:** Impact Check requires an existing Graph Snapshot.
+- **Post:** When Graph Snapshot exists, DBSCTR has attempted `graphify affected` for target files, symbols, specs, or domain terms before editing.
+- **Post:** DBSCTR reads likely affected files before editing when graph output identifies them.
+- **Invariant:** Missing or failing Impact Check falls back to Grep, Glob, and Read.
+
+### Module: Git Hook Setup
+- **Pre:** Graphify CLI is available.
+- **Pre:** v1 hook setup is approved for the repository.
+- **Post:** `graphify hook install` has been attempted.
+- **Post:** `graphify hook status` has been checked and reported.
+- **Invariant:** Hook setup must not edit Graphify package internals.
+- **Invariant:** Hook setup must not introduce OpenCode plugin hooks in v1.
 
 ## Skill Instruction Interfaces
 

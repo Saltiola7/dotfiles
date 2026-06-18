@@ -20,6 +20,19 @@ artifacts rather than creating duplicates.
 **Critical: Read the project's AGENTS.md** for project-specific adaptations before starting any phase.
 The project AGENTS.md defines which patterns to use for error handling, contracts, domain types, and testing.
 
+**Graph Context Gate:** Before Phase 1 Domain source discovery, check whether
+`graphify-out/graph.json` exists in the repository. If it exists, run targeted Graphify queries before
+broad Grep/Glob work:
+- Use `graphify query "<task or bounded context>" --budget 2000` to identify likely bounded contexts,
+  adjacent contexts, existing specs, source files, and relationships.
+- Use `graphify affected "<file, symbol, spec, or domain term>"` before editing existing code,
+  skill workflows, specs, or contracts.
+- Use graph results only to target source reads. Source files remain authoritative.
+- If graph output is empty, weak, stale, conflicting, or Graphify fails, silently fall back to Grep,
+  Glob, and Read. Do not ask the user to build a graph for v1 unless the task is specifically about Graphify.
+- Do not modify Graphify package internals. Git hook setup, when requested or approved, is limited to
+  `graphify hook install` and `graphify hook status`.
+
 **Domain Modules (progressive disclosure):** When a task touches a foundational domain, read the
 corresponding module BEFORE starting Phase 1. These modules extend the relevant phases with domain-specific
 contracts, patterns, and worked examples. Load only what applies:
@@ -43,14 +56,15 @@ When in doubt, load the module — the cost is one extra file read; the cost of 
 
 **Process:**
 1. Check `docs/specs/` for existing specs that cover this area — read them first
-2. Identify the bounded context this work belongs to
-3. List all entities (things with identity) and value objects (things defined by attributes)
-4. List domain events (past-tense verbs: `OrderPlaced`, `CrawlCompleted`, `ReportGenerated`)
-5. Define the ubiquitous language — exact terms that will appear in code, tests, docs, and conversation
-6. Write domain types using the project's conventions:
+2. If `graphify-out/graph.json` exists, run the Graph Context Gate and verify useful findings with source files
+3. Identify the bounded context this work belongs to
+4. List all entities (things with identity) and value objects (things defined by attributes)
+5. List domain events (past-tense verbs: `OrderPlaced`, `CrawlCompleted`, `ReportGenerated`)
+6. Define the ubiquitous language — exact terms that will appear in code, tests, docs, and conversation
+7. Write domain types using the project's conventions:
    - Check project AGENTS.md for domain type patterns (Django models, Pydantic, dataclasses, etc.)
    - Structure only — no logic yet
-7. Identify external data sources and sinks as named domain concepts:
+8. Identify external data sources and sinks as named domain concepts:
    - Each source the system reads from (files, APIs, webhooks, queues) gets a name in the ubiquitous language
    - Each sink the system writes to (output files, downstream APIs, caches) gets a name
    - For multi-hop pipelines, sketch the full chain using arrow notation:
@@ -69,6 +83,7 @@ create one using the project's `docs/specs/_template_spec.md`.
 
 **TodoWrite items:**
 - Identify bounded context and adjacent contexts
+- Run Graph Context Gate when `graphify-out/graph.json` exists
 - Check existing specs in docs/specs/
 - Define entities, value objects, domain events
 - Write/update domain types (no logic)
@@ -79,6 +94,7 @@ create one using the project's `docs/specs/_template_spec.md`.
 - If you cannot name the bounded context, STOP and ask the user
 - Do NOT add methods to domain types yet — that comes in Spec phase
 - If an existing spec covers this domain, UPDATE it — do not create a parallel doc
+- Graph query results MUST be verified with source files before becoming domain artifacts
 
 ---
 
