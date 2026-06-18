@@ -35,4 +35,4 @@ Tasks that must be sequential (shared models/contracts/migrations):
 | 1 | Add graph context gate to DBSCTR skill | 2026-06-18 | `4538e6c` |
 | 2 | Add graph context gate to Discovery skill | 2026-06-18 | `4538e6c` |
 | 3 | Install Graphify git hook for graph refresh | 2026-06-18 | `.git/hooks` local state |
-| 4 | Verify skill instructions and hook status | 2026-06-18 | pending test commit |
+| 4 | Verify skill instructions and hook status | 2026-06-18 | `9c91934` |
