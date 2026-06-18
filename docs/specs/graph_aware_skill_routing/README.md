@@ -156,6 +156,59 @@ Adjacent contexts:
 
 TBD in Phase 4.
 
+## Skill Instruction Interfaces
+
+### Discovery Graph Context Gate
+
+```text
+Input: user request, repository root
+Precondition: Discovery is required or requested
+Step 1: If graphify-out/graph.json exists, query graph context for the requested domain, likely bounded contexts, and existing specs.
+Step 2: Summarize only useful relationships in working context.
+Step 3: Continue required Discovery interview questions.
+Fallback: If graph context is unavailable, weak, or stale, continue with Grep/Glob/Read without asking user to build a graph.
+Source rule: Verify graph findings with source files before writing Discovery artifacts.
+Behaviors: Discovery consults existing Graph Snapshot; Graph context is unavailable; Graph context is weak or stale.
+```
+
+### DBSCTR Graph Context Gate
+
+```text
+Input: implementation task, repository root
+Precondition: DBSCTR is required or requested
+Step 1: Before Phase 1 Domain, check for graphify-out/graph.json.
+Step 2: If present, query graph context for bounded context, adjacent contexts, existing specs, likely source files, and dependencies.
+Step 3: Use graph context to target Grep/Glob/Read, not to replace them.
+Fallback: If graph context is unavailable, weak, or stale, continue with standard DBSCTR source discovery.
+Source rule: Source Truth overrides Graph Query Result.
+Behaviors: DBSCTR consults existing Graph Snapshot; Graph context is unavailable; Graph context is weak or stale.
+```
+
+### DBSCTR Impact Check
+
+```text
+Input: target files, symbols, specs, or domain terms discovered before editing
+Precondition: Task modifies existing code, skill workflow, or spec
+Step 1: If graphify-out/graph.json exists, run graph impact query for target files, symbols, specs, or domain terms.
+Step 2: Read likely affected files before editing when graph output identifies them.
+Step 3: Continue normal implementation when graph impact query fails.
+Fallback: Use Grep/Glob/Read for impact discovery.
+Source rule: Do not block implementation on Graphify errors.
+Behaviors: Existing code is about to change; Impact Check cannot run.
+```
+
+### Git Hook Setup
+
+```text
+Input: repository root with Graphify CLI available
+Precondition: v1 hook setup approved
+Step 1: Run graphify hook install.
+Step 2: Verify graphify hook status.
+Fallback: If hook install fails, leave skill behavior unchanged and report failure.
+Source rule: Hook refresh is convenience only; skills still check Graph Snapshot existence.
+Behaviors: Graphify git hook is installed.
+```
+
 ## Verification
 
 ```bash
