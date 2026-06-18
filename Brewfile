@@ -6,7 +6,6 @@ tap "hashicorp/tap"
 tap "jakehilborn/jakehilborn"
 tap "FelixKratz/formulae"
 tap "lawzava/scrape", "https://github.com/lawzava/scrape"
-tap "modularml/packages"
 tap "mrkai77/cask"
 tap "ngrok/ngrok"
 tap "nikitabobko/tap"
@@ -120,7 +119,6 @@ brew "FelixKratz/formulae/borders"
 brew "malpern/tap/sketchybar-toggle"
 brew "switchaudio-osx"
 brew "lawzava/scrape/scrape"
-brew "modularml/packages/modular"
 brew "shopify/shopify/themekit"
 cask "1password"
 cask "1password-cli"
@@ -148,7 +146,6 @@ cask "tailscale-app"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
 mas "Amphetamine", id: 937984704
-mas "Blackmagic Disk Speed Test", id: 425264550
 mas "BlueWallet", id: 1376878040
 mas "Color Picker", id: 1545870783
 mas "Dark Reader for Safari", id: 1438243180
@@ -158,12 +155,10 @@ mas "Marked 2", id: 890031187
 mas "Mate Translate", id: 1005088137
 mas "PDF Expert", id: 1055273043
 mas "Prompt", id: 1594420480
-mas "Slack", id: 803453959
 mas "Strongbox", id: 1481853033
 mas "Telegram", id: 747648890
 mas "The Unarchiver", id: 425424353
 mas "WhatsApp", id: 310633997
-mas "Yoink", id: 457622435
 go "golang.org/x/tools/gopls"
 go "honnef.co/go/tools/cmd/staticcheck"
 uv "aider-chat", with: ["pip"]
