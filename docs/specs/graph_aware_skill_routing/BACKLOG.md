@@ -6,10 +6,10 @@
 
 | # | Task | Priority | Status | Notes |
 |---|------|----------|--------|-------|
-| 1 | Add graph context gate to DBSCTR skill | high | pending | Requires spec domain and behavior. |
-| 2 | Add graph context gate to Discovery skill | high | pending | Requires spec domain and behavior. |
-| 3 | Install Graphify git hook for graph refresh | medium | pending | Use `graphify hook install`; no OpenCode plugin. |
-| 4 | Verify skill instructions and hook status | medium | pending | Validate docs, skill wording, and hook state. |
+| 1 | Add graph context gate to DBSCTR skill | high | done | Implemented in `dot_agents/skills/dbsctr/SKILL.md`. |
+| 2 | Add graph context gate to Discovery skill | high | done | Implemented in `dot_agents/skills/discovery/SKILL.md`. |
+| 3 | Install Graphify git hook for graph refresh | medium | done | `graphify hook install` completed; no OpenCode plugin added. |
+| 4 | Verify skill instructions and hook status | medium | done | Hook status, graph query, targeted chezmoi apply, and git status checked. |
 
 ## Dependency Chain
 
@@ -32,3 +32,7 @@ Tasks that must be sequential (shared models/contracts/migrations):
 
 | # | Task | Completed | Commit |
 |---|------|-----------|--------|
+| 1 | Add graph context gate to DBSCTR skill | 2026-06-18 | `4538e6c` |
+| 2 | Add graph context gate to Discovery skill | 2026-06-18 | `4538e6c` |
+| 3 | Install Graphify git hook for graph refresh | 2026-06-18 | `.git/hooks` local state |
+| 4 | Verify skill instructions and hook status | 2026-06-18 | pending test commit |
