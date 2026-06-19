@@ -119,6 +119,11 @@ export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
 # fail with "Failed to load credential file". Clearing them lets gcloud resolve
 # its on-disk active config normally.
 __cleanup_gcp_cache() {
+  # Under herdr, sibling panes share the SA cache files; a single pane's
+  # startup/exit must not delete them out from under still-open panes. Let the
+  # herdr session lifecycle own cleanup. Outside herdr, clean up normally.
+  [ -n "$HERDR_ENV" ] && return 0
+
   local sa="$HOME/.cache/gcp/enterprise-seo-tools-sa.json"
   local gws="$HOME/.cache/gcp/gws-content-reader-key.json"
 
@@ -150,3 +155,17 @@ __cleanup_gcp_cache
 # Secrets are cached in memory — only one biometric prompt per session.
 # Implementation lives in ~/.local/bin/secret (source-able script).
 secret() { . "$HOME/.local/bin/secret"; }
+
+# --- herdr auto-hydration ---
+# herdr auto-restarts and auto-launches agents (opencode) by spawning each pane
+# as a login shell. Those panes must start with secrets already exported so the
+# agent — and its non-TTY child tool-shells — inherit a populated env without a
+# manual `secret &&`. We auto-run `secret` here, gated on:
+#   HERDR_ENV         → only in herdr-managed panes (plain terminals stay lazy)
+#   _SECRETS_LOADED   → skip if this shell already hydrated
+#   [ -t 0 ]          → only where a Touch ID prompt can appear (TTY)
+# The first TTY pane mints + caches one session token (one Touch ID); every
+# other pane and agent shell reuses the shared cache silently.
+if [ -n "$HERDR_ENV" ] && [ -z "$_SECRETS_LOADED" ] && [ -t 0 ] && command -v op >/dev/null 2>&1; then
+  secret || echo "herdr auto-hydrate: secret load failed (run 'secret' manually)" >&2
+fi
