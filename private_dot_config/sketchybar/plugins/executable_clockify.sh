@@ -6,18 +6,16 @@ CLOCKIFY_API="https://api.clockify.me/api/v1"
 CACHE_DIR="/tmp/sketchybar_clockify"
 mkdir -p "$CACHE_DIR"
 
-# Load API key (cached to avoid repeated 1Password calls)
+# Load API key. Poll path must never call 1Password; `secret` populates this cache.
 get_api_key() {
     if [ -f "$CACHE_DIR/api_key" ]; then
         cat "$CACHE_DIR/api_key"
+    elif [ -n "$CLOCKIFY_API_KEY" ]; then
+        printf '%s' "$CLOCKIFY_API_KEY" > "$CACHE_DIR/api_key"
+        chmod 600 "$CACHE_DIR/api_key"
+        printf '%s' "$CLOCKIFY_API_KEY"
     else
-        local key
-        key="$(op read 'op://Personal/Clockify API Key/credential' 2>/dev/null)"
-        if [ -n "$key" ]; then
-            echo "$key" > "$CACHE_DIR/api_key"
-            chmod 600 "$CACHE_DIR/api_key"
-            echo "$key"
-        fi
+        return 1
     fi
 }
 

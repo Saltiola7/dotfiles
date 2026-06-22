@@ -28,12 +28,40 @@ __OP_SESSION_VAR="OP_SESSION_${__OP_USER_UUID}"
 
 __OP_CACHE_DIR="$HOME/.cache/op"
 __OP_CACHE_FILE="$__OP_CACHE_DIR/session"
+__OP_TIMEOUT_SECONDS="${OP_TIMEOUT_SECONDS:-8}"
+__OP_LOCK_DIR="$__OP_CACHE_DIR/session.lock"
+
+__op_timeout() {
+  perl -e '
+    use strict;
+    use warnings;
+    my $timeout = shift @ARGV;
+    my $pid = fork();
+    die "fork failed\n" unless defined $pid;
+    if ($pid == 0) {
+      exec @ARGV;
+      exit 127;
+    }
+    local $SIG{ALRM} = sub {
+      kill "TERM", $pid;
+      select undef, undef, undef, 0.2;
+      kill "KILL", $pid;
+      exit 124;
+    };
+    alarm $timeout;
+    waitpid($pid, 0);
+    my $status = $?;
+    exit 127 if $status == -1;
+    exit(128 + ($status & 127)) if $status & 127;
+    exit($status >> 8);
+  ' "$__OP_TIMEOUT_SECONDS" "$@"
+}
 
 # --- Validate that `op` can actually read vaults with the current session ---
 # `op whoami` is NOT sufficient — it returns success for an expired session.
 # `op vault list` is the real liveness probe.
 __op_session_valid() {
-  op vault list >/dev/null 2>&1
+  __op_timeout op vault list >/dev/null 2>&1
 }
 
 # --- Try the on-disk cached token first ---
@@ -52,15 +80,27 @@ __op_mint() {
   if [ ! -t 0 ]; then
     return 1
   fi
+  mkdir -p "$__OP_CACHE_DIR" && chmod 700 "$__OP_CACHE_DIR"
+  if ! mkdir "$__OP_LOCK_DIR" 2>/dev/null; then
+    local i
+    for i in 1 2 3 4 5; do
+      sleep 1
+      __op_load_cached && return 0
+    done
+    return 1
+  fi
   local tok
-  tok="$(op signin --account "$__OP_ACCOUNT" --raw 2>/dev/null)"
-  [ -n "$tok" ] || return 1
+  tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --raw 2>/dev/null)"
+  if [ -z "$tok" ]; then
+    rmdir "$__OP_LOCK_DIR" 2>/dev/null
+    return 1
+  fi
   export "$__OP_SESSION_VAR"="$tok"
   export OP_ACCOUNT="$__OP_ACCOUNT"
-  __op_session_valid || return 1
+  __op_session_valid || { rmdir "$__OP_LOCK_DIR" 2>/dev/null; return 1; }
   # Persist for sibling panes / agent shells (0600 in a 0700 dir).
-  mkdir -p "$__OP_CACHE_DIR" && chmod 700 "$__OP_CACHE_DIR"
   printf '%s' "$tok" >| "$__OP_CACHE_FILE" && chmod 600 "$__OP_CACHE_FILE"
+  rmdir "$__OP_LOCK_DIR" 2>/dev/null
   return 0
 }
 
