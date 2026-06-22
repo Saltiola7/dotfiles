@@ -11,3 +11,4 @@ None.
 | AUTH-001 | Remove blocking auth from Herdr shell startup | done |
 | AUTH-002 | Make `secret` fail fast when `op` hangs | done |
 | AUTH-003 | Stop Clockify poll loop from calling `op` | done |
+| AUTH-004 | Remove template-time 1Password reads from Databricks config | done |

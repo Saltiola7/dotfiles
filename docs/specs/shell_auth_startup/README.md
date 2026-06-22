@@ -8,6 +8,7 @@ Entities:
 - `LoginShell`: shell started by terminal, Herdr pane, or SSH.
 - `SecretLoader`: sourceable `secret` command that exports credentials into current shell.
 - `OnePasswordCommand`: `op` CLI command that can require app integration or biometric approval.
+- `TemplateRenderer`: chezmoi render path that must not require live 1Password access.
 - `HerdrPane`: restored or newly opened Herdr pane with `HERDR_ENV` set.
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 
@@ -61,6 +62,9 @@ Glossary:
 - **Invariant:** profile startup must not invoke `secret` automatically.
 - **Invariant:** profile startup must not run `op` commands.
 
+### TemplateRenderer
+- **Invariant:** `chezmoi status` and `chezmoi apply` must not call template-time `onepasswordRead` for routine config files.
+
 ### SecretLoader
 - **Pre:** `secret` is sourced, not executed.
 - **Post:** every `op` command either returns successfully or fails within `CommandTimeout`.
@@ -76,3 +80,4 @@ Glossary:
 - Shell syntax checks pass for edited scripts.
 - Static search confirms no Herdr profile auto-`secret` block remains.
 - Static search confirms Clockify poller has no `op read` call.
+- Static search confirms Databricks config has no `onepasswordRead` call.

@@ -13,6 +13,7 @@ README.md
 **/__pycache__/
 zen-catppuccin-mocha/
 interactive_installers.sh
+graphify-out/
 
 # Lock-managed agent skills (produced by run_onchange_install-skills.sh)
 .agents/skills/caveman
