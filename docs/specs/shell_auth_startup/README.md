@@ -63,6 +63,7 @@ Glossary:
 - Given `SecretLoadRequested` reads a cached `OnePasswordSessionCache`
 - When the cached token is expired or rejected
 - Then the first required 1Password fetch fails fast
+- And a TTY shell may mint a fresh `OnePasswordSessionCache` and retry once
 - And partial credential state is cleaned up
 
 ### Feature: Clockify polling without auth storm
@@ -96,6 +97,7 @@ Glossary:
 ### OnePasswordSessionCache
 - **Invariant:** cached tokens may be reused without a separate vault-list preflight.
 - **Post:** stale cached tokens are discovered by the required secret fetch path and fail fast through `CommandTimeout`.
+- **Post:** TTY stale-cache recovery may force one fresh token mint after a failed required secret fetch.
 
 ### ClockifyPoller
 - **Invariant:** recurring poll path reads `CachedClockifyApiKey` only.
