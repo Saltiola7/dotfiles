@@ -18,8 +18,8 @@
 # required downstream. Net effect under herdr: one Touch ID per session restart.
 #
 # The cached token is short-lived (1Password expires sessions after ~30 min idle).
-# Stale tokens are detected by the first required 1Password read in the caller,
-# avoiding an extra vault-list preflight on every successful load.
+# Validate it once before callers fan out to parallel item reads; otherwise a
+# stale token can trigger one biometric prompt per parallel `op` process.
 
 # --- Account identity (this machine's single Personal account) ---
 # user_uuid drives the OP_SESSION_<uuid> env var name that `op` reads.
@@ -58,6 +58,12 @@ __op_timeout() {
   ' "$__OP_TIMEOUT_SECONDS" "$@"
 }
 
+# --- Validate that `op` can actually read vaults with the current session ---
+# `op whoami` is NOT sufficient — it can succeed for an expired session.
+__op_session_valid() {
+  __op_timeout op vault list >/dev/null 2>&1
+}
+
 # --- Try the on-disk cached token first ---
 __op_load_cached() {
   [ -r "$__OP_CACHE_FILE" ] || return 1
@@ -66,6 +72,7 @@ __op_load_cached() {
   [ -n "$tok" ] || return 1
   export "$__OP_SESSION_VAR"="$tok"
   export OP_ACCOUNT="$__OP_ACCOUNT"
+  __op_session_valid
 }
 
 # --- Mint a fresh token (requires a TTY for the biometric prompt) ---
@@ -74,13 +81,17 @@ __op_mint() {
     return 1
   fi
   mkdir -p "$__OP_CACHE_DIR" && chmod 700 "$__OP_CACHE_DIR"
+  if [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then
+    rm -rf "$__OP_LOCK_DIR"
+  fi
   if ! mkdir "$__OP_LOCK_DIR" 2>/dev/null; then
     local i
     for i in 1 2 3 4 5; do
       sleep 1
       __op_load_cached && return 0
     done
-    return 1
+    rmdir "$__OP_LOCK_DIR" 2>/dev/null || return 1
+    mkdir "$__OP_LOCK_DIR" 2>/dev/null || return 1
   fi
   local tok
   tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --raw 2>/dev/null)"
@@ -90,6 +101,7 @@ __op_mint() {
   fi
   export "$__OP_SESSION_VAR"="$tok"
   export OP_ACCOUNT="$__OP_ACCOUNT"
+  __op_session_valid || { rmdir "$__OP_LOCK_DIR" 2>/dev/null; return 1; }
   # Persist for sibling panes / agent shells (0600 in a 0700 dir).
   printf '%s' "$tok" >| "$__OP_CACHE_FILE" && chmod 600 "$__OP_CACHE_FILE"
   rmdir "$__OP_LOCK_DIR" 2>/dev/null
@@ -104,11 +116,14 @@ if [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then
   }
 elif [ -n "${!__OP_SESSION_VAR:-}" ]; then
   export OP_ACCOUNT="$__OP_ACCOUNT"
-  : # current env session will be verified by the required secret fetch
+  __op_session_valid || __op_mint || {
+    echo "op-session: current 1Password session is stale." >&2
+    return 1 2>/dev/null || exit 1
+  }
 elif __op_load_cached; then
-  : # cached token will be verified by the required secret fetch
+  : # reused valid cached token
 elif __op_mint; then
-  : # minted + cached a fresh token; caller fetch verifies it
+  : # minted + cached a fresh token
 else
   echo "op-session: no valid 1Password session." >&2
   if [ ! -t 0 ]; then

@@ -13,7 +13,7 @@ def _write_executable(path: Path, content: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def test_op_session_reuses_cache_without_vault_list(tmp_path: Path) -> None:
+def test_op_session_validates_cache_once_before_fanout(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     cache_dir = tmp_path / ".cache" / "op"
     bin_dir.mkdir()
@@ -27,7 +27,7 @@ def test_op_session_reuses_cache_without_vault_list(tmp_path: Path) -> None:
         f"""#!/bin/bash
 printf '%s\n' "$*" >> {quoted_log_file}
 if [ "$1 $2" = "vault list" ]; then
-  exit 99
+  exit 0
 fi
 exit 0
 """,
@@ -38,7 +38,14 @@ exit 0
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
 
     result = subprocess.run(
-        ["bash", "-lc", f"source {ROOT / 'dot_local/bin/executable_op-session'}"],
+        [
+            "script",
+            "-q",
+            "/dev/null",
+            "bash",
+            "-lc",
+            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        ],
         env=env,
         text=True,
         capture_output=True,
@@ -46,7 +53,60 @@ exit 0
     )
 
     assert result.returncode == 0, result.stderr
-    assert not log_file.exists()
+    assert log_file.read_text().splitlines() == ["vault list"]
+
+
+def test_op_session_force_mint_clears_stale_lock(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    cache_dir = tmp_path / ".cache" / "op"
+    lock_dir = cache_dir / "session.lock"
+    bin_dir.mkdir()
+    lock_dir.mkdir(parents=True)
+    log_file = tmp_path / "op.log"
+    quoted_log_file = shlex.quote(str(log_file))
+
+    _write_executable(
+        bin_dir / "op",
+        f"""#!/bin/bash
+printf '%s\n' "$*" >> {quoted_log_file}
+if [ "$1" = "signin" ]; then
+  printf '%s\n' fresh-token
+  exit 0
+fi
+if [ "$1 $2" = "vault list" ]; then
+  exit 0
+fi
+exit 2
+""",
+    )
+
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["OP_SESSION_FORCE_MINT"] = "1"
+
+    result = subprocess.run(
+        [
+            "script",
+            "-q",
+            "/dev/null",
+            "bash",
+            "-lc",
+            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not lock_dir.exists()
+    assert (cache_dir / "session").read_text() == "fresh-token"
+    assert log_file.read_text().splitlines() == [
+        "signin --account my --raw",
+        "vault list",
+    ]
 
 
 def test_secret_fetches_by_uuid_and_projects_once(tmp_path: Path) -> None:
