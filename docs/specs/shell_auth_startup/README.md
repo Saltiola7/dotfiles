@@ -15,7 +15,8 @@ Entities:
 Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
 - `OnePasswordSessionCache`: local token cache under `~/.cache/op/session`.
-- `InjectedSecretBundle`: JSON document produced by grouped 1Password item fetches.
+- `ShellSecretsItem`: consolidated 1Password item containing every secret required by `SecretLoader`.
+- `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
 - `ProjectedSecretSet`: validated JSON object containing every scalar secret and file payload needed by the shell.
 - `CommandTimeout`: maximum wall time for external auth calls.
@@ -50,10 +51,10 @@ Glossary:
 - Then `SecretLoader` fails fast
 - And partial credential state is cleaned up
 
-**Scenario: Secrets are loaded as a grouped bundle**
+**Scenario: Secrets are loaded from one consolidated item**
 - Given `SecretLoadRequested` runs with a valid 1Password session
 - When `SecretLoader` resolves required secrets
-- Then it fetches required items by `OnePasswordItemId`
+- Then it fetches exactly one `ShellSecretsItem` by `OnePasswordItemId`
 - And it projects them into one `ProjectedSecretSet`
 - And it exports all required environment variables
 - And it materializes required credential files
@@ -89,7 +90,8 @@ Glossary:
 - **Post:** every `op` command either returns successfully or fails within `CommandTimeout`.
 - **Post:** failed secret loading unsets `_SECRETS_LOADED`.
 - **Invariant:** secret values are parsed from `InjectedSecretBundle` as JSON, not shell-evaluated text.
-- **Invariant:** 1Password items are fetched by `OnePasswordItemId`, not title lookup.
+- **Invariant:** `ShellSecretsItem` is fetched by `OnePasswordItemId`, not title lookup.
+- **Invariant:** `SecretLoader` performs one secret item fetch per load after session validation.
 - **Invariant:** required fields are projected into `ProjectedSecretSet` by one JSON projection step before exports or file writes.
 - **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
 - **Post:** all required secrets are non-empty before `_SECRETS_LOADED` is set.
