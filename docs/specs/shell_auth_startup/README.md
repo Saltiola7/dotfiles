@@ -15,7 +15,7 @@ Entities:
 Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
 - `OnePasswordSessionCache`: local token cache under `~/.cache/op/session`.
-- `InjectedSecretBundle`: JSON document produced by one batched 1Password item fetch.
+- `InjectedSecretBundle`: JSON document produced by grouped 1Password item fetches.
 - `CommandTimeout`: maximum wall time for external auth calls.
 
 Events:
@@ -48,7 +48,7 @@ Glossary:
 - Then `SecretLoader` fails fast
 - And partial credential state is cleaned up
 
-**Scenario: Secrets are loaded as a batched bundle**
+**Scenario: Secrets are loaded as a grouped bundle**
 - Given `SecretLoadRequested` runs with a valid 1Password session
 - When `SecretLoader` resolves required secrets
 - Then it resolves them through one `InjectedSecretBundle`
@@ -79,7 +79,7 @@ Glossary:
 - **Post:** every `op` command either returns successfully or fails within `CommandTimeout`.
 - **Post:** failed secret loading unsets `_SECRETS_LOADED`.
 - **Invariant:** secret values are parsed from `InjectedSecretBundle` as JSON, not shell-evaluated text.
-- **Invariant:** the batched secret path requires `jq` for JSON field extraction.
+- **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
 - **Post:** all required secrets are non-empty before `_SECRETS_LOADED` is set.
 
 ### ClockifyPoller
