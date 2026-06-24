@@ -16,6 +16,8 @@ Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
 - `OnePasswordSessionCache`: local token cache under `~/.cache/op/session`.
 - `InjectedSecretBundle`: JSON document produced by grouped 1Password item fetches.
+- `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
+- `ProjectedSecretSet`: validated JSON object containing every scalar secret and file payload needed by the shell.
 - `CommandTimeout`: maximum wall time for external auth calls.
 
 Events:
@@ -51,10 +53,17 @@ Glossary:
 **Scenario: Secrets are loaded as a grouped bundle**
 - Given `SecretLoadRequested` runs with a valid 1Password session
 - When `SecretLoader` resolves required secrets
-- Then it resolves them through one `InjectedSecretBundle`
+- Then it fetches required items by `OnePasswordItemId`
+- And it projects them into one `ProjectedSecretSet`
 - And it exports all required environment variables
 - And it materializes required credential files
 - And missing required values fail the whole load
+
+**Scenario: Cached session is stale**
+- Given `SecretLoadRequested` reads a cached `OnePasswordSessionCache`
+- When the cached token is expired or rejected
+- Then the first required 1Password fetch fails fast
+- And partial credential state is cleaned up
 
 ### Feature: Clockify polling without auth storm
 
@@ -79,8 +88,14 @@ Glossary:
 - **Post:** every `op` command either returns successfully or fails within `CommandTimeout`.
 - **Post:** failed secret loading unsets `_SECRETS_LOADED`.
 - **Invariant:** secret values are parsed from `InjectedSecretBundle` as JSON, not shell-evaluated text.
+- **Invariant:** 1Password items are fetched by `OnePasswordItemId`, not title lookup.
+- **Invariant:** required fields are projected into `ProjectedSecretSet` by one JSON projection step before exports or file writes.
 - **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
 - **Post:** all required secrets are non-empty before `_SECRETS_LOADED` is set.
+
+### OnePasswordSessionCache
+- **Invariant:** cached tokens may be reused without a separate vault-list preflight.
+- **Post:** stale cached tokens are discovered by the required secret fetch path and fail fast through `CommandTimeout`.
 
 ### ClockifyPoller
 - **Invariant:** recurring poll path reads `CachedClockifyApiKey` only.
