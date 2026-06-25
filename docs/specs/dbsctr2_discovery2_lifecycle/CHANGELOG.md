@@ -43,3 +43,22 @@
 
 - Finalized backlog state after rollout.
 - Left v1 skills untouched and recorded v2 as OpenCode-managed default routing.
+
+## 2026-06-25 Follow-Up: DBSCTR2 DVC Sync
+
+### Behavior
+
+- Added DBSCTR2 behavior for DVC-aware phase commits and DVC-before-Git push
+  sequencing.
+
+### Contract
+
+- Added DVC marker detection, DVC metadata commit coupling, graphify DVC artifact
+  handling, unrelated-drift reporting, and push failure stop rules.
+
+### Test
+
+- Deployed updated DBSCTR2 skill with `chezmoi apply`.
+- Verified deployed target contains the DVC Sync Gate, `dvc push` rule, and
+  graphify DVC artifact rule.
+- Confirmed `chezmoi status` returned clean output after deploy.

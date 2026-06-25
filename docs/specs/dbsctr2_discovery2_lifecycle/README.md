@@ -49,6 +49,7 @@ other artifacts current when implementation changes.
 | Ownership Contract | Per-task definition of files a subagent may write, files it may read, dependencies, collision risks, and validation. |
 | Concurrent Backlog | Backlog structured so independent tasks can run in parallel without file collisions. |
 | Phase Gate | Required checkpoint before moving to next DBSCTR2 phase or committing. |
+| DVC Sync Gate | Required DBSCTR2 checkpoint in DVC repos that keeps tracked outputs, DVC metadata, and phase commits aligned. |
 | Artifact Freshness | Requirement that existing specs, backlogs, changelogs, docs, contracts, and tests remain aligned with behavior changes. |
 | Thin Command | Slash command that only loads the matching skill and passes `$ARGUMENTS`; source of truth remains in the skill. |
 | OpenCode Routing | Managed `AGENTS.md` guidance that selects `dbsctr2` and `discovery2` in OpenCode sessions. |
@@ -102,6 +103,18 @@ phase order, artifact freshness, safety, and commit ownership.
 - **Post:** Domain, Behavior, Spec, Contract, Test, and Refactor are executed or
   verified in order.
 - **Invariant:** Known stale artifacts make the cycle incomplete.
+
+### DVC Sync Contract
+- **Pre:** A DBSCTR2 cycle runs in a repo containing `.dvc/`, `*.dvc`,
+  `dvc.yaml`, or `dvc.lock`.
+- **Post:** Phase commits that changed DVC-tracked outputs include the matching
+  `.dvc` metadata or `dvc.lock` changes in the same Git commit.
+- **Post:** When DBSCTR2 is asked to push Git refs, `dvc push` succeeds before
+  `git push` runs.
+- **Invariant:** `graphify-out/graph.json.dvc`, when present, is a normal DVC
+  artifact.
+- **Invariant:** Unrelated pre-existing DVC drift is reported and excluded unless
+  the user includes it.
 
 ### Subagent Ownership Contract
 - **Pre:** A write subagent has explicit owned write files, read files,
@@ -188,6 +201,21 @@ phase order, artifact freshness, safety, and commit ownership.
 - Then the Orchestrator stages only intended files
 - And commits with the phase prefix format
 - And subagents never commit
+
+**Scenario: Sync DVC metadata with phase commits**
+- Given DBSCTR2 runs in a repo with `.dvc/`, `*.dvc`, `dvc.yaml`, or `dvc.lock`
+- And the phase changed DVC-tracked outputs
+- When the Orchestrator reaches the phase commit gate
+- Then it runs `dvc status`
+- And updates matching DVC metadata for outputs changed by the phase
+- And includes that metadata in the same Git commit as the code or docs that
+  produced the output
+
+**Scenario: Push DVC data before Git refs**
+- Given DBSCTR2 is asked to push from a DVC repo
+- When the Orchestrator prepares to push Git refs
+- Then it runs `dvc push` first
+- And it stops before `git push` if DVC data upload fails
 
 ### Feature: Concurrent Backlog and Subagents
 

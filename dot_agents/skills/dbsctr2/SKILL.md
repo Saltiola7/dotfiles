@@ -28,6 +28,8 @@ Refactor phases without stale artifacts or overlapping subagent edits.
 - Matching specs, backlogs, changelogs, docs, contracts, and tests stay fresh.
 - Subagents, when used, have non-overlapping ownership contracts.
 - The orchestrator reviews, validates, and commits each phase gate.
+- DVC-tracked outputs stay synchronized with phase commits when the repo uses
+  DVC.
 - V1 `dbsctr` and `discovery` remain unchanged and callable.
 
 ## When To Use
@@ -209,12 +211,34 @@ Commit prefix: `[refactor]`.
 
 At each phase boundary:
 1. Inspect `git status`, `git diff`, and recent log.
-2. Stage only intended files.
-3. Commit with the phase prefix.
-4. Skip commit if the phase produced no new file changes.
+2. Run the DVC Sync Gate when the repo has DVC markers.
+3. Stage only intended files, including changed DVC metadata that belongs to the
+   phase.
+4. Commit with the phase prefix.
+5. Skip commit if the phase produced no new file changes.
 
 Tiny adjacent phases may share a commit only when the phase work is trivial and
 the artifacts remain clear.
+
+## DVC Sync Gate
+
+Use this gate only inside repos with any DVC marker: `.dvc/`, `*.dvc`,
+`dvc.yaml`, or `dvc.lock`.
+
+At every DBSCTR2 phase commit in a DVC repo:
+- Run `dvc status` before staging.
+- If the phase changed DVC-tracked outputs, run `dvc add <output>` or the
+  project-equivalent update for each changed output.
+- Treat `graphify-out/graph.json.dvc` as a normal DVC artifact when present.
+- Include resulting `.dvc` files or `dvc.lock` changes in the same Git commit as
+  the code, docs, or config changes that produced them.
+- If `dvc status` reports unrelated pre-existing drift, do not update it
+  silently. Report it and keep it out of the commit unless the user includes it.
+
+When the user asks DBSCTR2 to push Git refs from a DVC repo:
+- Run `dvc push` before `git push`.
+- If `dvc push` fails, stop before `git push` and report the failure.
+- Do not push Git refs that reference DVC metadata whose data failed to upload.
 
 ## Artifact Freshness Contract
 
