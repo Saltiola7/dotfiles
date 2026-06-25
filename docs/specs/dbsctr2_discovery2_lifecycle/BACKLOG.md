@@ -1,0 +1,23 @@
+# Backlog — DBSCTR2 and Discovery2 Lifecycle
+
+## Active Tasks
+
+| ID | Title | Priority | Status | Depends On | Owns | Reads | Parallel Safe | Validation |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Define v2 lifecycle domain | high | in_progress | none | `docs/specs/dbsctr2_discovery2_lifecycle/README.md`, `BACKLOG.md`, `CHANGELOG.md` | v1 skill docs, OpenCode config | no | Spec names domain terms and external interfaces. |
+| 2 | Add v2 workflow scenarios | high | pending | 1 | `README.md`, `BACKLOG.md`, `CHANGELOG.md` | v1 skill docs | no | Given/When/Then scenarios cover routing, discovery, DBSCTR, subagents, Ponytail. |
+| 3 | Add v2 skill and command interfaces | high | pending | 2 | `dot_agents/skills/dbsctr2/SKILL.md`, `dot_agents/skills/discovery2/SKILL.md`, `private_dot_config/opencode/commands/*.md` | OpenCode command/skill docs | yes | Source files exist with required frontmatter and thin commands. |
+| 4 | Add v2 routing and config contracts | high | pending | 3 | `private_dot_config/opencode/AGENTS.md`, `private_dot_config/opencode/opencode.json.tmpl`, v2 skill contracts | OpenCode schema/config | no | Ponytail plugin and routing gates are present. |
+| 5 | Verify v2 deployment | high | pending | 4 | deployed target files | chezmoi target paths | no | `chezmoi apply`, target reads, config sanity, `chezmoi status`. |
+| 6 | Finalize lifecycle docs | medium | pending | 5 | `README.md`, `BACKLOG.md`, `CHANGELOG.md` | all changed files | no | Backlog and changelog reflect completed work. |
+
+## Parallel Execution Guide
+
+Tasks 3 and parts of task 4 can use write subagents only after the
+orchestrator assigns non-overlapping file ownership. The orchestrator must
+review all edits, run validation, and commit phase gates. Subagents never
+commit.
+
+## Completed Tasks
+
+None yet.
