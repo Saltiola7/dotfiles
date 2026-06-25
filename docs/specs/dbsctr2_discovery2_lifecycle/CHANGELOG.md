@@ -38,3 +38,8 @@
   headers.
 - Validated deployed OpenCode config JSON with `jq empty`.
 - Confirmed `chezmoi status` returned clean output after targeted apply.
+
+### Refactor
+
+- Finalized backlog state after rollout.
+- Left v1 skills untouched and recorded v2 as OpenCode-managed default routing.
