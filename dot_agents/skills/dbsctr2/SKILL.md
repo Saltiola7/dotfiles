@@ -107,6 +107,9 @@ Rules:
 
 ## Phase Contracts
 
+These phase contracts are invariants. Do not treat them as optional process
+notes after DBSCTR2 is loaded.
+
 ### Phase 1: Domain
 
 Outcome: bounded context, glossary, entities, value objects, domain events,
@@ -212,6 +215,43 @@ At each phase boundary:
 
 Tiny adjacent phases may share a commit only when the phase work is trivial and
 the artifacts remain clear.
+
+## Artifact Freshness Contract
+
+Before final response, check whether the changed behavior is represented in any
+of these artifacts:
+- `docs/specs/**/README.md`
+- `docs/specs/**/BACKLOG.md`
+- `docs/specs/**/CHANGELOG.md`
+- tests
+- code comments or docstrings that state behavior
+- command, skill, agent, or config docs
+
+If yes, update the affected artifact in the correct phase. Do not leave known
+stale artifacts.
+
+## OpenCode Config Contract
+
+When editing OpenCode files:
+- Preserve `"$schema": "https://opencode.ai/config.json"`.
+- Validate config shape against the OpenCode schema or known schema summary.
+- Use file-based skills, commands, and agents for non-trivial prompts.
+- Keep slash command bodies thin when the skill is the source of truth.
+- Tell the user to restart OpenCode after global config, command, skill, agent,
+  or plugin changes.
+
+## Subagent Safety Contract
+
+Before any write subagent starts, record:
+- files it may write
+- files it may read
+- files it may not touch
+- expected output
+- validation check
+- dependency and collision risk
+
+After it returns, the orchestrator must inspect the diff for its owned files,
+resolve integration issues, run validation, and commit only from the main thread.
 
 ## Output Contract
 

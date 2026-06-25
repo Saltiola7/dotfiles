@@ -81,6 +81,40 @@ phase order, artifact freshness, safety, and commit ownership.
   must be updated to avoid stale artifacts.
 - Explicit `/dbsctr` and `/discovery` continue to load v1 skills.
 
+## Contracts & Invariants
+
+### OpenCode Routing Contract
+- **Pre:** OpenCode reads managed `~/.config/opencode/AGENTS.md`.
+- **Pre:** V1 skills remain installed and unchanged.
+- **Post:** DBSCTR-required work routes to `dbsctr2` by default.
+- **Post:** Explicit `/dbsctr` and `/discovery` still load v1.
+- **Invariant:** `~/.claude/CLAUDE.md` is not modified by this v2 rollout.
+
+### Discovery2 Confidence Contract
+- **Pre:** Discovery2 has a bounded context or asks until it can name one.
+- **Post:** Final artifacts are written only after at least 95% confidence, unless
+  the user explicitly asks for a draft.
+- **Invariant:** Requirements distinguish facts, assumptions, non-goals, and
+  open risks.
+
+### DBSCTR2 Phase Contract
+- **Pre:** DBSCTR2 is loaded by routing or explicit command.
+- **Post:** Domain, Behavior, Spec, Contract, Test, and Refactor are executed or
+  verified in order.
+- **Invariant:** Known stale artifacts make the cycle incomplete.
+
+### Subagent Ownership Contract
+- **Pre:** A write subagent has explicit owned write files, read files,
+  off-limits files, validation, dependencies, and collision risks.
+- **Post:** The Orchestrator reviews, validates, stages, and commits.
+- **Invariant:** Subagents never commit.
+
+### OpenCode Config Contract
+- **Pre:** `opencode.json.tmpl` preserves `$schema` and existing config.
+- **Post:** Ponytail is listed in the global `plugin` array.
+- **Invariant:** Slash command bodies are thin wrappers and skill files remain
+  workflow source of truth.
+
 ## Behavior Scenarios
 
 ### Feature: OpenCode Routing

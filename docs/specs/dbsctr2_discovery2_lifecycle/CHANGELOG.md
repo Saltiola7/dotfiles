@@ -22,3 +22,10 @@
 - Added initial `discovery2` and `dbsctr2` skill interfaces with frontmatter,
   goals, success criteria, retrieval budgets, output contracts, and stop rules.
 - Added thin global command wrappers for `/discovery2` and `/dbsctr2`.
+
+### Contract
+
+- Added managed OpenCode routing instructions in `AGENTS.md`.
+- Added Ponytail to global OpenCode plugin config.
+- Added Discovery2 confidence, DBSCTR2 artifact freshness, OpenCode config, and
+  subagent safety contracts.

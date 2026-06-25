@@ -133,6 +133,19 @@ When confidence reaches at least 95%, create or update:
 
 `CHANGELOG.md` starts with the current date and notes Discovery2 decisions.
 
+## Contracts And Invariants
+
+- Confidence must be at least 95% before writing final Discovery2 artifacts,
+  unless the user explicitly asks for a draft.
+- Existing specs must be updated instead of duplicated when they cover the
+  bounded context.
+- Backlog tasks must include ownership and dependency fields so DBSCTR2 can
+  assign concurrent work safely.
+- Graphify output, when present, is routing context only. Source files remain
+  authoritative.
+- Requirements must distinguish facts, assumptions, non-goals, and open risks.
+- Discovery2 must not silently narrow scope to make implementation easier.
+
 ## Handoff To DBSCTR2
 
 After writing artifacts, summarize:
