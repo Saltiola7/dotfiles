@@ -16,3 +16,9 @@
   extraction, strict DBSCTR2 execution, stale-artifact prevention, phase-gate
   commits, concurrent backlog planning, write subagent ownership, Ponytail
   minimalism, and thin commands.
+
+### Spec
+
+- Added initial `discovery2` and `dbsctr2` skill interfaces with frontmatter,
+  goals, success criteria, retrieval budgets, output contracts, and stop rules.
+- Added thin global command wrappers for `/discovery2` and `/dbsctr2`.
