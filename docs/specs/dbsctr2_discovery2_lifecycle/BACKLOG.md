@@ -4,8 +4,7 @@
 
 | ID | Title | Priority | Status | Depends On | Owns | Reads | Parallel Safe | Validation |
 |---|---|---|---|---|---|---|---|---|
-| 4 | Add v2 routing and config contracts | high | in_progress | 3 | `private_dot_config/opencode/AGENTS.md`, `private_dot_config/opencode/opencode.json.tmpl`, v2 skill contracts | OpenCode schema/config | no | Ponytail plugin and routing gates are present. |
-| 5 | Verify v2 deployment | high | pending | 4 | deployed target files | chezmoi target paths | no | `chezmoi apply`, target reads, config sanity, `chezmoi status`. |
+| 5 | Verify v2 deployment | high | in_progress | 4 | deployed target files | chezmoi target paths | no | `chezmoi apply`, target reads, config sanity, `chezmoi status`. |
 | 6 | Finalize lifecycle docs | medium | pending | 5 | `README.md`, `BACKLOG.md`, `CHANGELOG.md` | all changed files | no | Backlog and changelog reflect completed work. |
 
 ## Parallel Execution Guide
@@ -22,3 +21,4 @@ commit.
 | 1 | Define v2 lifecycle domain | 2026-06-25 | `8993f76` |
 | 2 | Add v2 workflow scenarios | 2026-06-25 | `ad524ee` |
 | 3 | Add v2 skill and command interfaces | 2026-06-25 | `8b37fb1` |
+| 4 | Add v2 routing and config contracts | 2026-06-25 | `15e902a` |

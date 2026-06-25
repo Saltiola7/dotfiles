@@ -29,3 +29,12 @@
 - Added Ponytail to global OpenCode plugin config.
 - Added Discovery2 confidence, DBSCTR2 artifact freshness, OpenCode config, and
   subagent safety contracts.
+
+### Test
+
+- Validated source OpenCode config JSON with `jq empty`.
+- Deployed targeted v2 files with `chezmoi apply`.
+- Verified deployed target files exist and read deployed skill/command/routing
+  headers.
+- Validated deployed OpenCode config JSON with `jq empty`.
+- Confirmed `chezmoi status` returned clean output after targeted apply.

@@ -115,6 +115,16 @@ phase order, artifact freshness, safety, and commit ownership.
 - **Invariant:** Slash command bodies are thin wrappers and skill files remain
   workflow source of truth.
 
+## Verification Evidence
+
+2026-06-25 checks:
+- `jq empty private_dot_config/opencode/opencode.json.tmpl` passed.
+- Targeted `chezmoi apply` deployed v2 skills, commands, `AGENTS.md`, and
+  `opencode.json`.
+- Target file existence and `jq empty ~/.config/opencode/opencode.json` passed.
+- Deployed skill and command headers were read from target paths.
+- `chezmoi status` returned clean output after targeted apply.
+
 ## Behavior Scenarios
 
 ### Feature: OpenCode Routing
