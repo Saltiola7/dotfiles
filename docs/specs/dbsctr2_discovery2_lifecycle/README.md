@@ -80,3 +80,98 @@ phase order, artifact freshness, safety, and commit ownership.
 - If an edit changes behavior or existing artifacts, matching docs/specs/tests
   must be updated to avoid stale artifacts.
 - Explicit `/dbsctr` and `/discovery` continue to load v1 skills.
+
+## Behavior Scenarios
+
+### Feature: OpenCode Routing
+
+**Scenario: Route DBSCTR-required work to DBSCTR2**
+- Given an OpenCode session with managed routing instructions
+- And a user asks for a change that introduces user-observable behavior,
+  service logic, data schema, orchestration, validation, or domain constraints
+- When the Orchestrator classifies the task
+- Then it loads `dbsctr2` by default
+- And it does not load v1 `dbsctr` unless the user explicitly invokes `/dbsctr`
+
+**Scenario: Skip DBSCTR2 for tiny unrelated edits**
+- Given an OpenCode session with managed routing instructions
+- And a user asks for a formatting, config-only, git-only, or trivial edit that
+  does not affect behavior or artifacts
+- When the Orchestrator classifies the task
+- Then it may proceed without DBSCTR2
+- And it must still update existing artifacts if the edit changes documented behavior
+
+**Scenario: Preserve v1 explicit commands**
+- Given the v1 skills remain installed
+- When the user invokes `/dbsctr` or `/discovery`
+- Then OpenCode loads the v1 skill requested by the user
+- And the v2 routing guidance does not rename, delete, or deprecate v1
+
+### Feature: Discovery2 Intent Extraction
+
+**Scenario: Auto-run Discovery2 when DBSCTR2 has no spec**
+- Given DBSCTR2 starts for a bounded context
+- And no matching spec exists in `docs/specs/`
+- When the Orchestrator reaches the spec check
+- Then it loads `discovery2` automatically
+- And it interviews until it has at least 95% confidence in the user's actual intent
+
+**Scenario: Produce DBSCTR2-ready artifacts**
+- Given Discovery2 reaches at least 95% confidence
+- When it writes output artifacts
+- Then it creates or updates `README.md`, `BACKLOG.md`, and `CHANGELOG.md`
+- And the backlog includes dependencies, ownership boundaries, read/write scopes,
+  parallel-safety, validation, and reason for each task
+
+### Feature: Strict DBSCTR2 Execution
+
+**Scenario: Execute all DBSCTR2 phases when selected**
+- Given DBSCTR2 is loaded by routing or explicit command
+- When implementation work begins
+- Then the Orchestrator executes Domain, Behavior, Spec, Contract, Test, and Refactor in order
+- And it does not skip a phase
+- And it may combine tiny adjacent phase commits only when the artifacts remain clear
+
+**Scenario: Prevent stale artifacts**
+- Given existing specs, backlogs, changelogs, docs, contracts, or tests describe the changed area
+- When DBSCTR2 changes behavior or implementation details represented by those artifacts
+- Then it updates the affected artifacts in the matching phase
+- And it treats stale artifacts as an incomplete cycle
+
+**Scenario: Commit phase gates**
+- Given a DBSCTR2 phase produces file changes
+- When the phase gate passes
+- Then the Orchestrator stages only intended files
+- And commits with the phase prefix format
+- And subagents never commit
+
+### Feature: Concurrent Backlog and Subagents
+
+**Scenario: Assign write subagents safely**
+- Given DBSCTR2 has independent tasks or files
+- When the Orchestrator delegates work to write subagents
+- Then each delegated task has an Ownership Contract
+- And no two write subagents write the same file unless explicitly serialized
+- And the Orchestrator reviews, integrates, validates, and commits the result
+
+**Scenario: Avoid subagents for local work**
+- Given the Orchestrator can complete a small edit directly in one response
+- When subagent overhead would exceed benefit
+- Then it performs the work directly
+- And it records no subagent requirement
+
+### Feature: Ponytail Minimalism
+
+**Scenario: Reuse before building**
+- Given DBSCTR2 or Discovery2 considers a new artifact, abstraction, or implementation path
+- When existing code, specs, native platform features, standard library, or installed dependencies can solve the problem
+- Then the Orchestrator chooses the lowest sufficient rung
+- And it does not cut validation, security, data-loss handling, accessibility, or tests
+
+### Feature: Thin Commands
+
+**Scenario: Execute thin wrapper command**
+- Given the global `/dbsctr2` or `/discovery2` command is invoked
+- When OpenCode expands the command
+- Then the command only instructs the agent to load the matching skill and execute it against `$ARGUMENTS`
+- And all workflow source of truth remains in the skill file
