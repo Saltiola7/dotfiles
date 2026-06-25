@@ -21,4 +21,4 @@ commit.
 | 4 | Add v2 routing and config contracts | 2026-06-25 | `15e902a` |
 | 5 | Verify v2 deployment | 2026-06-25 | `9d40496` |
 | 6 | Finalize lifecycle docs | 2026-06-25 | `e74ef01` |
-| 7 | Add DBSCTR2 DVC sync gate | 2026-06-25 | current contract/test commit |
+| 7 | Add DBSCTR2 DVC sync gate | 2026-06-25 | `cafd07d` |
