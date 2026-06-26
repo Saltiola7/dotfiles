@@ -22,3 +22,4 @@ commit.
 | 5 | Verify v2 deployment | 2026-06-25 | `9d40496` |
 | 6 | Finalize lifecycle docs | 2026-06-25 | `e74ef01` |
 | 7 | Add DBSCTR2 DVC sync gate | 2026-06-25 | `cafd07d` |
+| 8 | Add Dependabot skill and DBSCTR2 gate | 2026-06-26 | current implementation commit |

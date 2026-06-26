@@ -62,3 +62,29 @@
 - Verified deployed target contains the DVC Sync Gate, `dvc push` rule, and
   graphify DVC artifact rule.
 - Confirmed `chezmoi status` returned clean output after deploy.
+
+## 2026-06-26 Follow-Up: Dependabot Workflow
+
+### Behavior
+
+- Added a focused current-repo Dependabot remediation workflow.
+- Added DBSCTR2 alert scoping so only alerts relevant to touched imports/usages
+  are delegated, while unrelated alerts are summarized by severity.
+
+### Spec
+
+- Added `dependabot` skill and thin `/dependabot` command interface.
+
+### Contract
+
+- Added Dependabot gate and remediation contracts for authenticated `gh`, scoped
+  alert context, patch/minor local remediation, major/breaking escalation to
+  DBSCTR2, dependency-specific tests, artifact freshness, commits, and pushes.
+
+### Test
+
+- Deployed the `dependabot` skill, `/dependabot` command, updated `dbsctr2`, and
+  updated OpenCode routing with targeted `chezmoi apply`.
+- Verified deployed target text for the Dependabot workflow, DBSCTR2 gate, thin
+  command wrapper, and routing rule.
+- Confirmed `chezmoi status` returned clean output after deploy.

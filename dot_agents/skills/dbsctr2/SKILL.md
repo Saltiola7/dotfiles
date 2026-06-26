@@ -28,6 +28,7 @@ Refactor phases without stale artifacts or overlapping subagent edits.
 - Matching specs, backlogs, changelogs, docs, contracts, and tests stay fresh.
 - Subagents, when used, have non-overlapping ownership contracts.
 - The orchestrator reviews, validates, and commits each phase gate.
+- Current-repo Dependabot alerts are checked without bloating context.
 - DVC-tracked outputs stay synchronized with phase commits when the repo uses
   DVC.
 - V1 `dbsctr` and `discovery` remain unchanged and callable.
@@ -211,14 +212,33 @@ Commit prefix: `[refactor]`.
 
 At each phase boundary:
 1. Inspect `git status`, `git diff`, and recent log.
-2. Run the DVC Sync Gate when the repo has DVC markers.
-3. Stage only intended files, including changed DVC metadata that belongs to the
+2. Run the Dependabot Gate when the repo has a GitHub remote and `gh` can fetch
+   current-repo alerts.
+3. Run the DVC Sync Gate when the repo has DVC markers.
+4. Stage only intended files, including changed DVC metadata that belongs to the
    phase.
-4. Commit with the phase prefix.
-5. Skip commit if the phase produced no new file changes.
+5. Commit with the phase prefix.
+6. Skip commit if the phase produced no new file changes.
 
 Tiny adjacent phases may share a commit only when the phase work is trivial and
 the artifacts remain clear.
+
+## Dependabot Gate
+
+Use this gate during DBSCTR2 cycles without loading the full Dependabot workflow
+unless relevant alerts are found or the user asks for remediation.
+
+At phase gates in a GitHub repo:
+- Use the authenticated `gh` CLI to check current-repo Dependabot alerts.
+- Keep alert retrieval compact; do not dump full alert JSON into context.
+- Classify an alert as relevant only when its vulnerable package is imported or
+  used by code touched in the current DBSCTR2 cycle.
+- For relevant alerts, load the `dependabot` skill and pass only the scoped alert
+  identifiers, package names, affected files, and touched usage evidence.
+- For non-relevant alerts, emit a one-line severity summary only, such as
+  `Non-relevant Dependabot alerts: critical=0 high=2 medium=5 low=3`.
+- If `gh` cannot fetch alerts, record the blocker and continue unless the current
+  work is explicitly dependency-security remediation.
 
 ## DVC Sync Gate
 

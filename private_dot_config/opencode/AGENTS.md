@@ -40,6 +40,13 @@ Before building, choose the lowest sufficient rung:
 
 Do not cut validation, security, data-loss handling, accessibility, or tests.
 
+## Dependabot
+
+Use `dependabot` for current-repo Dependabot alert triage and remediation. When
+DBSCTR2 is already running, keep Dependabot context scoped to alerts whose
+vulnerable package is imported or used by touched code, and summarize unrelated
+alerts by severity only.
+
 ## Subagents
 
 Use subagents when they make work faster or safer through independent ownership.

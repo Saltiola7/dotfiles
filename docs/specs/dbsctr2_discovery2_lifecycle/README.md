@@ -20,7 +20,7 @@ other artifacts current when implementation changes.
 ## Goals
 
 - Add globally managed `dbsctr2` and `discovery2` skills.
-- Add global `/dbsctr2` and `/discovery2` thin wrapper commands.
+- Add global `/dbsctr2`, `/discovery2`, and `/dependabot` thin wrapper commands.
 - Add OpenCode-native routing through managed `~/.config/opencode/AGENTS.md`.
 - Keep v1 `dbsctr` and `discovery` unchanged and callable forever.
 - Install Ponytail globally and make minimal correct work a hard principle.
@@ -44,11 +44,13 @@ other artifacts current when implementation changes.
 | V2 Lifecycle | Combined Discovery2 and DBSCTR2 workflow, routing, commands, and deployment artifacts. |
 | Discovery2 | Requirements interview skill that extracts user intent to at least 95% confidence before a DBSCTR2 cycle. |
 | DBSCTR2 | Strict six-phase implementation skill: Domain, Behavior, Spec, Contract, Test, Refactor. |
+| Dependabot Skill | Focused current-repo dependency security workflow for alert triage, remediation, validation, commits, and pushes. |
 | Orchestrator | Main agent running the skill, owning plan, file ownership, integration, validation, and commits. |
 | Write Subagent | Subagent allowed to edit isolated files under an explicit ownership contract. |
 | Ownership Contract | Per-task definition of files a subagent may write, files it may read, dependencies, collision risks, and validation. |
 | Concurrent Backlog | Backlog structured so independent tasks can run in parallel without file collisions. |
 | Phase Gate | Required checkpoint before moving to next DBSCTR2 phase or committing. |
+| Dependabot Gate | Lightweight DBSCTR2 checkpoint that checks current-repo alerts, delegates relevant ones, and summarizes unrelated alerts. |
 | DVC Sync Gate | Required DBSCTR2 checkpoint in DVC repos that keeps tracked outputs, DVC metadata, and phase commits aligned. |
 | Artifact Freshness | Requirement that existing specs, backlogs, changelogs, docs, contracts, and tests remain aligned with behavior changes. |
 | Thin Command | Slash command that only loads the matching skill and passes `$ARGUMENTS`; source of truth remains in the skill. |
@@ -61,8 +63,10 @@ other artifacts current when implementation changes.
 |---|---|
 | `dot_agents/skills/dbsctr2/SKILL.md` | Source skill for DBSCTR2. |
 | `dot_agents/skills/discovery2/SKILL.md` | Source skill for Discovery2. |
+| `dot_agents/skills/dependabot/SKILL.md` | Source skill for current-repo Dependabot remediation. |
 | `private_dot_config/opencode/commands/dbsctr2.md` | Global `/dbsctr2` command. |
 | `private_dot_config/opencode/commands/discovery2.md` | Global `/discovery2` command. |
+| `private_dot_config/opencode/commands/dependabot.md` | Global `/dependabot` command. |
 | `private_dot_config/opencode/AGENTS.md` | OpenCode-native routing instructions. |
 | `private_dot_config/opencode/opencode.json.tmpl` | Global OpenCode config, including Ponytail plugin. |
 
@@ -104,6 +108,26 @@ phase order, artifact freshness, safety, and commit ownership.
   verified in order.
 - **Invariant:** Known stale artifacts make the cycle incomplete.
 
+### Dependabot Gate Contract
+- **Pre:** DBSCTR2 runs in a GitHub repo where the authenticated `gh` CLI can
+  fetch current-repo Dependabot alerts.
+- **Post:** Alerts whose vulnerable package is imported or used by code touched
+  in the current DBSCTR2 cycle are delegated to the `dependabot` skill with
+  compact scoped context.
+- **Post:** Non-relevant alerts are summarized in one line by severity.
+- **Invariant:** The DBSCTR2 gate does not load full alert payloads into context
+  unless remediation is in scope.
+
+### Dependabot Remediation Contract
+- **Pre:** `/dependabot` runs in a current GitHub repo with authenticated `gh`.
+- **Post:** Alerts are listed, prioritized, planned, remediated when safe,
+  dependency-specific tests run, focused commits are created, and successful
+  remediation commits are pushed.
+- **Invariant:** Patch and minor updates may be local automated remediations;
+  major or breaking changes escalate to DBSCTR2.
+- **Invariant:** DBSCTR artifact freshness applies whenever remediation changes
+  behavior, contracts, docs, tests, config, or downstream-visible behavior.
+
 ### DVC Sync Contract
 - **Pre:** A DBSCTR2 cycle runs in a repo containing `.dvc/`, `*.dvc`,
   `dvc.yaml`, or `dvc.lock`.
@@ -136,6 +160,13 @@ phase order, artifact freshness, safety, and commit ownership.
   `opencode.json`.
 - Target file existence and `jq empty ~/.config/opencode/opencode.json` passed.
 - Deployed skill and command headers were read from target paths.
+- `chezmoi status` returned clean output after targeted apply.
+
+2026-06-26 checks:
+- Targeted `chezmoi apply` deployed `dependabot`, updated `dbsctr2`, updated
+  `/dependabot`, and updated OpenCode routing.
+- Deployed target checks found the Dependabot workflow, DBSCTR2 Dependabot Gate,
+  thin command wrapper, and routing rule.
 - `chezmoi status` returned clean output after targeted apply.
 
 ## Behavior Scenarios
@@ -202,6 +233,21 @@ phase order, artifact freshness, safety, and commit ownership.
 - And commits with the phase prefix format
 - And subagents never commit
 
+**Scenario: Gate relevant Dependabot alerts**
+- Given DBSCTR2 runs in a GitHub repo with Dependabot alerts
+- And a vulnerable package is imported or used by code touched in the current cycle
+- When the Orchestrator reaches a phase gate
+- Then it delegates the scoped alert to the `dependabot` skill
+- And passes only alert identifiers, package names, affected files, and touched
+  usage evidence
+
+**Scenario: Summarize unrelated Dependabot alerts**
+- Given DBSCTR2 runs in a GitHub repo with Dependabot alerts
+- And some alerts do not affect packages imported or used by touched code
+- When the Orchestrator reaches a phase gate
+- Then it reports a one-line severity summary for non-relevant alerts
+- And it does not load unrelated alert details into context
+
 **Scenario: Sync DVC metadata with phase commits**
 - Given DBSCTR2 runs in a repo with `.dvc/`, `*.dvc`, `dvc.yaml`, or `dvc.lock`
 - And the phase changed DVC-tracked outputs
@@ -243,7 +289,23 @@ phase order, artifact freshness, safety, and commit ownership.
 ### Feature: Thin Commands
 
 **Scenario: Execute thin wrapper command**
-- Given the global `/dbsctr2` or `/discovery2` command is invoked
+- Given the global `/dbsctr2`, `/discovery2`, or `/dependabot` command is invoked
 - When OpenCode expands the command
 - Then the command only instructs the agent to load the matching skill and execute it against `$ARGUMENTS`
 - And all workflow source of truth remains in the skill file
+
+### Feature: Dependabot Remediation
+
+**Scenario: Remediate current-repo alerts**
+- Given the `/dependabot` command is invoked in a GitHub repo
+- And authenticated `gh` can fetch current-repo Dependabot alerts
+- When alerts exist
+- Then the Orchestrator lists, prioritizes, and plans remediation
+- And patch or minor updates may be applied locally with dependency-specific tests
+- And major or breaking updates escalate to DBSCTR2
+
+**Scenario: Exit when no alerts exist**
+- Given the `/dependabot` command is invoked in a GitHub repo
+- And authenticated `gh` reports no current-repo Dependabot alerts
+- When triage completes
+- Then the Orchestrator reports no open alerts and stops
