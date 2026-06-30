@@ -100,7 +100,7 @@ __op_mint() {
   fi
   local tok err
   err="$(mktemp "${TMPDIR:-/tmp}/op-session.XXXXXX")" || return 1
-  tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --force --raw 2>"$err")"
+  tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --force --raw 2>|"$err")"
   if [ -z "$tok" ]; then
     [ ! -s "$err" ] || sed 's/^/op-session: op signin: /' "$err" >&2
     command rm -f "$err"
