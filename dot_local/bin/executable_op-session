@@ -36,6 +36,16 @@ __op_clear_session_env() {
   unset "$__OP_SESSION_VAR" OP_SESSION OP_SESSION_my
 }
 
+__op_is_ssh() {
+  [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]
+}
+
+__op_fail_ssh_without_service_token() {
+  echo "op-session: SSH shells require OP_SERVICE_ACCOUNT_TOKEN or a valid cached 1Password session." >&2
+  echo "op-session: inject OP_SERVICE_ACCOUNT_TOKEN into this Herdr/SSH session, then run 'secret'." >&2
+  return 1
+}
+
 __op_timeout() {
   perl -e '
     use strict;
@@ -132,6 +142,10 @@ elif [ -n "${!__OP_SESSION_VAR:-}" ]; then
   export OP_ACCOUNT="$__OP_ACCOUNT"
   if ! __op_session_valid; then
     __op_clear_session_env
+    if __op_is_ssh; then
+      __op_fail_ssh_without_service_token
+      return 1 2>/dev/null || exit 1
+    fi
     OP_SESSION_FORCE_MINT=1 __op_mint || {
       echo "op-session: current 1Password session is stale." >&2
       return 1 2>/dev/null || exit 1
@@ -139,6 +153,8 @@ elif [ -n "${!__OP_SESSION_VAR:-}" ]; then
   fi
 elif __op_load_cached; then
   : # reused valid cached token
+elif __op_is_ssh; then
+  __op_fail_ssh_without_service_token || return 1 2>/dev/null || exit 1
 elif __op_mint; then
   : # minted + cached a fresh token
 else

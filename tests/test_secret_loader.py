@@ -145,6 +145,53 @@ exit 2
     assert log_file.read_text().splitlines() == ["vault list"]
 
 
+def test_op_session_ssh_without_service_token_does_not_signin(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    cache_dir = tmp_path / ".cache" / "op"
+    bin_dir.mkdir()
+    cache_dir.mkdir(parents=True)
+    log_file = tmp_path / "op.log"
+    quoted_log_file = shlex.quote(str(log_file))
+
+    _write_executable(
+        bin_dir / "op",
+        f"""#!/bin/bash
+printf '%s\n' "$*" >> {quoted_log_file}
+if [ "$1 $2" = "vault list" ]; then
+  exit 1
+fi
+if [ "$1" = "signin" ]; then
+  exit 0
+fi
+exit 2
+""",
+    )
+
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["SSH_CONNECTION"] = "client server"
+
+    result = subprocess.run(
+        [
+            "script",
+            "-q",
+            "/dev/null",
+            "bash",
+            "-lc",
+            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "SSH shells require OP_SERVICE_ACCOUNT_TOKEN" in result.stderr + result.stdout
+    assert not log_file.exists()
+
+
 def test_op_session_force_mint_clears_stale_lock(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     cache_dir = tmp_path / ".cache" / "op"
@@ -170,6 +217,8 @@ exit 2
     )
 
     env = os.environ.copy()
+    env.pop("SSH_CONNECTION", None)
+    env.pop("SSH_TTY", None)
     env["HOME"] = str(tmp_path)
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["OP_SESSION_FORCE_MINT"] = "1"
@@ -225,6 +274,8 @@ exit 2
     )
 
     env = os.environ.copy()
+    env.pop("SSH_CONNECTION", None)
+    env.pop("SSH_TTY", None)
     env["HOME"] = str(tmp_path)
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"

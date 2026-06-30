@@ -69,6 +69,14 @@ Glossary:
 - And no biometric session mint is attempted
 - And no `OnePasswordSessionCache` is written
 
+**Scenario: SSH session lacks service account token**
+- Given `SecretLoadRequested` runs in an SSH `LoginShell`
+- And no valid `OnePasswordSessionCache` is available
+- And no `OnePasswordServiceAccountToken` is present in the environment
+- When `SecretLoader` resolves 1Password authentication
+- Then it fails fast without calling `op signin`
+- And it tells the user to inject `OP_SERVICE_ACCOUNT_TOKEN`
+
 **Scenario: Cached session is stale**
 - Given `SecretLoadRequested` reads a cached `OnePasswordSessionCache`
 - When the cached token is expired or rejected by the session validity probe
@@ -118,6 +126,7 @@ Glossary:
 - **Invariant:** `OnePasswordServiceAccountToken` takes precedence over cached and biometric session paths.
 - **Post:** valid service account tokens must not call `op signin` or write `OnePasswordSessionCache`.
 - **Post:** invalid service account tokens fail fast with a service-account-specific error.
+- **Post:** SSH shells without a service account token must not attempt biometric or password-based `op signin`.
 - **Post:** stale exported session tokens are discarded before a forced mint.
 - **Post:** stale cached tokens are refreshed once in a TTY shell before parallel 1Password item fetches run.
 - **Post:** non-TTY shells fail fast when no valid cached token is available.
