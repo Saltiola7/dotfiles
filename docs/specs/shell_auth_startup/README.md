@@ -15,6 +15,7 @@ Entities:
 Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
 - `OnePasswordSessionCache`: local token cache under `~/.cache/op/session`.
+- `OnePasswordServiceAccountToken`: per-session token injected into SSH/Herdr environments as `OP_SERVICE_ACCOUNT_TOKEN`.
 - `ShellSecretsItem`: consolidated 1Password item containing every secret required by `SecretLoader`.
 - `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
@@ -60,12 +61,28 @@ Glossary:
 - And it materializes required credential files
 - And missing required values fail the whole load
 
+**Scenario: SSH session uses injected service account token**
+- Given `SecretLoadRequested` runs in an SSH `LoginShell`
+- And `OnePasswordServiceAccountToken` is present in the environment
+- When the token passes the session validity probe
+- Then `SecretLoader` uses that token for the `ShellSecretsItem` fetch
+- And no biometric session mint is attempted
+- And no `OnePasswordSessionCache` is written
+
 **Scenario: Cached session is stale**
 - Given `SecretLoadRequested` reads a cached `OnePasswordSessionCache`
 - When the cached token is expired or rejected by the session validity probe
 - Then `SecretLoader` mints one fresh `OnePasswordSessionCache` in a TTY shell
 - And no grouped item fetch starts before the session is valid
 - And partial credential state is cleaned up
+
+**Scenario: Exported session is stale while a lock remains**
+- Given `OnePasswordSessionEnv` contains a stale token
+- And `OnePasswordSessionLock` remains from an earlier attempt
+- When the session validity probe rejects the exported token
+- Then `SecretLoader` discards the exported token
+- And it force-mints one fresh `OnePasswordSessionCache` in a TTY shell
+- And it removes the stale lock before minting
 
 ### Feature: Clockify polling without auth storm
 
@@ -98,6 +115,10 @@ Glossary:
 
 ### OnePasswordSessionCache
 - **Invariant:** cached tokens must pass one bounded validity probe before grouped item fetches start.
+- **Invariant:** `OnePasswordServiceAccountToken` takes precedence over cached and biometric session paths.
+- **Post:** valid service account tokens must not call `op signin` or write `OnePasswordSessionCache`.
+- **Post:** invalid service account tokens fail fast with a service-account-specific error.
+- **Post:** stale exported session tokens are discarded before a forced mint.
 - **Post:** stale cached tokens are refreshed once in a TTY shell before parallel 1Password item fetches run.
 - **Post:** non-TTY shells fail fast when no valid cached token is available.
 

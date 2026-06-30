@@ -32,6 +32,10 @@ __OP_CACHE_FILE="$__OP_CACHE_DIR/session"
 __OP_TIMEOUT_SECONDS="${OP_TIMEOUT_SECONDS:-8}"
 __OP_LOCK_DIR="$__OP_CACHE_DIR/session.lock"
 
+__op_clear_session_env() {
+  unset "$__OP_SESSION_VAR" OP_SESSION OP_SESSION_my
+}
+
 __op_timeout() {
   perl -e '
     use strict;
@@ -82,7 +86,8 @@ __op_mint() {
   fi
   mkdir -p "$__OP_CACHE_DIR" && chmod 700 "$__OP_CACHE_DIR"
   if [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then
-    rm -rf "$__OP_LOCK_DIR"
+    __op_clear_session_env
+    command rm -rf "$__OP_LOCK_DIR"
   fi
   if ! mkdir "$__OP_LOCK_DIR" 2>/dev/null; then
     local i
@@ -90,36 +95,48 @@ __op_mint() {
       sleep 1
       __op_load_cached && return 0
     done
-    rmdir "$__OP_LOCK_DIR" 2>/dev/null || return 1
+    command rmdir "$__OP_LOCK_DIR" 2>/dev/null || return 1
     mkdir "$__OP_LOCK_DIR" 2>/dev/null || return 1
   fi
-  local tok
-  tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --raw 2>/dev/null)"
+  local tok err
+  err="$(mktemp "${TMPDIR:-/tmp}/op-session.XXXXXX")" || return 1
+  tok="$(__op_timeout op signin --account "$__OP_ACCOUNT" --force --raw 2>"$err")"
   if [ -z "$tok" ]; then
-    rmdir "$__OP_LOCK_DIR" 2>/dev/null
+    [ ! -s "$err" ] || sed 's/^/op-session: op signin: /' "$err" >&2
+    command rm -f "$err"
+    command rmdir "$__OP_LOCK_DIR" 2>/dev/null
     return 1
   fi
+  command rm -f "$err"
   export "$__OP_SESSION_VAR"="$tok"
   export OP_ACCOUNT="$__OP_ACCOUNT"
-  __op_session_valid || { rmdir "$__OP_LOCK_DIR" 2>/dev/null; return 1; }
+  __op_session_valid || { command rmdir "$__OP_LOCK_DIR" 2>/dev/null; return 1; }
   # Persist for sibling panes / agent shells (0600 in a 0700 dir).
   printf '%s' "$tok" >| "$__OP_CACHE_FILE" && chmod 600 "$__OP_CACHE_FILE"
-  rmdir "$__OP_LOCK_DIR" 2>/dev/null
+  command rmdir "$__OP_LOCK_DIR" 2>/dev/null
   return 0
 }
 
 # --- Resolution order: existing env session → cache → fresh mint ---
-if [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then
+if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  __op_session_valid || {
+    echo "op-session: OP_SERVICE_ACCOUNT_TOKEN is invalid or lacks access." >&2
+    return 1 2>/dev/null || exit 1
+  }
+elif [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then
   __op_mint || {
     echo "op-session: failed to mint a fresh 1Password session." >&2
     return 1 2>/dev/null || exit 1
   }
 elif [ -n "${!__OP_SESSION_VAR:-}" ]; then
   export OP_ACCOUNT="$__OP_ACCOUNT"
-  __op_session_valid || __op_mint || {
-    echo "op-session: current 1Password session is stale." >&2
-    return 1 2>/dev/null || exit 1
-  }
+  if ! __op_session_valid; then
+    __op_clear_session_env
+    OP_SESSION_FORCE_MINT=1 __op_mint || {
+      echo "op-session: current 1Password session is stale." >&2
+      return 1 2>/dev/null || exit 1
+    }
+  fi
 elif __op_load_cached; then
   : # reused valid cached token
 elif __op_mint; then
