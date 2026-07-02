@@ -31,6 +31,7 @@ __OP_CACHE_DIR="$HOME/.cache/op"
 __OP_CACHE_FILE="$__OP_CACHE_DIR/session"
 __OP_TIMEOUT_SECONDS="${OP_TIMEOUT_SECONDS:-8}"
 __OP_LOCK_DIR="$__OP_CACHE_DIR/session.lock"
+__OP_KEYCHAIN_SERVICE="op-service-account-token"
 
 __op_clear_session_env() {
   unset "$__OP_SESSION_VAR" OP_SESSION OP_SESSION_my
@@ -40,9 +41,19 @@ __op_is_ssh() {
   [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]
 }
 
+__op_is_herdr() {
+  [ -n "${HERDR_ENV:-}" ]
+}
+
 __op_fail_ssh_without_service_token() {
   echo "op-session: SSH shells require OP_SERVICE_ACCOUNT_TOKEN or a valid cached 1Password session." >&2
   echo "op-session: inject OP_SERVICE_ACCOUNT_TOKEN into this Herdr/SSH session, then run 'secret'." >&2
+  return 1
+}
+
+__op_fail_herdr_without_service_token() {
+  echo "op-session: Herdr shells require OP_SERVICE_ACCOUNT_TOKEN from env or macOS Keychain." >&2
+  echo "op-session: store it with: security add-generic-password -U -s $__OP_KEYCHAIN_SERVICE -a $__OP_ACCOUNT -w \"\$OP_SERVICE_ACCOUNT_TOKEN\"" >&2
   return 1
 }
 
@@ -76,6 +87,14 @@ __op_timeout() {
 # `op whoami` is NOT sufficient — it can succeed for an expired session.
 __op_session_valid() {
   __op_timeout op vault list >/dev/null 2>&1
+}
+
+__op_load_keychain_service_token() {
+  command -v security >/dev/null 2>&1 || return 1
+  local tok
+  tok="$(security find-generic-password -s "$__OP_KEYCHAIN_SERVICE" -a "$__OP_ACCOUNT" -w 2>/dev/null)" || return 1
+  [ -n "$tok" ] || return 1
+  export OP_SERVICE_ACCOUNT_TOKEN="$tok"
 }
 
 # --- Try the on-disk cached token first ---
@@ -131,6 +150,15 @@ __op_mint() {
 if [ -n "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
   __op_session_valid || {
     echo "op-session: OP_SERVICE_ACCOUNT_TOKEN is invalid or lacks access." >&2
+    return 1 2>/dev/null || exit 1
+  }
+elif __op_is_herdr; then
+  __op_load_keychain_service_token || {
+    __op_fail_herdr_without_service_token
+    return 1 2>/dev/null || exit 1
+  }
+  __op_session_valid || {
+    echo "op-session: Keychain OP_SERVICE_ACCOUNT_TOKEN is invalid or lacks access." >&2
     return 1 2>/dev/null || exit 1
   }
 elif [ -n "${OP_SESSION_FORCE_MINT:-}" ]; then

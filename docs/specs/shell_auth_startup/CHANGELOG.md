@@ -8,3 +8,8 @@
 - Changed Clockify SketchyBar polling to use only cached/env API keys; poll loop no longer calls `op read`.
 - Removed Databricks `onepasswordRead` template calls; `secret` now exports Databricks env vars.
 - Verification: shell syntax checks passed; `secret` with `OP_TIMEOUT_SECONDS=2` failed fast in non-TTY.
+
+## 2026-07-02
+
+- Changed Herdr secret loading to use `OP_SERVICE_ACCOUNT_TOKEN` from the environment or macOS Keychain service `op-service-account-token` account `my`.
+- Herdr panes now fail fast instead of attempting delegated desktop `op signin`.

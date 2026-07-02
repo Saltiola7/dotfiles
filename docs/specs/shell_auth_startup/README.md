@@ -16,6 +16,7 @@ Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
 - `OnePasswordSessionCache`: local token cache under `~/.cache/op/session`.
 - `OnePasswordServiceAccountToken`: per-session token injected into SSH/Herdr environments as `OP_SERVICE_ACCOUNT_TOKEN`.
+- `MacOSKeychainServiceToken`: local login-Keychain item that stores `OnePasswordServiceAccountToken` for Herdr panes.
 - `ShellSecretsItem`: consolidated 1Password item containing every secret required by `SecretLoader`.
 - `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
@@ -68,6 +69,23 @@ Glossary:
 - Then `SecretLoader` uses that token for the `ShellSecretsItem` fetch
 - And no biometric session mint is attempted
 - And no `OnePasswordSessionCache` is written
+
+**Scenario: Herdr session uses Keychain-backed service account token**
+- Given `SecretLoadRequested` runs in a `HerdrPane`
+- And no `OnePasswordServiceAccountToken` is present in the environment
+- And a `MacOSKeychainServiceToken` exists
+- When the token passes the session validity probe
+- Then `SecretLoader` uses that token for the `ShellSecretsItem` fetch
+- And no biometric or delegated `op signin` is attempted
+- And no `OnePasswordSessionCache` is read or written
+
+**Scenario: Herdr session lacks service account token**
+- Given `SecretLoadRequested` runs in a `HerdrPane`
+- And no `OnePasswordServiceAccountToken` is present in the environment
+- And no `MacOSKeychainServiceToken` is available
+- When `SecretLoader` resolves 1Password authentication
+- Then it fails fast without calling `op signin`
+- And it tells the user to configure a Keychain-backed `OP_SERVICE_ACCOUNT_TOKEN`
 
 **Scenario: SSH session lacks service account token**
 - Given `SecretLoadRequested` runs in an SSH `LoginShell`
@@ -124,6 +142,8 @@ Glossary:
 ### OnePasswordSessionCache
 - **Invariant:** cached tokens must pass one bounded validity probe before grouped item fetches start.
 - **Invariant:** `OnePasswordServiceAccountToken` takes precedence over cached and biometric session paths.
+- **Invariant:** `HerdrPane` uses `OnePasswordServiceAccountToken` from environment or `MacOSKeychainServiceToken` only; it must not call delegated desktop `op signin`.
+- **Invariant:** `MacOSKeychainServiceToken` is read from service `op-service-account-token` and account `my`.
 - **Post:** valid service account tokens must not call `op signin` or write `OnePasswordSessionCache`.
 - **Post:** invalid service account tokens fail fast with a service-account-specific error.
 - **Post:** SSH shells without a service account token must not attempt biometric or password-based `op signin`.

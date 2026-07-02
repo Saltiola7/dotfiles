@@ -13,6 +13,19 @@ def _write_executable(path: Path, content: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
+def _base_env(tmp_path: Path, bin_dir: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env.pop("HERDR_ENV", None)
+    env.pop("OP_SERVICE_ACCOUNT_TOKEN", None)
+    env.pop("OP_SESSION", None)
+    env.pop("OP_SESSION_my", None)
+    env.pop("OP_SESSION_FORCE_MINT", None)
+    env.pop("OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY", None)
+    return env
+
+
 def test_op_session_validates_cache_once_before_fanout(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     cache_dir = tmp_path / ".cache" / "op"
@@ -33,17 +46,12 @@ exit 0
 """,
     )
 
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env = _base_env(tmp_path, bin_dir)
 
     result = subprocess.run(
         [
-            "script",
-            "-q",
-            "/dev/null",
             "bash",
-            "-lc",
+            "-c",
             f"source {ROOT / 'dot_local/bin/executable_op-session'}",
         ],
         env=env,
@@ -75,18 +83,13 @@ exit 2
 """,
     )
 
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env = _base_env(tmp_path, bin_dir)
     env["OP_SERVICE_ACCOUNT_TOKEN"] = "service-token"
 
     result = subprocess.run(
         [
-            "script",
-            "-q",
-            "/dev/null",
             "bash",
-            "-lc",
+            "-c",
             f"source {ROOT / 'dot_local/bin/executable_op-session'}",
         ],
         env=env,
@@ -120,18 +123,13 @@ exit 2
 """,
     )
 
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env = _base_env(tmp_path, bin_dir)
     env["OP_SERVICE_ACCOUNT_TOKEN"] = "bad-token"
 
     result = subprocess.run(
         [
-            "script",
-            "-q",
-            "/dev/null",
             "bash",
-            "-lc",
+            "-c",
             f"source {ROOT / 'dot_local/bin/executable_op-session'}",
         ],
         env=env,
@@ -143,6 +141,101 @@ exit 2
     assert result.returncode == 1
     assert "OP_SERVICE_ACCOUNT_TOKEN is invalid or lacks access" in result.stderr + result.stdout
     assert log_file.read_text().splitlines() == ["vault list"]
+
+
+def test_op_session_herdr_uses_keychain_service_account_token(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    cache_dir = tmp_path / ".cache" / "op"
+    bin_dir.mkdir()
+    log_file = tmp_path / "op.log"
+    quoted_log_file = shlex.quote(str(log_file))
+
+    _write_executable(
+        bin_dir / "security",
+        """#!/bin/bash
+if [ "$1" = "find-generic-password" ] && [ "$2" = "-s" ] && [ "$3" = "op-service-account-token" ] && [ "$4" = "-a" ] && [ "$5" = "my" ] && [ "$6" = "-w" ]; then
+  printf '%s\n' keychain-token
+  exit 0
+fi
+exit 2
+""",
+    )
+
+    _write_executable(
+        bin_dir / "op",
+        f"""#!/bin/bash
+printf '%s\t%s\n' "$*" "${{OP_SERVICE_ACCOUNT_TOKEN:-}}" >> {quoted_log_file}
+if [ "$1 $2" = "vault list" ]; then
+  [ "${{OP_SERVICE_ACCOUNT_TOKEN:-}}" = "keychain-token" ]
+  exit $?
+fi
+if [ "$1" = "signin" ]; then
+  exit 9
+fi
+exit 2
+""",
+    )
+
+    env = _base_env(tmp_path, bin_dir)
+    env["HERDR_ENV"] = "1"
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert log_file.read_text().splitlines() == ["vault list\tkeychain-token"]
+    assert not (cache_dir / "session").exists()
+
+
+def test_op_session_herdr_without_service_token_does_not_signin(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_file = tmp_path / "op.log"
+    quoted_log_file = shlex.quote(str(log_file))
+
+    _write_executable(
+        bin_dir / "security",
+        "#!/bin/bash\nexit 44\n",
+    )
+
+    _write_executable(
+        bin_dir / "op",
+        f"""#!/bin/bash
+printf '%s\n' "$*" >> {quoted_log_file}
+if [ "$1" = "signin" ]; then
+  exit 9
+fi
+exit 2
+""",
+    )
+
+    env = _base_env(tmp_path, bin_dir)
+    env["HERDR_ENV"] = "1"
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        ],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Herdr shells require OP_SERVICE_ACCOUNT_TOKEN" in result.stderr + result.stdout
+    assert not log_file.exists()
 
 
 def test_op_session_ssh_without_service_token_does_not_signin(tmp_path: Path) -> None:
@@ -167,9 +260,7 @@ exit 2
 """,
     )
 
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env = _base_env(tmp_path, bin_dir)
     env["SSH_CONNECTION"] = "client server"
 
     result = subprocess.run(
@@ -216,11 +307,9 @@ exit 2
 """,
     )
 
-    env = os.environ.copy()
+    env = _base_env(tmp_path, bin_dir)
     env.pop("SSH_CONNECTION", None)
     env.pop("SSH_TTY", None)
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["OP_SESSION_FORCE_MINT"] = "1"
     env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
 
@@ -273,11 +362,9 @@ exit 2
 """,
     )
 
-    env = os.environ.copy()
+    env = _base_env(tmp_path, bin_dir)
     env.pop("SSH_CONNECTION", None)
     env.pop("SSH_TTY", None)
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
 
     result = subprocess.run(
@@ -336,7 +423,7 @@ cat <<'JSON'
 {{"label":"DATABRICKS_TOKEN","value":"db-token"}},
 {{"label":"AWS_PROFILE","value":"bedrock"}},
 {{"label":"AWS_REGION","value":"us-west-2"}},
-{{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\"type\":\"service_account\"}}"}},
+{{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\\"type\\\":\\\"service_account\\\"}}"}},
 {{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
 {{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
 {{"label":"CLICKHOUSE_HOST","value":"clickhouse"}},
@@ -353,15 +440,13 @@ cat <<'JSON'
 {{"label":"ATLASSIAN_API","value":"atlassian"}},
 {{"label":"EMAIL","value":"me@example.com"}},
 {{"label":"ATLASSIAN_URL","value":"https://example.atlassian.net"}},
-{{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\"type\":\"service_account\"}}"}}
+{{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\\\"type\\\":\\\"service_account\\\"}}"}}
 ]}}
 JSON
 """,
     )
 
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env = _base_env(tmp_path, bin_dir)
     env["SECRET_PROFILE"] = "1"
 
     command = f"""
