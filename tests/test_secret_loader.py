@@ -411,7 +411,7 @@ if [ "$1" != "item" ] || [ "$2" != "get" ]; then
   exit 2
 fi
 case "$3" in
-  vjsfewbg2dzuatpwfmkqws5hle) ;;
+  ojb5dyao2ahusvjgvgh7gbuxj4) ;;
   *) exit 3 ;;
 esac
 cat <<'JSON'
@@ -467,5 +467,5 @@ test "$(cat /tmp/sketchybar_clockify/api_key)" = clockify
 
     assert result.returncode == 0, result.stderr
     op_calls = op_log.read_text().splitlines()
-    assert op_calls == ["item get vjsfewbg2dzuatpwfmkqws5hle --vault Automation --reveal --format json"]
+    assert op_calls == ["item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"]
     assert all("--reveal --format json" in call for call in op_calls)

@@ -14,3 +14,4 @@
 - Changed Herdr secret loading to use `OP_SERVICE_ACCOUNT_TOKEN` from the environment or macOS Keychain service `op-service-account-token` account `my`.
 - Herdr panes now fail fast instead of attempting delegated desktop `op signin`.
 - Added explicit `Automation` vault scoping for the `Shell Secrets` item fetch required by service accounts.
+- Changed the default `ShellSecretsItem` id to the copied item in `Automation`.
