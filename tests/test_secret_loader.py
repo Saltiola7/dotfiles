@@ -467,5 +467,5 @@ test "$(cat /tmp/sketchybar_clockify/api_key)" = clockify
 
     assert result.returncode == 0, result.stderr
     op_calls = op_log.read_text().splitlines()
-    assert op_calls == ["item get vjsfewbg2dzuatpwfmkqws5hle --reveal --format json"]
+    assert op_calls == ["item get vjsfewbg2dzuatpwfmkqws5hle --vault Automation --reveal --format json"]
     assert all("--reveal --format json" in call for call in op_calls)

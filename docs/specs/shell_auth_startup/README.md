@@ -18,6 +18,7 @@ Value objects:
 - `OnePasswordServiceAccountToken`: per-session token injected into SSH/Herdr environments as `OP_SERVICE_ACCOUNT_TOKEN`.
 - `MacOSKeychainServiceToken`: local login-Keychain item that stores `OnePasswordServiceAccountToken` for Herdr panes.
 - `ShellSecretsItem`: consolidated 1Password item containing every secret required by `SecretLoader`.
+- `ShellSecretsVault`: non-Personal 1Password vault (`Automation`) containing `ShellSecretsItem` for service-account access.
 - `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
 - `ProjectedSecretSet`: validated JSON object containing every scalar secret and file payload needed by the shell.
@@ -78,6 +79,7 @@ Glossary:
 - Then `SecretLoader` uses that token for the `ShellSecretsItem` fetch
 - And no biometric or delegated `op signin` is attempted
 - And no `OnePasswordSessionCache` is read or written
+- And the `ShellSecretsItem` fetch specifies `ShellSecretsVault`
 
 **Scenario: Herdr session lacks service account token**
 - Given `SecretLoadRequested` runs in a `HerdrPane`
@@ -134,6 +136,7 @@ Glossary:
 - **Post:** failed secret loading unsets `_SECRETS_LOADED`.
 - **Invariant:** secret values are parsed from `InjectedSecretBundle` as JSON, not shell-evaluated text.
 - **Invariant:** `ShellSecretsItem` is fetched by `OnePasswordItemId`, not title lookup.
+- **Invariant:** `ShellSecretsItem` is fetched from `ShellSecretsVault` so service-account reads satisfy 1Password CLI vault scoping.
 - **Invariant:** `SecretLoader` performs one secret item fetch per load after session validation.
 - **Invariant:** required fields are projected into `ProjectedSecretSet` by one JSON projection step before exports or file writes.
 - **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
