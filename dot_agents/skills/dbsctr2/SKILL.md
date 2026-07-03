@@ -73,11 +73,27 @@ Do not cut validation, security, data-loss handling, accessibility, or tests.
 
 - Read relevant `docs/specs/` artifacts first.
 - Read project `AGENTS.md` if present.
+- Read applicable DBSCTR2 domain modules before Phase 1 Domain.
 - If `graphify-out/graph.json` exists, run one targeted graph query before broad
   search and verify useful findings with source files.
 - Use Grep, Glob, and Read for source truth.
 - Run another retrieval loop only if a required interface, owner, contract,
   validation command, or affected file is missing.
+
+## Domain Modules
+
+When a task touches a foundational domain, read the matching module before Phase
+1 Domain. Load only what applies:
+
+| Domain signal | Module to read |
+|---|---|
+| Data pipelines, ETL, orchestration, warehouse writes, streaming, data lakes | `modules/data.md` |
+| Self-service analytics agent, semantic-layer routing, question→entity mapping, reference docs for non-expert consumers | `modules/data.md` + `modules/analytics_references.md` |
+| Infrastructure-as-Code, cloud resources, deployment, scaling, platform services | `modules/cloud.md` |
+| ML model training/serving, LLM calls, embeddings, evals, feature engineering | `modules/ml.md` |
+
+Multiple modules may apply. If in doubt, load the module; missing a domain
+contract is costlier than one extra file read.
 
 ## Discovery2 Handoff
 
@@ -120,6 +136,7 @@ external sources/sinks, and affected artifacts are known.
 
 Actions:
 - Check existing specs before creating anything.
+- Load applicable DBSCTR2 domain modules and apply their Phase 1 extensions.
 - Update the matching spec domain sections.
 - If no spec exists, run Discovery2.
 - Identify stale docs or contracts that must be updated later.
@@ -127,6 +144,7 @@ Actions:
 Gate:
 - Bounded context named.
 - Domain terms appear in the spec.
+- Applicable module guidance is used or explicitly ruled out.
 - Existing artifacts are reused or explicitly ruled out.
 
 Commit prefix: `[domain]`.
@@ -170,6 +188,7 @@ are explicit.
 Actions:
 - Add preconditions, postconditions, invariants, schema constraints, and config
   contracts where relevant.
+- Apply applicable DBSCTR2 module Phase 4 contract extensions.
 - Define stale-artifact checks and validation commands.
 
 Gate:
@@ -184,6 +203,7 @@ Outcome: tests or practical verification prove the change works.
 
 Actions:
 - Prefer tests before implementation when the project has a test harness.
+- Apply applicable DBSCTR2 module Phase 5 test or eval extensions.
 - For config/skill work, run deployment and smoke checks.
 - Record commands that passed or could not run.
 

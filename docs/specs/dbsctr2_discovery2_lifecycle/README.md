@@ -7,8 +7,9 @@ Discovery skills. The system creates strict, prompt-guide-native workflows that
 remain callable beside the existing v1 skills forever.
 
 The v2 lifecycle optimizes for current GPT-5.5 and Claude Opus 4.8 prompting
-guidance, OpenCode global configuration, controlled subagent use, and stale-doc
-prevention. It does not replace the original `dbsctr` or `discovery` skills.
+guidance, OpenCode global configuration, controlled subagent use, stale-doc
+prevention, and v2-owned domain module guidance. The original `dbsctr` and
+`discovery` skills remain installed for explicit v1 use.
 
 ## Problem Statement
 
@@ -23,6 +24,8 @@ other artifacts current when implementation changes.
 - Add global `/dbsctr2`, `/discovery2`, and `/dependabot` thin wrapper commands.
 - Add OpenCode-native routing through managed `~/.config/opencode/AGENTS.md`.
 - Keep v1 `dbsctr` and `discovery` unchanged and callable forever.
+- Copy foundational DBSCTR modules into DBSCTR2 and route domain-specific work to
+  the v2 module files.
 - Install Ponytail globally and make minimal correct work a hard principle.
 - Make DBSCTR2 strict when selected by routing or explicit command.
 - Make Discovery2 interview until at least 95% confidence in user intent.
@@ -44,6 +47,7 @@ other artifacts current when implementation changes.
 | V2 Lifecycle | Combined Discovery2 and DBSCTR2 workflow, routing, commands, and deployment artifacts. |
 | Discovery2 | Requirements interview skill that extracts user intent to at least 95% confidence before a DBSCTR2 cycle. |
 | DBSCTR2 | Strict six-phase implementation skill: Domain, Behavior, Spec, Contract, Test, Refactor. |
+| DBSCTR2 Domain Module | V2 module file loaded before Domain for foundational contexts such as data, cloud/platform, ML/AI, or analytics reference scaffolding. |
 | Dependabot Skill | Focused current-repo dependency security workflow for alert triage, remediation, validation, commits, and pushes. |
 | Orchestrator | Main agent running the skill, owning plan, file ownership, integration, validation, and commits. |
 | Write Subagent | Subagent allowed to edit isolated files under an explicit ownership contract. |
@@ -62,6 +66,10 @@ other artifacts current when implementation changes.
 | Interface | Purpose |
 |---|---|
 | `dot_agents/skills/dbsctr2/SKILL.md` | Source skill for DBSCTR2. |
+| `dot_agents/skills/dbsctr2/modules/data.md` | DBSCTR2 data engineering module. |
+| `dot_agents/skills/dbsctr2/modules/cloud.md` | DBSCTR2 cloud/platform/IaC module. |
+| `dot_agents/skills/dbsctr2/modules/ml.md` | DBSCTR2 ML/AI module. |
+| `dot_agents/skills/dbsctr2/modules/analytics_references.md` | DBSCTR2 analytics reference scaffolding module. |
 | `dot_agents/skills/discovery2/SKILL.md` | Source skill for Discovery2. |
 | `dot_agents/skills/dependabot/SKILL.md` | Source skill for current-repo Dependabot remediation. |
 | `private_dot_config/opencode/commands/dbsctr2.md` | Global `/dbsctr2` command. |
@@ -84,6 +92,7 @@ phase order, artifact freshness, safety, and commit ownership.
 - Tiny unrelated edits do not require DBSCTR2 unless the user invokes it.
 - If an edit changes behavior or existing artifacts, matching docs/specs/tests
   must be updated to avoid stale artifacts.
+- DBSCTR2 loads applicable v2 domain modules before Phase 1 Domain.
 - Explicit `/dbsctr` and `/discovery` continue to load v1 skills.
 
 ## Contracts & Invariants
@@ -104,9 +113,18 @@ phase order, artifact freshness, safety, and commit ownership.
 
 ### DBSCTR2 Phase Contract
 - **Pre:** DBSCTR2 is loaded by routing or explicit command.
+- **Pre:** Foundational domain work is checked against `dbsctr2/modules/`.
 - **Post:** Domain, Behavior, Spec, Contract, Test, and Refactor are executed or
   verified in order.
+- **Post:** Applicable module extensions are applied in the matching phase.
 - **Invariant:** Known stale artifacts make the cycle incomplete.
+
+### DBSCTR2 Module Contract
+- **Pre:** A task touches data engineering, analytics reference scaffolding,
+  cloud/platform/IaC, or ML/AI work.
+- **Post:** DBSCTR2 reads the matching module file from
+  `dot_agents/skills/dbsctr2/modules/` before Phase 1 Domain.
+- **Invariant:** V2 module guidance must not depend on v1 `dbsctr` paths.
 
 ### Dependabot Gate Contract
 - **Pre:** DBSCTR2 runs in a GitHub repo where the authenticated `gh` CLI can
@@ -169,6 +187,14 @@ phase order, artifact freshness, safety, and commit ownership.
   thin command wrapper, and routing rule.
 - `chezmoi status` returned clean output after targeted apply.
 
+2026-07-03 checks:
+- Targeted `chezmoi apply ~/.agents/skills/dbsctr2` deployed the updated DBSCTR2
+  skill and v2 module directory.
+- Deployed target checks found `data.md`, `cloud.md`, `ml.md`, and
+  `analytics_references.md` under `~/.agents/skills/dbsctr2/modules/`.
+- Deployed DBSCTR2 skill text contains the Domain Modules routing table and
+  Phase 1 module loading action.
+
 ## Behavior Scenarios
 
 ### Feature: OpenCode Routing
@@ -212,6 +238,14 @@ phase order, artifact freshness, safety, and commit ownership.
   parallel-safety, validation, and reason for each task
 
 ### Feature: Strict DBSCTR2 Execution
+
+**Scenario: Load applicable DBSCTR2 domain modules**
+- Given DBSCTR2 is loaded for foundational domain work
+- And the task matches data engineering, analytics reference scaffolding,
+  cloud/platform/IaC, or ML/AI signals
+- When the Orchestrator starts Phase 1 Domain
+- Then it reads the matching module from `dot_agents/skills/dbsctr2/modules/`
+- And it applies the module's phase extensions or explicitly rules them out
 
 **Scenario: Execute all DBSCTR2 phases when selected**
 - Given DBSCTR2 is loaded by routing or explicit command

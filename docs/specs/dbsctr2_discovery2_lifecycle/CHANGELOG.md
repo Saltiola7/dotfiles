@@ -88,3 +88,25 @@
 - Verified deployed target text for the Dependabot workflow, DBSCTR2 gate, thin
   command wrapper, and routing rule.
 - Confirmed `chezmoi status` returned clean output after deploy.
+
+## 2026-07-03 Follow-Up: DBSCTR2 Domain Modules
+
+### Domain
+
+- Added DBSCTR2-owned domain modules for data engineering, cloud/platform/IaC,
+  ML/AI, and analytics reference scaffolding.
+
+### Behavior
+
+- Added DBSCTR2 module routing so applicable modules are read before Phase 1
+  Domain and their phase extensions are applied or explicitly ruled out.
+
+### Spec
+
+- Added the v2 module files under `dot_agents/skills/dbsctr2/modules/` and kept
+  v1 modules intact for explicit v1 use.
+
+### Contract
+
+- Added the invariant that v2 module guidance must not depend on v1 `dbsctr`
+  paths.

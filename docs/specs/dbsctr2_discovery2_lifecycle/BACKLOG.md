@@ -23,3 +23,4 @@ commit.
 | 6 | Finalize lifecycle docs | 2026-06-25 | `e74ef01` |
 | 7 | Add DBSCTR2 DVC sync gate | 2026-06-25 | `cafd07d` |
 | 8 | Add Dependabot skill and DBSCTR2 gate | 2026-06-26 | `e2681bd` |
+| 9 | Copy domain modules into DBSCTR2 | 2026-07-03 | pending |
