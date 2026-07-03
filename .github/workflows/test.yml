@@ -1,5 +1,7 @@
 name: Tests
 
+# Keep this workflow in the path filter so CI fixes validate themselves.
+
 on:
   push:
     paths:
