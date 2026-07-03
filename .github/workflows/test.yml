@@ -3,12 +3,14 @@ name: Tests
 on:
   push:
     paths:
+      - ".github/workflows/test.yml"
       - "private_dot_config/kitty/**"
       - "dot_local/bin/**"
       - "tests/**"
       - "pyproject.toml"
   pull_request:
     paths:
+      - ".github/workflows/test.yml"
       - "private_dot_config/kitty/**"
       - "dot_local/bin/**"
       - "tests/**"
