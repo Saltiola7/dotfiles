@@ -15,3 +15,4 @@
 - Herdr panes now fail fast instead of attempting delegated desktop `op signin`.
 - Added explicit `Automation` vault scoping for the `Shell Secrets` item fetch required by service accounts.
 - Changed the default `ShellSecretsItem` id to the copied item in `Automation`.
+- Changed `secret` to source sibling `op-session` directly so existing panes do not need `hash -r` after deploys.

@@ -80,6 +80,7 @@ Glossary:
 - And no biometric or delegated `op signin` is attempted
 - And no `OnePasswordSessionCache` is read or written
 - And the `ShellSecretsItem` fetch specifies `ShellSecretsVault`
+- And `SecretLoader` sources sibling `op-session` directly instead of using shell command lookup
 
 **Scenario: Herdr session lacks service account token**
 - Given `SecretLoadRequested` runs in a `HerdrPane`
@@ -140,6 +141,7 @@ Glossary:
 - **Invariant:** `SecretLoader` performs one secret item fetch per load after session validation.
 - **Invariant:** required fields are projected into `ProjectedSecretSet` by one JSON projection step before exports or file writes.
 - **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
+- **Invariant:** installed `SecretLoader` sources sibling `op-session` by path so stale shell command hashes cannot select an old broker.
 - **Post:** all required secrets are non-empty before `_SECRETS_LOADED` is set.
 
 ### OnePasswordSessionCache

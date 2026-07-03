@@ -13,3 +13,4 @@ None.
 | AUTH-003 | Stop Clockify poll loop from calling `op` | done |
 | AUTH-004 | Remove template-time 1Password reads from Databricks config | done |
 | AUTH-005 | Use Keychain-backed 1Password service account token in Herdr | done |
+| AUTH-006 | Avoid stale shell command lookup for `op-session` | done |

@@ -469,3 +469,85 @@ test "$(cat /tmp/sketchybar_clockify/api_key)" = clockify
     op_calls = op_log.read_text().splitlines()
     assert op_calls == ["item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"]
     assert all("--reveal --format json" in call for call in op_calls)
+
+
+def test_secret_uses_sibling_op_session_before_path_lookup(tmp_path: Path) -> None:
+    install_dir = tmp_path / "install"
+    path_dir = tmp_path / "path"
+    install_dir.mkdir()
+    path_dir.mkdir()
+    op_log = tmp_path / "op.log"
+    bad_session_log = tmp_path / "bad-session.log"
+    quoted_op_log = shlex.quote(str(op_log))
+    quoted_bad_session_log = shlex.quote(str(bad_session_log))
+
+    (install_dir / "secret").write_text((ROOT / "dot_local/bin/executable_secret").read_text())
+    (install_dir / "op-session").write_text((ROOT / "dot_local/bin/executable_op-session").read_text())
+
+    _write_executable(
+        path_dir / "op-session",
+        f"""#!/bin/bash
+printf used > {quoted_bad_session_log}
+return 42 2>/dev/null || exit 42
+""",
+    )
+
+    _write_executable(
+        path_dir / "op",
+        f"""#!/bin/bash
+printf '%s\n' "$*" >> {quoted_op_log}
+if [ "$1 $2" = "vault list" ]; then
+  exit 0
+fi
+if [ "$1 $2 $3" != "item get ojb5dyao2ahusvjgvgh7gbuxj4" ]; then
+  exit 2
+fi
+cat <<'JSON'
+{{"title":"Shell Secrets","fields":[
+{{"label":"GEMINI_API_KEY","value":"gemini"}},
+{{"label":"GOOGLE_GENERATIVE_AI_API_KEY","value":"google"}},
+{{"label":"OPENAI_API_KEY","value":"openai"}},
+{{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
+{{"label":"DATABRICKS_TOKEN","value":"db-token"}},
+{{"label":"AWS_PROFILE","value":"bedrock"}},
+{{"label":"AWS_REGION","value":"us-west-2"}},
+{{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}},
+{{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
+{{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
+{{"label":"CLICKHOUSE_HOST","value":"clickhouse"}},
+{{"label":"CLICKHOUSE_USER","value":"user"}},
+{{"label":"CLICKHOUSE_PORT","value":"9440"}},
+{{"label":"CLICKHOUSE_PASSWORD","value":"pass"}},
+{{"label":"SEMRUSH_API","value":"semrush"}},
+{{"label":"SEMRUSH_ENTERPRISE_API","value":"enterprise"}},
+{{"label":"PAGESPEED_API_KEY","value":"pagespeed"}},
+{{"label":"GCS_AKAMAI_ACCESS_KEY","value":"access"}},
+{{"label":"GCS_AKAMAI_SECRET_KEY","value":"secret"}},
+{{"label":"CLOCKIFY_API_KEY","value":"clockify"}},
+{{"label":"GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC","value":"github"}},
+{{"label":"ATLASSIAN_API","value":"atlassian"}},
+{{"label":"EMAIL","value":"me@example.com"}},
+{{"label":"ATLASSIAN_URL","value":"https://example.atlassian.net"}},
+{{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}}
+]}}
+JSON
+""",
+    )
+
+    env = _base_env(tmp_path, path_dir)
+    env["OP_SERVICE_ACCOUNT_TOKEN"] = "service-token"
+
+    result = subprocess.run(
+        ["bash", "-lc", f"source {install_dir / 'secret'}"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not bad_session_log.exists()
+    assert op_log.read_text().splitlines() == [
+        "vault list",
+        "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json",
+    ]
