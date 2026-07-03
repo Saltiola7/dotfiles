@@ -2,6 +2,7 @@ import os
 import shlex
 import stat
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -24,6 +25,24 @@ def _base_env(tmp_path: Path, bin_dir: Path) -> dict[str, str]:
     env.pop("OP_SESSION_FORCE_MINT", None)
     env.pop("OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY", None)
     return env
+
+
+def _run_bash_in_pty(command: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    wrapper = """
+import os
+import pty
+import sys
+
+status = pty.spawn(["bash", "-lc", sys.argv[1]])
+sys.exit(os.waitstatus_to_exitcode(status))
+"""
+    return subprocess.run(
+        [sys.executable, "-c", wrapper, command],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
 
 
 def test_op_session_validates_cache_once_before_fanout(tmp_path: Path) -> None:
@@ -263,19 +282,9 @@ exit 2
     env = _base_env(tmp_path, bin_dir)
     env["SSH_CONNECTION"] = "client server"
 
-    result = subprocess.run(
-        [
-            "script",
-            "-q",
-            "/dev/null",
-            "bash",
-            "-lc",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = _run_bash_in_pty(
+        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        env,
     )
 
     assert result.returncode == 1
@@ -313,19 +322,9 @@ exit 2
     env["OP_SESSION_FORCE_MINT"] = "1"
     env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
 
-    result = subprocess.run(
-        [
-            "script",
-            "-q",
-            "/dev/null",
-            "bash",
-            "-lc",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = _run_bash_in_pty(
+        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        env,
     )
 
     assert result.returncode == 0, result.stderr
@@ -367,19 +366,9 @@ exit 2
     env.pop("SSH_TTY", None)
     env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
 
-    result = subprocess.run(
-        [
-            "script",
-            "-q",
-            "/dev/null",
-            "bash",
-            "-lc",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
+    result = _run_bash_in_pty(
+        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
+        env,
     )
 
     assert result.returncode == 0, result.stderr
