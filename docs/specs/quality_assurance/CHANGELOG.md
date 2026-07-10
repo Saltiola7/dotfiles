@@ -9,6 +9,9 @@ All notable changes to this bounded context.
 - Domain model for scoped QA gates, full audits, toolchain discovery, concern
   authorities, finding normalization, and safe fix batches.
 - Behavior scenarios and concurrent implementation backlog.
+- Concrete skill, command, routing, project-management, and handoff interfaces.
+- Contracts for scoped noise isolation, concern authorities, fix safety,
+  validation evidence, subagents, and non-duplicated instructions.
 
 ### Decisions
 - One `qa` skill replaces the standalone Dependabot skill and command.

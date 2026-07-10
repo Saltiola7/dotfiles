@@ -5,8 +5,8 @@
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
 | QA-1 | Define domain and behavior | high | done | - | `docs/specs/quality_assurance/README.md` | existing lifecycle specs and skills | no | Establish shared language and user-visible behavior | S | Spec review |
-| QA-2 | Define interfaces and contracts | high | in_progress | QA-1 | quality-assurance spec files | OpenCode schema and current skills | no | Make implementation targets and invariants explicit | S | Interface-to-scenario review |
-| QA-3 | Repair OpenCode subagent routing | high | pending | QA-2 | `private_dot_config/opencode/opencode.json.tmpl` | available OpenCode models | yes | Restore requested concurrent analysis | S | Launch read-only explore subagent |
+| QA-2 | Define interfaces and contracts | high | done | QA-1 | quality-assurance spec files | OpenCode schema and current skills | no | Make implementation targets and invariants explicit | S | Interface-to-scenario review |
+| QA-3 | Repair OpenCode subagent routing | high | in_progress | QA-2 | `private_dot_config/opencode/opencode.json.tmpl` | available OpenCode models | yes | Restore requested concurrent analysis | S | Launch read-only explore subagent |
 | QA-4 | Implement QA skill and command | high | pending | QA-2 | `dot_agents/skills/qa/**`, `private_dot_config/opencode/commands/qa.md` | current Dependabot skill and command | yes | Consolidate quality concerns under one workflow | M | Skill/command smoke checks |
 | QA-5 | Integrate DBSCTR2 and Discovery2 | high | pending | QA-2 | `dot_agents/skills/dbsctr2/SKILL.md`, `dot_agents/skills/discovery2/SKILL.md` | QA skill interface | yes | Add scoped gate and toolchain discovery | M | Text contract checks |
 | QA-6 | Replace global routing and remove Dependabot wrappers | high | pending | QA-2 | global `AGENTS.md`, Dependabot skill/command paths | QA interface and v1 invariants | yes | Make QA the single global quality route | S | Routing grep checks |
