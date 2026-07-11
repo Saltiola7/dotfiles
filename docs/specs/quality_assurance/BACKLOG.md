@@ -12,8 +12,8 @@
 | QA-6 | Replace global routing and remove Dependabot wrappers | high | done | QA-2 | global `AGENTS.md`, Dependabot skill/command paths | QA interface and v1 invariants | yes | Make QA the single global quality route | S | Routing grep checks |
 | QA-7 | Manage project AGENTS through chezmoi | high | done | QA-2 | `MGM/git/seo-data-science/AGENTS.md` | current project `AGENTS.md` | yes | Preserve project adaptations without global duplication | S | `chezmoi diff` target |
 | QA-8 | Write project toolchain handoff | high | done | QA-2 | `seo-data-science/docs/specs/toolchain/**` | project configs, ADR-032, JFrog spec | yes | Defer project setup with evidence and decisions intact | M | Handoff completeness review |
-| QA-9 | Deploy and validate | high | in_progress | QA-3, QA-4, QA-5, QA-6, QA-7 | deployed OpenCode and agent paths | all changed files | no | Prove configuration and workflow loading | M | Targeted apply and smoke checks |
-| QA-10 | Finalize artifacts | medium | pending | QA-8, QA-9 | QA backlog and changelog | validation evidence | no | Remove stale status and record outcome | S | Final diff review |
+| QA-9 | Deploy and validate | high | done | QA-3, QA-4, QA-5, QA-6, QA-7 | deployed OpenCode and agent paths | all changed files | no | Prove configuration and workflow loading | M | Targeted apply and smoke checks |
+| QA-10 | Finalize artifacts | medium | done | QA-8, QA-9 | QA backlog and changelog | validation evidence | no | Remove stale status and record outcome | S | Final diff review |
 
 ## Parallel Execution Guide
 

@@ -31,3 +31,13 @@ All notable changes to this bounded context.
 ### Removed
 - Standalone `dependabot` skill and `/dependabot` command; Dependabot alerts are
   now QA finding inputs.
+
+### Verified
+- Rendered OpenCode JSON parsed successfully.
+- Targeted chezmoi apply deployed QA, updated DBSCTR2/Discovery2 and routing,
+  removed standalone Dependabot surfaces, and synchronized project instructions.
+- Chezmoi dry-run was idempotent and `chezmoi status` was clean.
+- Restarted OpenCode successfully launched three concurrent ownership-isolated
+  write subagents with the corrected model configuration.
+- `seo-data-science` handoff Markdown passed diff checks; unrelated DVC drift and
+  one unrelated high Dependabot alert remained out of scope.
