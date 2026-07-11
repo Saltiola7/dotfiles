@@ -1,5 +1,14 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-10 Follow-Up: QA Gate
+
+- Replaced the standalone Dependabot skill, command, and DBSCTR2 gate with the
+  repository-aware `qa` skill and thin `/qa` command.
+- Scoped DBSCTR2 quality checks to affected code and dependencies while ignoring
+  unrelated pre-existing findings.
+- Kept Dependabot alerts as QA finding inputs rather than a separate workflow.
+- Added Discovery2 toolchain-command, authority, and baseline discovery.
+
 ## 2026-06-25
 
 ### Domain

@@ -29,6 +29,8 @@ artifacts.
 - The bounded context and adjacent contexts are named.
 - Existing specs and source artifacts are checked before new artifacts are
   created.
+- Project quality commands, concern authorities, and accepted baselines are
+  captured for DBSCTR2 validation without prescribing tools.
 - The backlog is safe for concurrent work: each task has ownership, read/write
   scope, dependencies, collision risks, parallel safety, validation, and reason.
 - The output can feed DBSCTR2 without repeating the full interview.
@@ -70,6 +72,8 @@ Do not cut validation, security, data-loss handling, accessibility, or tests.
 ## Retrieval Budget
 
 - Start by checking `docs/specs/` for matching bounded contexts.
+- Read applicable `AGENTS.md`, manifests, CI configuration, and task runners to
+  discover project quality commands, concern authorities, and accepted baselines.
 - If `graphify-out/graph.json` exists, run one targeted graph query for the
   feature or bounded context, then verify useful findings with source files.
 - Use Grep, Glob, and Read for source truth.
@@ -99,6 +103,7 @@ Coverage checklist:
 - Integration points and external dependencies.
 - Edge cases, failure modes, and rollback expectations.
 - Tests, validation commands, and observability.
+- Project quality authorities and baselines, including known accepted findings.
 - Backlog parallelization and collision risks.
 
 ## Output Contract
@@ -117,6 +122,10 @@ When confidence reaches at least 95%, create or update:
 - architecture or data-flow notes when relevant
 - contracts and invariants where known
 - validation strategy
+
+The validation strategy must record configured commands, their source of
+authority, applicable scope, known baselines, and unavailable checks or gaps. It
+must not prescribe, install, or configure tools during Discovery2.
 
 `BACKLOG.md` must include one table with:
 - id
@@ -144,6 +153,8 @@ When confidence reaches at least 95%, create or update:
 - Graphify output, when present, is routing context only. Source files remain
   authoritative.
 - Requirements must distinguish facts, assumptions, non-goals, and open risks.
+- Project instructions and configured commands remain authoritative; Discovery2
+  records the toolchain profile rather than inventing one.
 - Discovery2 must not silently narrow scope to make implementation easier.
 
 ## Handoff To DBSCTR2

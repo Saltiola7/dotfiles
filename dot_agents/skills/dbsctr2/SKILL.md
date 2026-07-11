@@ -28,7 +28,8 @@ Refactor phases without stale artifacts or overlapping subagent edits.
 - Matching specs, backlogs, changelogs, docs, contracts, and tests stay fresh.
 - Subagents, when used, have non-overlapping ownership contracts.
 - The orchestrator reviews, validates, and commits each phase gate.
-- Current-repo Dependabot alerts are checked without bloating context.
+- QA validates touched code, dependencies, tests, and artifacts at phase gates
+  without failing the cycle for unrelated pre-existing findings.
 - DVC-tracked outputs stay synchronized with phase commits when the repo uses
   DVC.
 - V1 `dbsctr` and `discovery` remain unchanged and callable.
@@ -73,6 +74,8 @@ Do not cut validation, security, data-loss handling, accessibility, or tests.
 
 - Read relevant `docs/specs/` artifacts first.
 - Read project `AGENTS.md` if present.
+- Read project-declared quality commands, authorities, and baselines needed to
+  define the affected QA scope.
 - Read applicable DBSCTR2 domain modules before Phase 1 Domain.
 - If `graphify-out/graph.json` exists, run one targeted graph query before broad
   search and verify useful findings with source files.
@@ -232,8 +235,7 @@ Commit prefix: `[refactor]`.
 
 At each phase boundary:
 1. Inspect `git status`, `git diff`, and recent log.
-2. Run the Dependabot Gate when the repo has a GitHub remote and `gh` can fetch
-   current-repo alerts.
+2. Run the QA Gate for the affected scope.
 3. Run the DVC Sync Gate when the repo has DVC markers.
 4. Stage only intended files, including changed DVC metadata that belongs to the
    phase.
@@ -243,22 +245,20 @@ At each phase boundary:
 Tiny adjacent phases may share a commit only when the phase work is trivial and
 the artifacts remain clear.
 
-## Dependabot Gate
+## QA Gate
 
-Use this gate during DBSCTR2 cycles without loading the full Dependabot workflow
-unless relevant alerts are found or the user asks for remediation.
+At each phase boundary, load `qa` in scoped mode with only the compact Affected
+Scope: touched files, dependencies, tests, specs, contracts, manifests, and
+direct downstream impact. Use project-declared quality commands, authorities,
+and baselines; do not duplicate QA's tool selection or remediation workflow.
 
-At phase gates in a GitHub repo:
-- Use the authenticated `gh` CLI to check current-repo Dependabot alerts.
-- Keep alert retrieval compact; do not dump full alert JSON into context.
-- Classify an alert as relevant only when its vulnerable package is imported or
-  used by code touched in the current DBSCTR2 cycle.
-- For relevant alerts, load the `dependabot` skill and pass only the scoped alert
-  identifiers, package names, affected files, and touched usage evidence.
-- For non-relevant alerts, emit a one-line severity summary only, such as
-  `Non-relevant Dependabot alerts: critical=0 high=2 medium=5 low=3`.
-- If `gh` cannot fetch alerts, record the blocker and continue unless the current
-  work is explicitly dependency-security remediation.
+- Relevant findings fail the gate or are recorded as blockers with next-best
+  validation.
+- Unrelated pre-existing tool findings do not fail or broaden the DBSCTR2 cycle.
+- Deterministic safe remediation may remain in the scoped QA run.
+- Remediation that changes behavior, contracts, schemas, orchestration, or
+  downstream-visible output remains in or escalates to the current DBSCTR2 cycle.
+- Record compact validation evidence and residual risk before committing.
 
 ## DVC Sync Gate
 
@@ -322,7 +322,7 @@ resolve integration issues, run validation, and commit only from the main thread
 Final response must include:
 - outcome
 - phase commits created
-- validation run
+- QA and other validation run, affected scope, and residual risk
 - blockers or restart notes
 
 ## Stop Rules
