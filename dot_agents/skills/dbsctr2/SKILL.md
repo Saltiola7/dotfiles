@@ -36,6 +36,8 @@ command, or affected file remains unknown.
 ## Phase Gates
 
 Complete phases in order. Each gate consumes the previous phase's artifact.
+For non-trivial work, create six todos named Domain, Behavior, Spec, Contract,
+Test, and Refactor. Keep exactly one active until all required gates complete.
 
 ### 1. Domain `[domain]`
 
@@ -87,6 +89,22 @@ Before a write subagent starts, specify its goal, readable and writable files,
 off-limits paths, dependencies, collision risk, expected output, and validation.
 Subagents edit only owned files and never stage or commit. The orchestrator
 reviews diffs, resolves integration, validates, and alone commits.
+
+Log the selected optimized agent and model. Child results must state the
+question, inspected sources, findings, facts versus assumptions, validation,
+blockers, uncertainty, and changed files. Trust sourced Explore and Scout output
+unless uncertain, contradictory, or controlling a risky edit. Review every
+Builder patch. If an optimized agent fails, report it and retry the task once by
+continuing with the active same-provider flagship; never cross providers
+silently.
+
+## Plan To Build
+
+Plan mode is read-only. Its final Build Handoff contains decisions, interfaces,
+scope, contracts, validation, risks, unresolved questions, and inspected source
+state without claiming writes occurred. Build verifies source and artifact
+freshness before persisting it. OpenCode snapshots and session diffs aid
+recovery; Git remains authoritative for integration and commits.
 
 ## Commit Gate
 

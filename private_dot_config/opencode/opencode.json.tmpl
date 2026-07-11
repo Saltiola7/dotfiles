@@ -8,6 +8,12 @@
         "chunkTimeout": 60000
       }
     },
+    "amazon-bedrock": {
+      "options": {
+        "region": "us-west-2",
+        "profile": "BedrockDeveloperAccess-302432775606"
+      }
+    },
     "google": {},
     "moonshotai": {
       "npm": "@ai-sdk/openai-compatible",
@@ -81,22 +87,15 @@
     }
   },
   "agent": {
-    "gpt": {
-      "description": "Primary GPT-5.6 agent with balanced reasoning",
-      "mode": "primary",
-      "model": "openai/gpt-5.6",
-      "variant": "medium"
-    },
     "opus": {
       "description": "Primary Opus 4.8 agent for agentic coding",
       "mode": "primary",
       "model": "opencode/claude-opus-4-8",
       "variant": "xhigh"
-    },
-    "explore": { "model": "opencode/claude-sonnet-4-6" },
-    "scout": { "model": "opencode/claude-sonnet-4-6" }
+    }
   },
-  "model": "opencode/claude-sonnet-4-6",
-  "small_model": "opencode/claude-sonnet-4-6",
+  "default_agent": "gpt",
+  "model": "openai/gpt-5.6-sol",
+  "small_model": "openai/gpt-5.6-luna",
   "plugin": ["@dietrichgebert/ponytail"]
 }
