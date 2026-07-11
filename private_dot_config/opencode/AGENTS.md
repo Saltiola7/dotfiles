@@ -1,69 +1,51 @@
 # OpenCode Global Routing
 
-## DBSCTR2 Default
+## Workflow
 
-Use `dbsctr2` by default for coding work that changes behavior, domain rules,
-models, schemas, APIs, views, services, pipelines, orchestration, validation,
-contracts, or downstream-visible output.
+Use `dbsctr2` for changes to behavior, domain rules, schemas, APIs, views,
+services, pipelines, orchestration, validation, contracts, or downstream-visible
+output. Skip it for trivial, formatting-only, git-only, dependency-only, and
+non-behavioral configuration work, or when the user requests a lighter workflow.
 
-Skip DBSCTR2 for trivial edits, formatting-only work, git-only tasks,
-dependency-only changes, and configuration with no behavior impact. Also skip it
-when the user explicitly requests a lighter workflow.
+If intent is unclear or no matching `docs/specs/` context exists, run
+`discovery2` to at least 95% confidence before DBSCTR2. Keep affected specs,
+contracts, tests, backlogs, and changelogs current in the same cycle.
 
-When no matching spec exists in `docs/specs/`, or intent is unclear, load
-`discovery2` first. Do not resume DBSCTR2 until Discovery2 reaches at least 95%
-confidence and writes or updates the required artifacts.
+Use `qa` for DBSCTR2 touched-scope gates. Run repository-wide QA only when the
+user explicitly requests it; Dependabot alerts are QA inputs.
 
-If a change affects an existing spec, contract, test, backlog, or changelog,
-update it in the same cycle. Stale artifacts are a failure.
+## Execution
 
-## V1 Permanence
+For requests to explain, review, diagnose, or plan, inspect relevant materials
+and report the result without implementing unless requested. For requests to
+change, build, or fix, make in-scope local changes and run non-destructive
+validation without asking first.
 
-Keep these v1 commands unchanged and callable forever:
-- `/dbsctr` loads `dbsctr`
-- `/discovery` loads `discovery`
+Require confirmation before external writes, destructive or irreversible
+actions, purchases, or material scope expansion.
 
-Do not rename, delete, or deprecate v1.
+Use `ponytail` full for coding and choose the lowest sufficient implementation
+rung. Never remove necessary validation, security, data-loss handling,
+accessibility, or tests.
 
-## Ponytail
+Use `caveman` full by default. Preserve conclusions, evidence, material caveats,
+decisions, and next actions; trim introductions, repetition, generic reassurance,
+and optional background first.
 
-Use `ponytail` full mode by default for coding work. Choose the lowest sufficient
-rung: reuse existing code, then standard library or native platform features,
-then installed dependencies, then the smallest correct change.
+## Context And Delegation
 
-Do not simplify away validation, security, data-loss handling, accessibility,
-or necessary tests.
+For codebase or architecture questions, query an existing `graphify-out/` graph
+before broad search, then verify useful results against authoritative source,
+specs, contracts, and project instructions. Update the graph when project rules
+require it.
 
-## Caveman
+Delegate only independent work when parallel ownership makes execution faster or
+safer. Give each write subagent explicit writable paths and off-limits scope.
+The orchestrator reviews and validates integrated work and alone stages or
+commits; subagents never commit.
 
-Use `caveman` full mode by default for concise communication. Expand when
-clarity, safety, user-requested explanation, discovery interviews, audit reports,
-or complex tradeoffs require normal prose.
+## Compatibility
 
-## Graphify
-
-For codebase, architecture, or relationship questions, use an existing
-`graphify-out/` graph first. Prefer its report, wiki, and graph queries before
-raw searches, but treat source code, current specs, contracts, and configured
-project instructions as authoritative when they disagree.
-
-Update the graph after code changes when project instructions require it.
-
-## Quality Assurance
-
-Use `qa` as the DBSCTR2 quality gate for touched files, dependencies, tests,
-specs, contracts, and directly affected code. Discover and run the repository's
-configured tools; do not impose a universal toolchain or fail scoped work for
-unrelated pre-existing findings.
-
-Run a repository-wide QA audit only when the user explicitly requests a full
-audit. Use one project-selected authority per concern, classify fixes before
-editing, validate safe fixes, and return behavior-changing fixes to DBSCTR2.
-Dependabot alerts are QA inputs, not a standalone routing workflow.
-
-## Subagents
-
-Use subagents only when independent ownership makes work faster or safer. Every
-write subagent needs an explicit ownership contract naming writable paths and
-off-limits scope. The orchestrator reviews and validates integrated work and is
-the only agent that may stage or commit. Subagents never commit.
+Keep `/dbsctr` and `/discovery` unchanged and callable forever. They load the V1
+skills; do not rename, delete, deprecate, or modify them without explicit user
+instruction.

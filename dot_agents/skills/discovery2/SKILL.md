@@ -1,175 +1,69 @@
 ---
 name: discovery2
-description: >
-  Discovery2 requirements interview for DBSCTR2. Use when starting a new
-  feature, initiative, or bounded context, or when DBSCTR2 finds no matching
-  spec. Interviews until at least 95% confidence in user intent, then produces
-  DBSCTR2-ready spec, backlog, and changelog artifacts.
+description: Use when starting or scoping a feature, initiative, or bounded context, or when DBSCTR2 lacks an adequate matching spec; interviews to 95% confidence and writes DBSCTR2-ready artifacts.
 trigger: /discovery2
 ---
 
-# Discovery2 — Intent Extraction for DBSCTR2
+# Discovery2
 
-## Role
+## Outcome
 
-You are the requirements interviewer for a DBSCTR2 cycle. Your job is to learn
-what the user actually wants, not what they think they should want, then produce
-artifacts that make a strict DBSCTR2 implementation possible.
+Reach at least 95% confidence in user intent, then create or update the matching
+`docs/specs/{bounded_context}/README.md`, `BACKLOG.md`, and `CHANGELOG.md` so
+DBSCTR2 can proceed without repeating discovery.
 
-## Goal
+Skip the interview when an existing spec answers the material questions. Do not
+use for tiny unrelated changes. If the user explicitly accepts lower confidence,
+stop without presenting final artifacts as 95%-ready unless they request a draft.
 
-Reach at least 95% confidence in the user's intent for the intended DBSCTR2
-cycle. Then create or update the matching `docs/specs/{bounded_context}/`
-artifacts.
+## Retrieve
 
-## Success Criteria
+Read matching specs, applicable project instructions, manifests, CI, task
+runners, and configured validation. Record project-selected quality commands,
+authorities, baselines, unavailable checks, and gaps; do not install or prescribe
+tools during Discovery2.
 
-- The user's problem, motivation, constraints, non-goals, success criteria, and
-  acceptance signals are explicit.
-- The bounded context and adjacent contexts are named.
-- Existing specs and source artifacts are checked before new artifacts are
-  created.
-- Project quality commands, concern authorities, and accepted baselines are
-  captured for DBSCTR2 validation without prescribing tools.
-- The backlog is safe for concurrent work: each task has ownership, read/write
-  scope, dependencies, collision risks, parallel safety, validation, and reason.
-- The output can feed DBSCTR2 without repeating the full interview.
+If `graphify-out/graph.json` exists, run one targeted query and verify useful
+results against source. Search again only for a missing owner, interface, flow,
+domain term, artifact, or validation command.
 
-## When To Use
-
-- The user invokes `/discovery2`.
-- The user asks to scope, plan, interview, or discover a feature or initiative.
-- DBSCTR2 starts and no matching spec exists in `docs/specs/`.
-- Existing specs are stale or too incomplete to support a strict DBSCTR2 cycle.
-
-## When Not To Use
-
-- The task is a tiny unrelated edit with no behavior or artifact impact.
-- Existing specs already answer the intent questions with enough confidence.
-- The user explicitly asks to skip Discovery2 and accept lower confidence.
-
-## Prompt-Guidance Defaults
-
-- Use outcome-first questioning: ask for missing facts that change the artifact.
-- Keep each question round to 3-5 questions.
-- Prefer concrete multiple-choice questions when the answer space is known.
-- Ask open questions when motives, tradeoffs, or risk tolerance are unclear.
-- Stop asking when confidence is at least 95% and remaining gaps do not affect
-  implementation choices.
-
-## Ponytail Principle
-
-Before proposing scope or artifacts, choose the lowest sufficient rung:
-1. Does this need to exist?
-2. Can existing code or specs cover it?
-3. Can native platform or standard library do it?
-4. Can an installed dependency do it?
-5. Can one small change do it?
-6. Otherwise define the minimum correct solution.
-
-Do not cut validation, security, data-loss handling, accessibility, or tests.
-
-## Retrieval Budget
-
-- Start by checking `docs/specs/` for matching bounded contexts.
-- Read applicable `AGENTS.md`, manifests, CI configuration, and task runners to
-  discover project quality commands, concern authorities, and accepted baselines.
-- If `graphify-out/graph.json` exists, run one targeted graph query for the
-  feature or bounded context, then verify useful findings with source files.
-- Use Grep, Glob, and Read for source truth.
-- Do another retrieval loop only when a required owner, API, data flow, domain
-  term, existing artifact, or validation command is missing.
-- Do not search again to improve wording or fill nonessential examples.
-
-## Interview Loop
+## Interview
 
 For each round:
-1. State current confidence percentage and the biggest uncertainty.
-2. Ask 3-5 targeted questions.
-3. After answers, update the working summary and confidence.
-4. Challenge vague answers with a concrete follow-up.
-5. Stop only at at least 95% confidence.
 
-Coverage checklist:
-- Problem and why now.
-- Stakeholders, users, maintainers, downstream systems.
-- Success criteria and failure criteria.
-- Scope and non-goals.
-- Constraints: technical, time, security, compatibility, data, UX, operations.
-- Bounded context and adjacent contexts.
-- Domain terms, entities, value objects, events.
-- User workflows and system flows.
-- Data sources, sinks, transformations, freshness, volume, lineage.
-- Integration points and external dependencies.
-- Edge cases, failure modes, and rollback expectations.
-- Tests, validation commands, and observability.
-- Project quality authorities and baselines, including known accepted findings.
-- Backlog parallelization and collision risks.
+1. State confidence and the largest uncertainty.
+2. Ask 3-5 questions whose answers can change scope or implementation.
+3. Prefer concrete choices when the answer space is known; use open questions
+   for motives, tradeoffs, and risk tolerance.
+4. Update the working summary and challenge consequential vagueness.
+5. Stop when confidence reaches 95% and remaining gaps do not affect choices.
 
-## Output Contract
+Cover only what applies: problem and timing; stakeholders and downstreams;
+success and failure; goals and non-goals; technical, security, compatibility,
+data, UX, time, and operational constraints; bounded and adjacent contexts;
+Domain terms, entities, values, and events; workflows and integrations; data
+sources, sinks, transformations, freshness, volume, and lineage; edge cases,
+failure modes, rollback, observability, validation, and parallel ownership.
 
-When confidence reaches at least 95%, create or update:
+## Artifacts
 
-- `docs/specs/{bounded_context}/README.md`
-- `docs/specs/{bounded_context}/BACKLOG.md`
-- `docs/specs/{bounded_context}/CHANGELOG.md`
+`README.md` contains the overview, problem, goals, non-goals, ubiquitous
+language, Given/When/Then behavior, relevant architecture or data flow,
+contracts, risks, and validation strategy.
 
-`README.md` must include:
-- overview and problem statement
-- goals and non-goals
-- glossary / ubiquitous language
-- behavior scenarios
-- architecture or data-flow notes when relevant
-- contracts and invariants where known
-- validation strategy
+The validation strategy records each configured command's authority, scope,
+baseline, and availability.
 
-The validation strategy must record configured commands, their source of
-authority, applicable scope, known baselines, and unavailable checks or gaps. It
-must not prescribe, install, or configure tools during Discovery2.
+`BACKLOG.md` contains one table with `id`, `title`, `priority`, `status`,
+`depends_on`, `owns`, `reads`, `parallel_safe`, `reason`, `effort`, and
+`validation`. Ownership and dependencies must prevent concurrent collisions.
 
-`BACKLOG.md` must include one table with:
-- id
-- title
-- priority
-- status
-- depends_on
-- owns
-- reads
-- parallel_safe
-- reason
-- effort
-- validation
+`CHANGELOG.md` starts with the current date and records discovery decisions.
+Update an existing matching context rather than duplicating it. Distinguish
+facts, assumptions, non-goals, and open risks; never narrow scope silently.
 
-`CHANGELOG.md` starts with the current date and notes Discovery2 decisions.
+## Handoff
 
-## Contracts And Invariants
-
-- Confidence must be at least 95% before writing final Discovery2 artifacts,
-  unless the user explicitly asks for a draft.
-- Existing specs must be updated instead of duplicated when they cover the
-  bounded context.
-- Backlog tasks must include ownership and dependency fields so DBSCTR2 can
-  assign concurrent work safely.
-- Graphify output, when present, is routing context only. Source files remain
-  authoritative.
-- Requirements must distinguish facts, assumptions, non-goals, and open risks.
-- Project instructions and configured commands remain authoritative; Discovery2
-  records the toolchain profile rather than inventing one.
-- Discovery2 must not silently narrow scope to make implementation easier.
-
-## Handoff To DBSCTR2
-
-After writing artifacts, summarize:
-- bounded context
-- confidence percentage
-- remaining known risks
-- next DBSCTR2 task id
-- tasks that can run concurrently
-
-## Stop Rules
-
-- Stop and ask if the bounded context cannot be named.
-- Stop and ask if two plausible interpretations would lead to different specs.
-- Stop if the user rejects Discovery2 and explicitly accepts lower confidence.
-- Do not write artifacts before the confidence gate unless the user explicitly
-  asks for a draft.
+Report the bounded context, confidence, remaining risks, next DBSCTR2 task, and
+parallel-safe tasks. Stop and ask when the bounded context is unknown or two
+plausible interpretations would produce different specs.

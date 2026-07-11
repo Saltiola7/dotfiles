@@ -1,333 +1,125 @@
 ---
 name: dbsctr2
-description: >
-  DBSCTR2 strict implementation pipeline for OpenCode. Use for behavior,
-  domain, schema, API, service, orchestration, validation, or downstream-visible
-  changes. Runs Domain, Behavior, Spec, Contract, Test, Refactor with artifact
-  freshness, phase-gate commits, and subagent-safe backlog orchestration.
+description: Use for behavior, domain, schema, API, service, orchestration, validation, or downstream-visible changes requiring the Domain, Behavior, Spec, Contract, Test, Refactor lifecycle.
 trigger: /dbsctr2
 ---
 
-# DBSCTR2 — Strict OpenCode Implementation Pipeline
+# DBSCTR2
 
-## Role
-
-You are the orchestrator for a strict DBSCTR2 implementation cycle. You own the
-plan, artifacts, file ownership, integration, validation, and commits.
-
-## Goal
+## Outcome
 
 Deliver the requested change through Domain, Behavior, Spec, Contract, Test, and
-Refactor phases without stale artifacts or overlapping subagent edits.
+Refactor. The orchestrator owns planning, file ownership, integration,
+validation, phase commits, and artifact freshness.
 
-## Success Criteria
+Do not load for trivial, formatting-only, git-only, dependency-only,
+documentation-only, or non-behavioral configuration changes unless explicitly
+invoked. Never modify V1 `dbsctr` or `discovery` without explicit instruction.
 
-- Existing specs, code, tests, and docs are checked before creating new
-  artifacts.
-- Every phase produces or verifies the artifact consumed by the next phase.
-- Matching specs, backlogs, changelogs, docs, contracts, and tests stay fresh.
-- Subagents, when used, have non-overlapping ownership contracts.
-- The orchestrator reviews, validates, and commits each phase gate.
-- QA validates touched code, dependencies, tests, and artifacts at phase gates
-  without failing the cycle for unrelated pre-existing findings.
-- DVC-tracked outputs stay synchronized with phase commits when the repo uses
-  DVC.
-- V1 `dbsctr` and `discovery` remain unchanged and callable.
+## Start
 
-## When To Use
+1. Read applicable project instructions and matching `docs/specs/` artifacts.
+2. Discover configured quality commands, authorities, and accepted baselines.
+3. If `graphify-out/graph.json` exists, run one targeted query, then verify useful
+   results against source.
+4. Read applicable domain modules before Domain:
+   - data pipelines, ETL, orchestration, warehouses, streams, lakes: `modules/data.md`
+   - self-service analytics or semantic routing: `modules/data.md` and `modules/analytics_references.md`
+   - infrastructure, cloud resources, deployment, scaling: `modules/cloud.md`
+   - ML, LLMs, embeddings, evals, feature engineering: `modules/ml.md`
+5. If no adequate matching spec exists or intent remains unclear, run
+   `discovery2`. Resume only at 95% confidence with required artifacts written.
 
-- The user invokes `/dbsctr2`.
-- OpenCode routing classifies the task as DBSCTR-required.
-- The task changes behavior, domain rules, schemas, APIs, service logic,
-  orchestration, validation, data flow, or downstream-visible outputs.
+Search again only when a required interface, owner, contract, validation
+command, or affected file remains unknown.
 
-## When Not To Use
+## Phase Gates
 
-- Formatting-only, git-only, config-only, dependency-only, or documentation-only
-  changes with no behavior impact.
-- Tiny edits with no matching artifacts to update, unless the user explicitly
-  invokes DBSCTR2.
+Complete phases in order. Each gate consumes the previous phase's artifact.
 
-## Hard Invariants
+### 1. Domain `[domain]`
 
-- Do not write implementation code before Domain and Behavior are complete or
-  verified from existing artifacts.
-- Do not skip phases after DBSCTR2 is loaded.
-- Do not create duplicate specs when a matching `docs/specs/` context exists.
-- Do not leave known stale artifacts.
-- Do not let subagents commit.
-- Do not modify v1 skills unless the user explicitly asks.
+Name the bounded context, glossary, entities, value objects, events, external
+sources/sinks, applicable modules, and affected artifacts. Reuse and update an
+existing spec rather than creating a duplicate.
 
-## Ponytail Principle
+### 2. Behavior `[behavior]`
 
-Before building, choose the lowest sufficient rung:
-1. Does this need to exist?
-2. Can existing code or specs cover it?
-3. Can native platform or standard library do it?
-4. Can an installed dependency do it?
-5. Can one small change do it?
-6. Otherwise build the minimum correct solution.
+Write implementation-free Given/When/Then scenarios using Domain terms. Cover
+happy paths, edges, and failures. Resolve ambiguity that changes behavior with
+the user.
 
-Do not cut validation, security, data-loss handling, accessibility, or tests.
+### 3. Spec `[spec]`
 
-## Retrieval Budget
+Define concrete signatures, commands, config shapes, file targets, examples,
+and a dependency-aware backlog. Map every interface to behavior and record
+non-overlapping ownership when delegating.
 
-- Read relevant `docs/specs/` artifacts first.
-- Read project `AGENTS.md` if present.
-- Read project-declared quality commands, authorities, and baselines needed to
-  define the affected QA scope.
-- Read applicable DBSCTR2 domain modules before Phase 1 Domain.
-- If `graphify-out/graph.json` exists, run one targeted graph query before broad
-  search and verify useful findings with source files.
-- Use Grep, Glob, and Read for source truth.
-- Run another retrieval loop only if a required interface, owner, contract,
-  validation command, or affected file is missing.
+### 4. Contract `[contract]`
 
-## Domain Modules
+Define relevant preconditions, postconditions, runtime invariants, schemas,
+configuration rules, failure behavior, stale-artifact checks, and validation
+commands. Apply domain-module contract extensions and validate OpenCode config
+against its current schema when applicable.
 
-When a task touches a foundational domain, read the matching module before Phase
-1 Domain. Load only what applies:
+### 5. Test `[test]`
 
-| Domain signal | Module to read |
-|---|---|
-| Data pipelines, ETL, orchestration, warehouse writes, streaming, data lakes | `modules/data.md` |
-| Self-service analytics agent, semantic-layer routing, question→entity mapping, reference docs for non-expert consumers | `modules/data.md` + `modules/analytics_references.md` |
-| Infrastructure-as-Code, cloud resources, deployment, scaling, platform services | `modules/cloud.md` |
-| ML model training/serving, LLM calls, embeddings, evals, feature engineering | `modules/ml.md` |
+Prefer tests before implementation when a harness exists. Implement the minimum
+correct change, apply domain-module test/eval extensions, and run configured
+checks. For config or skill changes, deploy and smoke-test. Record passed checks
+and blockers with next-best evidence.
 
-Multiple modules may apply. If in doubt, load the module; missing a domain
-contract is costlier than one extra file read.
+### 6. Refactor `[refactor]`
 
-## Discovery2 Handoff
+Remove duplication and stale notes, align names with the Domain, update backlog
+and changelog, and preserve validation evidence. Finish with no known stale
+artifact and only intended worktree changes.
 
-If no matching spec exists in `docs/specs/`, automatically load `discovery2` and
-execute it against the current task. Resume DBSCTR2 only after Discovery2 reaches
-at least 95% confidence and writes or updates the required artifacts.
+Tiny adjacent phases may share a commit when their work is trivial and artifacts
+remain clear. Skip commits for phases producing no file changes.
 
-## Subagent Protocol
+## Delegation
 
-Use subagents when work can be split safely and the overhead is worth it.
+Delegate when independent, non-overlapping work justifies the overhead; start
+independent subagents together. Do direct work when it fits one response.
 
-Before delegation, the orchestrator must define an Ownership Contract:
-- task id and goal
-- files the subagent may write
-- files the subagent may read
-- files explicitly off-limits
-- dependencies and blockers
-- expected output
-- validation command or check
-- collision risk
-
-Rules:
-- Spawn multiple subagents in one turn when fanning out across independent
-  files, specs, tests, or research tasks.
-- Do not spawn a subagent for work the orchestrator can complete directly in one
-  response.
-- Write subagents may edit only their assigned files.
-- Orchestrator reviews all subagent diffs before validation or commit.
-- Orchestrator alone stages and commits.
-
-## Phase Contracts
-
-These phase contracts are invariants. Do not treat them as optional process
-notes after DBSCTR2 is loaded.
-
-### Phase 1: Domain
-
-Outcome: bounded context, glossary, entities, value objects, domain events,
-external sources/sinks, and affected artifacts are known.
-
-Actions:
-- Check existing specs before creating anything.
-- Load applicable DBSCTR2 domain modules and apply their Phase 1 extensions.
-- Update the matching spec domain sections.
-- If no spec exists, run Discovery2.
-- Identify stale docs or contracts that must be updated later.
-
-Gate:
-- Bounded context named.
-- Domain terms appear in the spec.
-- Applicable module guidance is used or explicitly ruled out.
-- Existing artifacts are reused or explicitly ruled out.
-
-Commit prefix: `[domain]`.
-
-### Phase 2: Behavior
-
-Outcome: Given/When/Then scenarios describe user or downstream-visible behavior.
-
-Actions:
-- Add or update behavior scenarios in the spec.
-- Cover happy paths, edge cases, and failure behavior.
-- Keep scenarios implementation-free.
-
-Gate:
-- Every scenario uses Domain terms.
-- Ambiguity that changes behavior is resolved with the user.
-
-Commit prefix: `[behavior]`.
-
-### Phase 3: Spec
-
-Outcome: concrete interfaces, signatures, file targets, examples, and task
-ownership are defined.
-
-Actions:
-- Add function signatures, command templates, config shapes, or file interfaces.
-- Map each interface to behavior scenarios.
-- Compile or update the concurrent backlog.
-
-Gate:
-- Every interface maps to at least one scenario.
-- Subagent ownership boundaries are explicit when delegation is used.
-
-Commit prefix: `[spec]`.
-
-### Phase 4: Contract
-
-Outcome: runtime invariants, config rules, validation rules, and failure behavior
-are explicit.
-
-Actions:
-- Add preconditions, postconditions, invariants, schema constraints, and config
-  contracts where relevant.
-- Apply applicable DBSCTR2 module Phase 4 contract extensions.
-- Define stale-artifact checks and validation commands.
-
-Gate:
-- Contracts cover changed interfaces and external boundaries.
-- Config changes match OpenCode schema.
-
-Commit prefix: `[contract]`.
-
-### Phase 5: Test
-
-Outcome: tests or practical verification prove the change works.
-
-Actions:
-- Prefer tests before implementation when the project has a test harness.
-- Apply applicable DBSCTR2 module Phase 5 test or eval extensions.
-- For config/skill work, run deployment and smoke checks.
-- Record commands that passed or could not run.
-
-Gate:
-- Relevant checks pass, or blockers are documented with next-best checks.
-
-Commit prefix: `[test]`.
-
-### Phase 6: Refactor
-
-Outcome: implementation is simpler, names match the domain, and artifacts are
-final.
-
-Actions:
-- Remove duplication and stale notes.
-- Update backlog statuses and changelog.
-- Re-run or preserve validation evidence.
-
-Gate:
-- No known stale artifacts remain.
-- Worktree contains only intended changes.
-
-Commit prefix: `[refactor]`.
+Before a write subagent starts, specify its goal, readable and writable files,
+off-limits paths, dependencies, collision risk, expected output, and validation.
+Subagents edit only owned files and never stage or commit. The orchestrator
+reviews diffs, resolves integration, validates, and alone commits.
 
 ## Commit Gate
 
-At each phase boundary:
-1. Inspect `git status`, `git diff`, and recent log.
-2. Run the QA Gate for the affected scope.
-3. Run the DVC Sync Gate when the repo has DVC markers.
-4. Stage only intended files, including changed DVC metadata that belongs to the
-   phase.
-5. Commit with the phase prefix.
-6. Skip commit if the phase produced no new file changes.
+At every phase boundary:
 
-Tiny adjacent phases may share a commit only when the phase work is trivial and
-the artifacts remain clear.
+1. Inspect status, diff, and recent log.
+2. Run `qa` in scoped mode for touched files, dependencies, tests, specs,
+   contracts, manifests, and direct downstream impact.
+3. Treat relevant findings as failures or documented blockers. Ignore unrelated
+   pre-existing findings. Safe deterministic remediation may stay in scope;
+   behavior, contract, schema, orchestration, validation, or downstream changes
+   remain in DBSCTR2.
+4. In repositories with `.dvc/`, `*.dvc`, `dvc.yaml`, or `dvc.lock`, run
+   `dvc status`. Update and stage DVC metadata only for outputs changed by this
+   phase; report and exclude unrelated drift.
+5. Stage only intended files and commit using the phase prefix.
 
-## QA Gate
+If asked to push from a DVC repo, run `dvc push` before `git push`; stop if it
+fails.
 
-At each phase boundary, load `qa` in scoped mode with only the compact Affected
-Scope: touched files, dependencies, tests, specs, contracts, manifests, and
-direct downstream impact. Use project-declared quality commands, authorities,
-and baselines; do not duplicate QA's tool selection or remediation workflow.
+## Artifact And Config Contracts
 
-- Relevant findings fail the gate or are recorded as blockers with next-best
-  validation.
-- Unrelated pre-existing tool findings do not fail or broaden the DBSCTR2 cycle.
-- Deterministic safe remediation may remain in the scoped QA run.
-- Remediation that changes behavior, contracts, schemas, orchestration, or
-  downstream-visible output remains in or escalates to the current DBSCTR2 cycle.
-- Record compact validation evidence and residual risk before committing.
+Keep affected specs, backlogs, changelogs, tests, behavioral comments/docstrings,
+commands, skills, agents, and config docs current.
 
-## DVC Sync Gate
+For OpenCode changes, preserve its `$schema`, validate the rendered shape, keep
+non-trivial prompts in files and slash commands thin, deploy with chezmoi when
+managed there, and tell the user to restart OpenCode.
 
-Use this gate only inside repos with any DVC marker: `.dvc/`, `*.dvc`,
-`dvc.yaml`, or `dvc.lock`.
+## Final Response
 
-At every DBSCTR2 phase commit in a DVC repo:
-- Run `dvc status` before staging.
-- If the phase changed DVC-tracked outputs, run `dvc add <output>` or the
-  project-equivalent update for each changed output.
-- Treat `graphify-out/graph.json.dvc` as a normal DVC artifact when present.
-- Include resulting `.dvc` files or `dvc.lock` changes in the same Git commit as
-  the code, docs, or config changes that produced them.
-- If `dvc status` reports unrelated pre-existing drift, do not update it
-  silently. Report it and keep it out of the commit unless the user includes it.
-
-When the user asks DBSCTR2 to push Git refs from a DVC repo:
-- Run `dvc push` before `git push`.
-- If `dvc push` fails, stop before `git push` and report the failure.
-- Do not push Git refs that reference DVC metadata whose data failed to upload.
-
-## Artifact Freshness Contract
-
-Before final response, check whether the changed behavior is represented in any
-of these artifacts:
-- `docs/specs/**/README.md`
-- `docs/specs/**/BACKLOG.md`
-- `docs/specs/**/CHANGELOG.md`
-- tests
-- code comments or docstrings that state behavior
-- command, skill, agent, or config docs
-
-If yes, update the affected artifact in the correct phase. Do not leave known
-stale artifacts.
-
-## OpenCode Config Contract
-
-When editing OpenCode files:
-- Preserve `"$schema": "https://opencode.ai/config.json"`.
-- Validate config shape against the OpenCode schema or known schema summary.
-- Use file-based skills, commands, and agents for non-trivial prompts.
-- Keep slash command bodies thin when the skill is the source of truth.
-- Tell the user to restart OpenCode after global config, command, skill, agent,
-  or plugin changes.
-
-## Subagent Safety Contract
-
-Before any write subagent starts, record:
-- files it may write
-- files it may read
-- files it may not touch
-- expected output
-- validation check
-- dependency and collision risk
-
-After it returns, the orchestrator must inspect the diff for its owned files,
-resolve integration issues, run validation, and commit only from the main thread.
-
-## Output Contract
-
-Final response must include:
-- outcome
-- phase commits created
-- QA and other validation run, affected scope, and residual risk
-- blockers or restart notes
-
-## Stop Rules
-
-- Stop and ask if the bounded context cannot be named.
-- Stop and ask if the next step is destructive, irreversible, or externally
-  side-effecting beyond local files and git commits.
-- Stop if subagent ownership would overlap and cannot be serialized.
+Lead with the outcome. Include phase commits, affected QA scope and validation,
+residual risks, blockers, and restart requirements. Stop for unresolved bounded
+context, overlapping ownership that cannot be serialized, or destructive,
+irreversible, external, costly, or materially scope-expanding actions requiring
+approval.

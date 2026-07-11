@@ -1,110 +1,88 @@
 ---
 name: qa
-description: >
-  Repository-aware quality assurance. Use for DBSCTR2 touched-scope gates or
-  explicit full audits covering quality, security, dependencies, and packaging.
+description: Use for DBSCTR2 touched-scope quality gates or explicit repository-wide audits covering configured quality, security, dependencies, and packaging checks.
 ---
 
 # Quality Assurance
 
-## Role
+## Scope
 
-Own repository toolchain discovery, scoped DBSCTR2 gates, explicit full audits,
-finding normalization, and safe-fix orchestration. Project instructions and
-configured commands are authoritative; do not install tools just because this
-skill supports them.
+- `scoped`: check only DBSCTR2's touched files, imports, manifests, packages,
+  tests, specs, and downstream contracts. Ignore unrelated existing findings.
+- `full`: inventory all configured concerns only when the user explicitly asks
+  for a repository-wide audit; keep baselined debt visible.
 
-## Modes
+Ask one short question if mode or affected scope is ambiguous. Never expand a
+scoped gate silently.
 
-- `scoped`: DBSCTR2 supplies touched files, imports, manifests, packages, tests,
-  specs, and downstream contracts. Check only that affected scope. Existing
-  findings outside it are unrelated noise: ignore them rather than failing the
-  gate.
-- `full`: run only when the user explicitly requests a full/repository-wide
-  audit. Inventory all configured concerns and keep baselined debt visible.
-- If mode or scope is ambiguous, ask one short question. Never silently expand a
-  scoped run into a full audit.
+## Toolchain
 
-## Discover The Toolchain
+Read applicable project instructions, manifests, lockfiles, task runners, CI,
+pre-commit config, and documented commands. For each configured concern, record
+command, scope support, baseline/suppressions, and one project-selected gating
+authority:
 
-Read the repository's applicable `AGENTS.md`, manifests, lockfiles, task runners,
-CI workflows, pre-commit configuration, and documented validation commands.
-Build a compact profile of command, scope support, baseline/suppressions, and
-authority for each configured concern:
+- format/lint, typing, tests/coverage, code/application security
+- dependencies, vulnerability scans, and current Dependabot alerts
+- dead code/complexity, docs, mutation, build/package/publish
 
-- formatting and lint
-- static typing
-- tests and coverage
-- code/application security
-- dependencies, vulnerability scanning, and GitHub Dependabot alerts
-- dead code and complexity
-- documentation checks
-- mutation testing
-- build, packaging, and publish validation
+Use only relevant configured concerns and do not install tools. Suppressions
+limit evidence; they do not prove suppressed code passed. If a required tool is
+unavailable, record the blocker and next-best check, never a pass.
 
-Use only relevant configured concerns. A broad suppression is evidence of a
-limited check, not proof that the suppressed code passed. If a configured tool
-is unavailable, record the blocker and next-best validation; never report a
-pass.
-
-Choose one gating Concern Authority per concern from project policy and CI.
-Overlapping tools may add context, but must not become duplicate or contradictory
-gates. When the project declares JFrog Xray, use its configured `jf` audit/scan
-commands as vulnerability authority and do not add `pip-audit`. Otherwise, for
-Python use configured `pip-audit` against the resolved or locked dependencies as
-the fallback. Fetch current-repository Dependabot alerts with authenticated `gh`
-and treat them as normalized finding inputs, not a separate workflow.
+Overlapping tools may provide context but not duplicate gates. Use configured
+JFrog Xray as vulnerability authority when declared; otherwise use configured
+`pip-audit` for resolved Python dependencies. Fetch current-repository
+Dependabot alerts with authenticated `gh` and normalize them as findings.
 
 ## Execute
 
 1. Establish mode, affected scope, repository state, and toolchain profile.
-2. Select the minimum checks that cover the requested scope and concerns.
-3. Run independent read-only checks concurrently when useful; serialize checks
-   that write caches, generated files, lockfiles, or shared outputs.
-4. Normalize each result to source, location, concern, severity, scope, and
-   remediation state. Deduplicate by root cause, with the Concern Authority's
-   result controlling gate status.
-5. Report findings before editing. In scoped mode, omit unrelated noise from the
-   gate; mention only blockers that prevent scope isolation.
-6. Group actionable findings into ranked, collision-safe Fix Batches with exact
+2. Select the minimum checks covering that scope and its concerns.
+3. Run independent read-only checks concurrently; serialize checks sharing
+   caches, generated files, lockfiles, or outputs.
+4. Collect every issue that could cause incorrect behavior, failed validation,
+   security exposure, or misleading output. Record uncertainty rather than
+   filtering early; omit pure style and naming preferences unless configured as
+   gates.
+5. Verify each candidate, then normalize source, location, concern, severity,
+   confidence, scope, and remediation state. Deduplicate by root cause; the
+   concern authority controls gate status.
+6. Report findings before editing. In scoped mode omit unrelated noise unless it
+   prevents scope isolation.
+7. Rank actionable findings into collision-safe Fix Batches with exact
    ownership, safety class, expected files, and focused validation.
 
-## Fix Safety
+## Fix Classes
 
-- `safe`: deterministic formatting or unambiguous tool-provided correction with
-  no behavior, contract, schema, dependency, or policy change. Apply only after
-  presenting the batch, then run focused validation.
+- `safe`: deterministic formatting or unambiguous tool correction with no
+  behavior, contract, schema, dependency, or policy change. Apply after
+  presenting the batch, then validate.
 - `review_required`: dependency changes, suspected dead code, security policy,
-  mutation survivors, complexity redesign, broad typing changes, or any fix with
-  uncertain semantics. Propose the batch and obtain review before editing.
+  mutation survivors, complexity redesign, broad typing, or uncertain semantics.
+  Obtain review before editing.
 - `escalate_dbsctr2`: behavior, contract, schema, orchestration, validation rule,
-  or downstream-visible changes. Return the finding and scope to DBSCTR2.
+  or downstream-visible changes.
 
-Never auto-delete suspected dead code; verify declarations, references, dynamic
-loading, public API use, and generated-code boundaries first. Do not broaden a
-dependency update beyond the finding. Re-run the affected authority and focused
-tests after every applied batch; stop if failures cannot be resolved safely
-within scope.
+Never auto-delete suspected dead code; verify references, dynamic loading,
+public APIs, and generated boundaries. Do not broaden dependency updates. Re-run
+the affected authority and focused tests after each applied batch; stop when a
+failure cannot be resolved safely in scope.
 
-## Subagents And Git
+## Delegation And Git
 
-Delegate only independent work. Before a write subagent starts, provide an
-Ownership Contract containing the concern/finding, files it may read and write,
-off-limits files, collision risks, expected output, and validation command.
-Subagents never stage, commit, or push. The orchestrator reviews and integrates
-all diffs, validates the combined result, and alone stages and commits when the
-task requests commits and repository rules permit them.
+Delegate only independent work. A write subagent receives its finding, readable
+and writable files, off-limits paths, collision risk, expected output, and
+validation. Subagents never stage, commit, or push. The orchestrator reviews,
+integrates, validates, and alone performs requested git writes.
 
-## Output
+## Report
 
-Report, in order:
-
-1. Mode, affected scope, selected authorities, and unavailable checks.
-2. Findings ordered by severity, with location, authority, scope, and status.
-3. Fix Batches: applied safe changes, proposed risky work, and DBSCTR2
-   escalations.
-4. Validation commands and results, changed files, residual findings, and risks.
+Lead with findings ordered by severity. Include mode and affected scope,
+authorities and unavailable checks, each finding's location/confidence/status,
+Fix Batches and escalations, validation results, changed files, and residual
+risk.
 
 A scoped gate passes only when affected findings are resolved or explicitly
-accepted and every required configured check ran. A full audit may complete with
-debt, but must expose all findings and their disposition.
+accepted and all required configured checks ran. A full audit may complete with
+debt but must expose every verified finding and disposition.
