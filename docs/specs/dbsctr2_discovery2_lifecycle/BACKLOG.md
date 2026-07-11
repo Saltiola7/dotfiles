@@ -22,6 +22,8 @@ Discovery2 confidence: 96%.
 | 16 | Enforce primary task permissions and builder boundaries | high | done | 12, 13, 14, 15 | primary/subagent permissions and prompts | resolved agent definitions | no | Prevent cross-provider and unsafe child actions | M | Rendered permission assertions passed |
 | 17 | Run temporary provider-routing scenarios | high | done | 16 | changelog validation evidence | deployed config and temporary fixture | no | Check quality, latency, routing, review, and fallback without a permanent harness | M | Static matrix and Bedrock live route passed; OpenAI timeout recorded |
 | 18 | Deploy and finalize lifecycle | high | done | 17 | managed targets and lifecycle artifacts | all implementation diffs and evidence | no | Complete DBSCTR2 cycle without stale artifacts | M | Dry-run, apply, resolved config, status, and affected-scope checks passed |
+| 19 | Restore Plan and explicit Build roles | high | done | 18 | primary agents, commands, routing, lifecycle docs | deployed agent behavior | no | Preserve the familiar Plan-to-Build workflow | S | Resolved primaries are Plan, Build-GPT, and Build-Claude |
+| 20 | Register runtime model variants | high | done | 19 | OpenAI and Bedrock model overrides | model registry and variant docs | no | Prevent configured agents from displaying inert Default variants | S | Resolved provider variants and agent selections passed assertions |
 
 Tasks 12 and 13 may run concurrently because they own separate agent families.
 The orchestrator alone owns shared config integration, task permissions,

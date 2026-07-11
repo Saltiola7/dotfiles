@@ -68,7 +68,9 @@ other artifacts current when implementation changes.
 | OpenCode Routing | Managed `AGENTS.md` guidance that selects `dbsctr2` and `discovery2` in OpenCode sessions. |
 | Ponytail Principle | Hard rule to avoid work, reuse existing artifacts/code, and make the minimum correct change. |
 | Provider Family | OpenAI, Amazon Bedrock, or the provider of an arbitrarily selected model. Delegation must remain inside it. |
-| Provider-Local Agent | Specialized subagent whose configured model belongs to the primary agent's provider family. |
+| Provider-Local Agent | Specialized subagent whose configured model belongs to the Build agent's provider family. |
+| Plan | Startup primary using GPT-5.6 Sol medium with native read-only planning behavior. |
+| Build Agent | `Build-GPT` or `Build-Claude`, selected explicitly for implementation. |
 | Optimized Subagent | Lower-cost Explore, Scout, or Builder selected for a bounded task instead of the flagship. |
 | Flagship Review | Parent review of delegated code before integration, final validation, staging, or commit. |
 | Same-Provider Fallback | One visible retry with the provider's flagship after an optimized subagent fails. |
@@ -180,15 +182,17 @@ phase order, artifact freshness, safety, and commit ownership.
 - **Invariant:** Subagents never commit.
 
 ### Provider-Affine Routing Contract
-- **Pre:** The active primary is `gpt`, `opus-bedrock`, or a generic primary with
+- **Pre:** The active primary is `Plan`, `Build-GPT`, `Build-Claude`, or a generic primary with
   an arbitrarily selected model.
-- **Post:** `gpt` may delegate only to OpenAI-specialized agents;
-  `opus-bedrock` may delegate only to Amazon Bedrock-specialized agents.
+- **Post:** `Build-GPT` may delegate only to OpenAI-specialized agents;
+  `Build-Claude` may delegate only to Amazon Bedrock-specialized agents.
 - **Post:** Generic Explore, Scout, and General agents inherit the active model
   for other providers.
 - **Invariant:** Delegation never crosses provider families silently.
-- **Invariant:** OpenAI is the startup default; unavailable Bedrock access does
+- **Invariant:** `Plan` on OpenAI is the startup default; unavailable Bedrock access does
   not prevent OpenCode startup.
+- **Invariant:** The unused OpenCode Zen `opus` primary and native `Build` agent
+  are not selectable.
 
 ### Optimized Agent Contract
 - **Pre:** Delegation has a clear scope, independent value, and expected output.
@@ -228,6 +232,8 @@ phase order, artifact freshness, safety, and commit ownership.
 ### OpenCode Config Contract
 - **Pre:** `opencode.json.tmpl` preserves `$schema` and existing config.
 - **Post:** Ponytail is listed in the global `plugin` array.
+- **Post:** Sol, Luna, Terra, Bedrock Opus, and Bedrock Sonnet expose explicit
+  configured variants used by their agents.
 - **Invariant:** Slash command bodies are thin wrappers and skill files remain
   workflow source of truth.
 
@@ -267,6 +273,10 @@ phase order, artifact freshness, safety, and commit ownership.
   value. `gpt` launched `explore-openai` twice, but the child did not return
   before timeout/abort; configuration and permission checks still passed.
 - `chezmoi status` returned clean output after deployment.
+- Follow-up resolved-config assertions confirmed native `Plan` as default,
+  disabled native `Build`, exact `Build-GPT` and `Build-Claude` names, removal of
+  legacy primaries, case-sensitive command targets, and explicit provider
+  variants for all configured OpenAI and Bedrock agents.
 
 ## Behavior Scenarios
 
@@ -384,8 +394,14 @@ phase order, artifact freshness, safety, and commit ownership.
 
 ### Feature: Provider-Affine OpenCode Agents
 
+**Scenario: Start in native Plan**
+- Given OpenCode starts without an explicit agent
+- When the initial session opens
+- Then native `Plan` is active on GPT-5.6 Sol at medium effort
+- And implementation requires selecting `Build-GPT` or `Build-Claude`
+
 **Scenario: Use optimized OpenAI agents**
-- Given the `gpt` primary runs GPT-5.6 Sol at medium effort
+- Given the `Build-GPT` primary runs GPT-5.6 Sol at medium effort
 - When local research, external research, or bounded coding clearly benefits
   from delegation
 - Then it invokes GPT-5.6 Luna Explore, GPT-5.6 Terra Scout, or GPT-5.6 Terra
@@ -393,7 +409,7 @@ phase order, artifact freshness, safety, and commit ownership.
 - And it does not invoke an Amazon Bedrock agent
 
 **Scenario: Use optimized Bedrock agents**
-- Given the `opus-bedrock` primary runs Claude Opus through Amazon Bedrock
+- Given the `Build-Claude` primary runs Claude Opus through Amazon Bedrock
 - When local research, external research, or bounded coding clearly benefits
   from delegation
 - Then it invokes the matching Claude Sonnet 5 agent at medium effort

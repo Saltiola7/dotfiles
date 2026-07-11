@@ -1,5 +1,16 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-10 Follow-Up: Plan And Build Agents
+
+- Made native `Plan` on GPT-5.6 Sol medium the startup agent.
+- Renamed the implementation primaries to `Build-GPT` and `Build-Claude`,
+  disabled native `Build`, and removed the unused OpenCode Zen `opus` primary.
+- Added explicit OpenAI reasoning and Bedrock thinking variants because the new
+  model catalog entries otherwise exposed only `Default` in the TUI.
+- Retargeted implementation commands and provider-affine routing to `Build-GPT`.
+- Deployed the renamed agents, removed stale deployed primary files, and verified
+  the resolved primary set, variants, command targets, and clean chezmoi status.
+
 ## 2026-07-10 Implementation: Provider-Affine OpenCode Agents
 
 - Added `gpt` on `openai/gpt-5.6-sol` and `opus-bedrock` on
