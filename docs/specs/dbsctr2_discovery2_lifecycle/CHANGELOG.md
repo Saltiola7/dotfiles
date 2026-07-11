@@ -1,5 +1,29 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-10 Discovery: Provider-Affine OpenCode Agents
+
+- Reached 96% confidence after reviewing OpenCode's agents, commands,
+  permissions, tools, references, plugins, SDK, server, config, and rules plus
+  current GPT-5.6 and Claude Sonnet 5 prompting guidance.
+- Selected OpenCode-native primary-agent switching for regular OpenAI and Amazon
+  Bedrock use, with GPT-5.6 Sol as the startup default and generic model
+  inheritance for other providers.
+- Assigned GPT-5.6 Luna low to OpenAI Explore, GPT-5.6 Terra medium to OpenAI
+  Scout and Builder, and Claude Sonnet 5 medium to Bedrock Explore, Scout, and
+  Builder. Flagship GPT-5.6 Sol or Bedrock Opus retains orchestration.
+- Required clear-benefit delegation, full routing visibility, one visible
+  same-provider flagship fallback, and no silent cross-provider delegation.
+- Required flagship review of delegated code while trusting source-backed
+  Explore and Scout results unless uncertain, contradictory, or controlling a
+  risky edit.
+- Added OpenCode-native phase-ledger, Plan-to-Build handoff, child-session
+  evidence, permission, snapshot, and session-diff requirements.
+- Deferred Review, phase-specific agents, routing plugins, and a permanent model
+  evaluation framework. Validation will use a small temporary scenario suite.
+- Kept the existing `opus` primary during migration and ignored the unused
+  Headroom provider; exact native Bedrock model identifiers remain a pre-build
+  validation item.
+
 ## 2026-07-10 Follow-Up: QA Gate
 
 - Replaced the standalone Dependabot skill, command, and DBSCTR2 gate with the

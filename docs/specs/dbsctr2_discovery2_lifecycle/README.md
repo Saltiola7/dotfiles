@@ -6,10 +6,11 @@ The bounded context is the v2 lifecycle for OpenCode-native DBSCTR and
 Discovery skills. The system creates strict, prompt-guide-native workflows that
 remain callable beside the existing v1 skills forever.
 
-The v2 lifecycle optimizes for current GPT-5.5 and Claude Opus 4.8 prompting
-guidance, OpenCode global configuration, controlled subagent use, stale-doc
-prevention, and v2-owned domain module guidance. The original `dbsctr` and
-`discovery` skills remain installed for explicit v1 use.
+The v2 lifecycle optimizes for GPT-5.6 Sol and Claude Opus on Amazon Bedrock,
+with provider-local GPT-5.6 Luna, GPT-5.6 Terra, and Claude Sonnet 5 subagents.
+It uses OpenCode-native agents, permissions, child sessions, todos, and recovery
+while preserving the original `dbsctr` and `discovery` skills for explicit v1
+use.
 
 ## Problem Statement
 
@@ -31,13 +32,19 @@ other artifacts current when implementation changes.
 - Make Discovery2 interview until at least 95% confidence in user intent.
 - Allow write subagents where viable while orchestrator owns review, test, and commit.
 - Compile backlogs that are safe for concurrent work.
+- Keep OpenAI and Bedrock delegation within the active provider family.
+- Use lower-cost Explore, Scout, and Builder agents only when delegation has a
+  clear benefit, with visible same-provider flagship fallback.
+- Make phase state and Plan-to-Build handoff explicit through OpenCode-native
+  session features.
 
 ## Non-Goals
 
 - Do not modify `~/.claude/CLAUDE.md`.
 - Do not delete, rename, or deprecate v1 skills.
-- Do not create model-specific v2 variants yet.
-- Do not add custom OpenCode agents yet.
+- Do not create provider-specific copies of DBSCTR2 or Discovery2.
+- Do not add a routing plugin, permanent model benchmark framework, phase-specific
+  agents, or a separate Review agent in this cycle.
 - Do not modify Graphify package internals.
 
 ## Domain Model
@@ -60,6 +67,13 @@ other artifacts current when implementation changes.
 | Thin Command | Slash command that only loads the matching skill and passes `$ARGUMENTS`; source of truth remains in the skill. |
 | OpenCode Routing | Managed `AGENTS.md` guidance that selects `dbsctr2` and `discovery2` in OpenCode sessions. |
 | Ponytail Principle | Hard rule to avoid work, reuse existing artifacts/code, and make the minimum correct change. |
+| Provider Family | OpenAI, Amazon Bedrock, or the provider of an arbitrarily selected model. Delegation must remain inside it. |
+| Provider-Local Agent | Specialized subagent whose configured model belongs to the primary agent's provider family. |
+| Optimized Subagent | Lower-cost Explore, Scout, or Builder selected for a bounded task instead of the flagship. |
+| Flagship Review | Parent review of delegated code before integration, final validation, staging, or commit. |
+| Same-Provider Fallback | One visible retry with the provider's flagship after an optimized subagent fails. |
+| Phase Ledger | Six OpenCode todos tracking Domain, Behavior, Spec, Contract, Test, and Refactor. |
+| Build Handoff | Structured read-only Plan output that Build verifies before persisting artifacts or implementation. |
 
 ## External Interfaces
 
@@ -77,6 +91,7 @@ other artifacts current when implementation changes.
 | `private_dot_config/opencode/commands/qa.md` | Global `/qa` command. |
 | `private_dot_config/opencode/AGENTS.md` | OpenCode-native routing instructions. |
 | `private_dot_config/opencode/opencode.json.tmpl` | Global OpenCode config, including Ponytail plugin. |
+| `private_dot_config/opencode/agents/*.md` | Provider-local primary and subagent definitions when file-based prompts are needed. |
 
 ## Prompt-Guidance Inputs
 
@@ -94,6 +109,11 @@ phase order, artifact freshness, safety, and commit ownership.
   must be updated to avoid stale artifacts.
 - DBSCTR2 loads applicable v2 domain modules before Phase 1 Domain.
 - Explicit `/dbsctr` and `/discovery` continue to load v1 skills.
+- GPT and Bedrock flagship workflows use selectable OpenCode primary agents;
+  OpenAI is the startup default and arbitrary providers use generic inheriting
+  agents.
+- Provider-local subagents are available globally; DBSCTR2 adds ownership,
+  evidence, fallback, and phase-gate requirements.
 
 ## Contracts & Invariants
 
@@ -158,6 +178,52 @@ phase order, artifact freshness, safety, and commit ownership.
   off-limits files, validation, dependencies, and collision risks.
 - **Post:** The Orchestrator reviews, validates, stages, and commits.
 - **Invariant:** Subagents never commit.
+
+### Provider-Affine Routing Contract
+- **Pre:** The active primary is `gpt`, `opus-bedrock`, or a generic primary with
+  an arbitrarily selected model.
+- **Post:** `gpt` may delegate only to OpenAI-specialized agents;
+  `opus-bedrock` may delegate only to Amazon Bedrock-specialized agents.
+- **Post:** Generic Explore, Scout, and General agents inherit the active model
+  for other providers.
+- **Invariant:** Delegation never crosses provider families silently.
+- **Invariant:** OpenAI is the startup default; unavailable Bedrock access does
+  not prevent OpenCode startup.
+
+### Optimized Agent Contract
+- **Pre:** Delegation has a clear scope, independent value, and expected output.
+- **Post:** OpenAI Explore uses GPT-5.6 Luna at low effort; OpenAI Scout and
+  Builder use GPT-5.6 Terra at medium effort.
+- **Post:** Bedrock Explore, Scout, and Builder use Claude Sonnet 5 at medium
+  effort; Bedrock Opus remains the parent orchestrator.
+- **Post:** Explore and Scout are read-only and return concise source-backed
+  evidence. Their output is trusted unless uncertain, contradictory, or directly
+  controlling a risky edit.
+- **Post:** Builders edit only owned files, run focused checks, and return the
+  patch scope and evidence for Flagship Review.
+- **Invariant:** Builders never stage, commit, push, deploy, perform external
+  writes, expand scope, or declare lifecycle gates complete.
+
+### Fallback And Visibility Contract
+- **Pre:** An optimized provider-local subagent launch fails or its model is
+  unavailable.
+- **Post:** The Orchestrator reports the intended agent and model, failure,
+  same-provider flagship retry, and outcome.
+- **Post:** One same-provider flagship retry occurs automatically before direct
+  continuation or a blocker is reported.
+- **Invariant:** Normal delegation emits a concise routing log; fallback is never
+  silent and never crosses providers.
+
+### OpenCode Session Contract
+- **Pre:** DBSCTR2 begins a non-trivial lifecycle.
+- **Post:** A six-item Phase Ledger has exactly one active phase until all gates
+  complete.
+- **Post:** Plan mode produces a Build Handoff without claiming writes occurred;
+  Build verifies freshness before using it.
+- **Post:** Child sessions report question, inspected sources, findings, facts
+  versus assumptions, validation, blockers, uncertainty, and changed files.
+- **Invariant:** OpenCode snapshots and session diffs support recovery but Git
+  remains authoritative for integration and commits.
 
 ### OpenCode Config Contract
 - **Pre:** `opencode.json.tmpl` preserves `$schema` and existing config.
@@ -303,6 +369,66 @@ phase order, artifact freshness, safety, and commit ownership.
 - When subagent overhead would exceed benefit
 - Then it performs the work directly
 - And it records no subagent requirement
+
+### Feature: Provider-Affine OpenCode Agents
+
+**Scenario: Use optimized OpenAI agents**
+- Given the `gpt` primary runs GPT-5.6 Sol at medium effort
+- When local research, external research, or bounded coding clearly benefits
+  from delegation
+- Then it invokes GPT-5.6 Luna Explore, GPT-5.6 Terra Scout, or GPT-5.6 Terra
+  Builder respectively
+- And it does not invoke an Amazon Bedrock agent
+
+**Scenario: Use optimized Bedrock agents**
+- Given the `opus-bedrock` primary runs Claude Opus through Amazon Bedrock
+- When local research, external research, or bounded coding clearly benefits
+  from delegation
+- Then it invokes the matching Claude Sonnet 5 agent at medium effort
+- And it does not invoke an OpenAI agent
+
+**Scenario: Preserve arbitrary-provider behavior**
+- Given the user selects a model outside the configured OpenAI and Bedrock
+  primary workflows
+- When the primary delegates work
+- Then generic subagents inherit the active model
+- And no provider-specific optimized agent is selected automatically
+
+**Scenario: Review delegated code with the flagship**
+- Given an optimized Builder changed explicitly owned files
+- When the child session returns
+- Then the flagship parent reviews the complete patch and integration impact
+- And the parent owns final affected-scope validation, staging, and commits
+
+**Scenario: Trust bounded research without duplicating it**
+- Given Explore or Scout returns source-backed findings without uncertainty or
+  contradiction
+- When the parent consumes the result
+- Then it does not repeat the full investigation
+- And it checks only claims that directly control a risky edit or conflict with
+  authoritative context
+
+**Scenario: Report same-provider fallback**
+- Given an optimized subagent fails to launch or its model is unavailable
+- When the parent recovers
+- Then it logs the failed agent and model and retries once with the same-provider
+  flagship
+- And it reports the retry outcome without crossing providers
+
+### Feature: OpenCode-Native Lifecycle State
+
+**Scenario: Track DBSCTR2 phases in todos**
+- Given DBSCTR2 starts non-trivial work
+- When lifecycle execution begins
+- Then it creates Domain, Behavior, Spec, Contract, Test, and Refactor todos
+- And exactly one phase is active until all required gates complete
+
+**Scenario: Hand Plan work to Build**
+- Given the active primary cannot write
+- When planning reaches an implementation-ready result
+- Then it returns a structured Build Handoff with decisions, interfaces, scope,
+  contracts, validation, risks, and unresolved questions
+- And Build verifies source and artifact freshness before persisting changes
 
 ### Feature: Ponytail Minimalism
 
