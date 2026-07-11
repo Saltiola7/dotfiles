@@ -4,10 +4,13 @@
 
 - Added selectable `Plan-GPT-Pro-Max` for exceptional architectural and
   high-risk planning while keeping routine Plan on standard medium.
-- Registered a `pro-max` Sol variant combining `reasoning.mode: pro` with
-  `reasoningEffort: max` because OpenCode's built-in variants stop at `xhigh`.
+- Registered a `max` variant on OpenCode's Sol-Pro alias because its built-in
+  variants stop at `xhigh`; the alias supplies Pro mode and the variant supplies
+  max effort.
 - Verified the resolved variant and a live `Plan-GPT-Pro-Max` request through
   the OpenAI OAuth route.
+- Corrected the agent to reference the Sol-Pro alias directly so the TUI exposes
+  the execution mode unambiguously without changing request behavior.
 
 ## 2026-07-11 Follow-Up: Optional Sol Pro Primaries
 

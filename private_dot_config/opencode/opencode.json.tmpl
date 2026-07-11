@@ -10,10 +10,15 @@
       "models": {
         "gpt-5.6-sol": {
           "variants": {
-            "medium": { "reasoningEffort": "medium" },
-            "pro-max": {
-              "reasoning": { "mode": "pro" },
-              "reasoningEffort": "max"
+            "medium": { "reasoningEffort": "medium" }
+          }
+        },
+        "gpt-5.6-sol-pro": {
+          "variants": {
+            "max": {
+              "reasoningEffort": "max",
+              "reasoningSummary": "auto",
+              "include": ["reasoning.encrypted_content"]
             }
           }
         },

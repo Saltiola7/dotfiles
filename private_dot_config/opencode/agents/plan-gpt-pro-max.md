@@ -2,8 +2,8 @@
 name: Plan-GPT-Pro-Max
 description: Maximum-effort read-only architectural planning with GPT-5.6 Sol Pro.
 mode: primary
-model: openai/gpt-5.6-sol
-variant: pro-max
+model: openai/gpt-5.6-sol-pro
+variant: max
 permission:
   edit: deny
   bash: deny
