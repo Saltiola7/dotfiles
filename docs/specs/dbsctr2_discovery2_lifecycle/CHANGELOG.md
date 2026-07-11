@@ -1,5 +1,14 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-11 Follow-Up: Maximum-Effort Sol Pro Planning
+
+- Added selectable `Plan-GPT-Pro-Max` for exceptional architectural and
+  high-risk planning while keeping routine Plan on standard medium.
+- Registered a `pro-max` Sol variant combining `reasoning.mode: pro` with
+  `reasoningEffort: max` because OpenCode's built-in variants stop at `xhigh`.
+- Verified the resolved variant and a live `Plan-GPT-Pro-Max` request through
+  the OpenAI OAuth route.
+
 ## 2026-07-11 Follow-Up: Optional Sol Pro Primaries
 
 - Added selectable `Plan-GPT-Pro` and `Build-GPT-Pro` agents using GPT-5.6 Sol

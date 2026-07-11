@@ -69,7 +69,7 @@ other artifacts current when implementation changes.
 | Ponytail Principle | Hard rule to avoid work, reuse existing artifacts/code, and make the minimum correct change. |
 | Provider Family | OpenAI, Amazon Bedrock, or the provider of an arbitrarily selected model. Delegation must remain inside it. |
 | Provider-Local Agent | Specialized subagent whose configured model belongs to the Build agent's provider family. |
-| Plan | Startup primary using GPT-5.6 Sol medium with native read-only planning behavior; `Plan-GPT-Pro` is an optional quality-first planner. |
+| Plan | Startup primary using GPT-5.6 Sol medium with native read-only planning behavior; `Plan-GPT-Pro` and `Plan-GPT-Pro-Max` are optional quality-first planners. |
 | Build Agent | `Build-GPT`, `Build-GPT-Pro`, or `Build-Claude`, selected explicitly for implementation. |
 | Optimized Subagent | Lower-cost Explore, Scout, or Builder selected for a bounded task instead of the flagship. |
 | Flagship Review | Parent review of delegated code before integration, final validation, staging, or commit. |
@@ -182,12 +182,12 @@ phase order, artifact freshness, safety, and commit ownership.
 - **Invariant:** Subagents never commit.
 
 ### Provider-Affine Routing Contract
-- **Pre:** The active primary is `Plan`, `Plan-GPT-Pro`, `Build-GPT`,
-  `Build-GPT-Pro`, `Build-Claude`, or a generic primary with
+- **Pre:** The active primary is `Plan`, `Plan-GPT-Pro`, `Plan-GPT-Pro-Max`,
+  `Build-GPT`, `Build-GPT-Pro`, `Build-Claude`, or a generic primary with
   an arbitrarily selected model.
-- **Post:** OpenAI Pro primaries use GPT-5.6 Sol Pro at medium effort and may
-  delegate only to OpenAI-specialized agents; `Build-GPT` follows the same
-  provider boundary;
+- **Post:** OpenAI Pro primaries use GPT-5.6 Sol Pro at their configured effort
+  and may delegate only to OpenAI-specialized agents; `Build-GPT` follows the
+  same provider boundary;
   `Build-Claude` may delegate only to Amazon Bedrock-specialized agents.
 - **Post:** Generic Explore, Scout, and General agents inherit the active model
   for other providers.
@@ -411,6 +411,12 @@ phase order, artifact freshness, safety, and commit ownership.
 - When the user selects `Plan-GPT-Pro` or `Build-GPT-Pro`
 - Then GPT-5.6 Sol runs in Pro mode at medium effort
 - And the normal Plan and `Build-GPT` agents remain the defaults for routine work
+
+**Scenario: Select maximum-effort architectural planning**
+- Given an exceptionally difficult or high-risk design decision
+- When the user selects `Plan-GPT-Pro-Max`
+- Then GPT-5.6 Sol runs in Pro mode at max reasoning effort with read-only access
+- And routine planning remains on native Plan at medium effort
 
 **Scenario: Use optimized OpenAI agents**
 - Given the `Build-GPT` primary runs GPT-5.6 Sol at medium effort
