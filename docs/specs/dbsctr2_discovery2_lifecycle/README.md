@@ -7,7 +7,7 @@ Discovery skills. The system creates strict, prompt-guide-native workflows that
 remain callable beside the existing v1 skills forever.
 
 The v2 lifecycle optimizes for GPT-5.6 Sol and Claude Opus on Amazon Bedrock,
-with provider-local GPT-5.6 Luna, GPT-5.6 Terra, and Claude Sonnet 5 subagents.
+with provider-local GPT-5.6 Terra and Claude Sonnet 5 subagents.
 It uses OpenCode-native agents, permissions, child sessions, todos, and recovery
 while preserving the original `dbsctr` and `discovery` skills for explicit v1
 use.
@@ -196,7 +196,7 @@ phase order, artifact freshness, safety, and commit ownership.
 
 ### Optimized Agent Contract
 - **Pre:** Delegation has a clear scope, independent value, and expected output.
-- **Post:** OpenAI Explore uses GPT-5.6 Luna at low effort; OpenAI Scout and
+- **Post:** OpenAI Explore uses GPT-5.6 Terra at low effort; OpenAI Scout and
   Builder use GPT-5.6 Terra at medium effort.
 - **Post:** Bedrock Explore, Scout, and Builder use Claude Sonnet 5 at medium
   effort; Bedrock Opus remains the parent orchestrator.
@@ -232,7 +232,7 @@ phase order, artifact freshness, safety, and commit ownership.
 ### OpenCode Config Contract
 - **Pre:** `opencode.json.tmpl` preserves `$schema` and existing config.
 - **Post:** Ponytail is listed in the global `plugin` array.
-- **Post:** Sol, Luna, Terra, Bedrock Opus, and Bedrock Sonnet expose explicit
+- **Post:** Sol, Terra, Bedrock Opus, and Bedrock Sonnet expose explicit
   configured variants used by their agents.
 - **Invariant:** Slash command bodies are thin wrappers and skill files remain
   workflow source of truth.
@@ -406,8 +406,8 @@ phase order, artifact freshness, safety, and commit ownership.
 - Given the `Build-GPT` primary runs GPT-5.6 Sol at medium effort
 - When local research, external research, or bounded coding clearly benefits
   from delegation
-- Then it invokes GPT-5.6 Luna Explore, GPT-5.6 Terra Scout, or GPT-5.6 Terra
-  Builder respectively
+- Then it invokes GPT-5.6 Terra Explore, Scout, or Builder at the configured
+  effort
 - And it does not invoke an Amazon Bedrock agent
 
 **Scenario: Use optimized Bedrock agents**

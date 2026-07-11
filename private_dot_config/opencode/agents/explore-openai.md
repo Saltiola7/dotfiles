@@ -1,7 +1,7 @@
 ---
 description: Fast read-only codebase exploration for an OpenAI primary.
 mode: subagent
-model: openai/gpt-5.6-luna
+model: openai/gpt-5.6-terra
 variant: low
 permission:
   edit: deny

@@ -1,5 +1,14 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-10 Fix: Replace Unavailable Luna
+
+- Replaced GPT-5.6 Luna with Terra low for OpenAI Explore after ChatGPT Pro OAuth
+  returned `Model not found gpt-5.6-luna` while Terra worked.
+- Changed `small_model` to Terra to stop the same permanent retry loop during
+  title generation and removed the unused Luna model override.
+- Verified a live `Build-GPT` to Terra `explore-openai` task completed and
+  returned the expected source value.
+
 ## 2026-07-10 Follow-Up: Plan And Build Agents
 
 - Made native `Plan` on GPT-5.6 Sol medium the startup agent.
