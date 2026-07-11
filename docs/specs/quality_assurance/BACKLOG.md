@@ -1,6 +1,9 @@
 # Backlog: Quality Assurance Skill
 
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-11
+
+QA-1 through QA-10 are historical records of the initial V2 integration. Active
+runtime paths and behavior are defined by QA-11 and the DBSCTR V3 specification.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -14,6 +17,7 @@
 | QA-8 | Write project toolchain handoff | high | done | QA-2 | `seo-data-science/docs/specs/toolchain/**` | project configs, ADR-032, JFrog spec | yes | Defer project setup with evidence and decisions intact | M | Handoff completeness review |
 | QA-9 | Deploy and validate | high | done | QA-3, QA-4, QA-5, QA-6, QA-7 | deployed OpenCode and agent paths | all changed files | no | Prove configuration and workflow loading | M | Targeted apply and smoke checks |
 | QA-10 | Finalize artifacts | medium | done | QA-8, QA-9 | QA backlog and changelog | validation evidence | no | Remove stale status and record outcome | S | Final diff review |
+| QA-11 | Add V3 capability coverage | high | done | QA-10 | QA skill and specification | DBSCTR V3 Engineering Profile contract | no | Expose missing required evidence without breaking configured-tool calls | M | V3 lifecycle contract tests and live `/qa` smoke passed |
 
 ## Parallel Execution Guide
 

@@ -42,7 +42,7 @@ surfaces.
 
 ### Provider-neutral commands
 
-Given any selected primary, when `/dbsctr2`, `/discovery2`, or `/qa` runs, then
+Given any selected primary, when `/dbsctr`, `/discovery`, or `/qa` runs, then
 the command uses that primary and does not force OpenAI.
 
 ### Plan and Build permissions
@@ -85,7 +85,8 @@ hook behavior remains available without a duplicate project plugin.
 - Native Build stays disabled and native Plan remains the startup default.
 - Commands contain no fixed `agent` field.
 - Skill names visible to OpenCode are unique.
-- V1 skills remain byte-for-byte unchanged.
+- Unversioned lifecycle commands load DBSCTR V3; V1 is removed and V2 source is
+  archived outside deployed skill paths.
 - Runtime cleanup is irreversible and was explicitly approved.
 
 ## Validation Strategy

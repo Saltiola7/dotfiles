@@ -2,16 +2,16 @@
 
 ## Workflow
 
-Use `dbsctr2` for changes to behavior, domain rules, schemas, APIs, views,
+Use `dbsctr` for changes to behavior, domain rules, schemas, APIs, views,
 services, pipelines, orchestration, validation, contracts, or downstream-visible
 output. Skip it for trivial, formatting-only, git-only, dependency-only, and
 non-behavioral configuration work, or when the user requests a lighter workflow.
 
 If intent is unclear or no matching `docs/specs/` context exists, run
-`discovery2` to at least 95% confidence before DBSCTR2. Keep affected specs,
+`discovery` to at least 95% confidence before DBSCTR. Keep affected specs,
 contracts, tests, backlogs, and changelogs current in the same cycle.
 
-Use `qa` for DBSCTR2 touched-scope gates. Run repository-wide QA only when the
+Use `qa` for DBSCTR touched-scope gates. Run repository-wide QA only when the
 user explicitly requests it; Dependabot alerts are QA inputs.
 
 ## Execution
@@ -54,8 +54,8 @@ Treat a graph as a routing hint, not a mandatory dependency. Check its recorded
 commit and whether the query matches the task; fall back immediately when stale,
 weak, or irrelevant. Source remains authoritative.
 
-## Compatibility
+## Lifecycle Version
 
-Keep `/dbsctr` and `/discovery` unchanged and callable forever. They load the V1
-skills; do not rename, delete, deprecate, or modify them without explicit user
-instruction.
+`/discovery` and `/dbsctr` load the unversioned DBSCTR V3 skills. V1 is removed.
+V2 is retained only as source history under `docs/archive/` and is not deployed.
+`/qa` remains available for explicit audits and DBSCTR capability gates.

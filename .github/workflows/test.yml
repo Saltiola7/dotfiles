@@ -10,6 +10,11 @@ on:
       - "dot_local/bin/**"
       - "tests/**"
       - "pyproject.toml"
+      - "dot_agents/skills/**"
+      - "private_dot_config/opencode/**"
+      - "docs/specs/dbsctr_v3_lifecycle/**"
+      - ".chezmoiignore"
+      - ".chezmoiremove"
   pull_request:
     paths:
       - ".github/workflows/test.yml"
@@ -17,13 +22,18 @@ on:
       - "dot_local/bin/**"
       - "tests/**"
       - "pyproject.toml"
+      - "dot_agents/skills/**"
+      - "private_dot_config/opencode/**"
+      - "docs/specs/dbsctr_v3_lifecycle/**"
+      - ".chezmoiignore"
+      - ".chezmoiremove"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.12", "3.13"]
+        python-version: ["3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6

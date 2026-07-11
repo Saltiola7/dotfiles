@@ -1,5 +1,9 @@
 .agents/skills/dependabot
 .config/opencode/commands/dependabot.md
+.agents/skills/discovery2
+.agents/skills/dbsctr2
+.config/opencode/commands/discovery2.md
+.config/opencode/commands/dbsctr2.md
 .local/bin/claude-personal
 .local/bin/opencode-personal
 Library/LaunchAgents/ai.headroom.proxy.bedrock.plist

@@ -8,7 +8,7 @@
 
 Graph-aware skill routing lets agent skills consult an existing Graphify knowledge graph before broad source search. The graph provides relationship and impact context; source files remain the authority for exact code, configuration, and behavior.
 
-Problem: DBSCTR and Discovery start from manual source search even when `graphify-out/graph.json` exists. That wastes context and can miss dependency relationships that Graphify already extracted.
+Problem: DBSCTR V3 and Discovery start from manual source search even when `graphify-out/graph.json` exists. That wastes context and can miss dependency relationships that Graphify already extracted.
 
 ## File Map
 

@@ -1,143 +1,123 @@
 ---
 name: discovery
-description: >
-  Deep requirements interview for new features and initiatives. Produces a spec (README.md)
-  and backlog (BACKLOG.md) through structured questioning until 95% confidence is reached.
-  Use when starting a new project, feature, or initiative. Auto-suggested when DBSCTR is
-  required but no spec exists for the bounded context.
+description: Discover and persist a DBSCTR-ready bounded context, Engineering Profile, behaviors, contracts, backlog, risks, and validation strategy at 95% confidence.
 trigger: /discovery
 ---
 
-# Discovery — Requirements Interview
+# Discovery — DBSCTR V3
 
-Discovery is Phase 0 of the development pipeline. It produces the inputs that DBSCTR consumes.
-Never skip Discovery for new features or initiatives. For bug fixes and small changes to
-existing features, Discovery is optional — the existing spec provides sufficient context.
+## Outcome
 
-## Graph Context Gate
+Reach at least 95% confidence in user intent, then create or update
+`docs/specs/{bounded_context}/README.md`, `BACKLOG.md`, and `CHANGELOG.md` so
+DBSCTR can proceed without repeating discovery.
 
-Before broad source search or writing Discovery artifacts, check whether `graphify-out/graph.json`
-exists in the repository. If it exists:
+Skip the interview when existing artifacts answer all material questions. Do not
+use for tiny unrelated changes. If the user accepts lower confidence, label the
+result a draft rather than DBSCTR-ready.
 
-- Run `graphify query "<feature, domain, or user request>" --budget 2000` to identify likely bounded
-  contexts, adjacent domains, existing specs, source files, and relationships.
-- Use graph context to target Grep, Glob, and Read. Do not treat graph output as source truth.
-- Verify useful graph findings with source files before including them in the interview summary,
-  README.md, BACKLOG.md, or CHANGELOG.md.
-- If graph output is empty, weak, stale, conflicting, or Graphify fails, silently fall back to Grep,
-  Glob, and Read.
-- Do not ask the user to build a graph for v1 unless the task is specifically about Graphify.
-- Do not modify Graphify package internals or add OpenCode plugin hooks for v1.
+## Retrieve
 
-## When to Run Discovery
+1. Read project instructions and matching specs, ADRs, manifests, lockfiles, CI,
+   task runners, configured validation, and relevant source.
+2. If `graphify-out/graph.json` exists, check its recorded commit, run one
+   targeted query, and verify useful claims against source. Fall back immediately
+   when the graph is stale, weak, or irrelevant.
+3. Record configured quality commands, authorities, baselines, suppressions,
+   unavailable checks, and capability gaps. Do not install or prescribe tools.
+4. Update an existing bounded context instead of creating a duplicate.
 
-**Required:**
-- New project or initiative
-- New feature that doesn't have an existing spec in docs/specs/
-- Major rework of an existing feature (scope change, not bug fix)
+Search again only for a missing owner, interface, flow, term, artifact,
+authority, or downstream contract.
 
-**Optional (but recommended):**
-- Feature that has a spec but the spec is outdated or incomplete
-- Cross-system changes affecting multiple specs
+## Engineering Profile
 
-**Not needed:**
-- Bug fixes where the spec already describes the expected behavior
-- Small additions to existing features (a new field, a UI tweak)
-- Refactoring that doesn't change behavior
+Persist stable defaults in the bounded-context README:
 
-## Interview Process
+- deliverable kind and accountable owner
+- languages, frameworks, and applicable modules
+- supported runtimes, platforms, and environments
+- public API, CLI, schema, configuration, and data compatibility commitments
+- trust boundaries and sensitive-data classification
+- release, deployment, operational, maintenance, and retirement obligations
+- project-selected quality and security authorities
 
-### Phase A: Problem Space (understand WHAT and WHY)
+For the current cycle, record only overrides:
 
-Ask these questions. Do not proceed until each is answered:
+- affected scope and downstreams
+- risk: `routine`, `elevated`, or `critical`
+- delivery intent: local, merge, release, or deploy
+- changed profile values and candidate Gate Statuses
 
-1. **Problem statement**: What problem are we solving? What's broken or missing?
-2. **Stakeholders**: Who benefits from this? Who uses it? Who maintains it?
-3. **Success criteria**: How do we know when this is done? What does "working" look like?
-4. **Scope boundaries**: What are we explicitly NOT doing? What's out of scope?
-5. **Constraints**: What technical, time, or resource constraints exist?
+Risk guidance:
 
-### Phase B: Solution Space (understand HOW at the architectural level)
+- `routine`: localized, reversible, and no material public, production,
+  sensitive-data, security-boundary, money, or safety impact
+- `elevated`: public compatibility, migration, external integration, production,
+  sensitive data, material reliability/performance, or security-boundary impact
+- `critical`: irreversible loss, broad outage, regulated exposure,
+  authentication/authorization failure, material financial impact, or safety harm
 
-6. **Bounded context**: What domain does this belong to? Adjacent domains?
-7. **Entities and relationships**: What are the key things being modeled?
-8. **User workflows**: Walk me through the user's experience step by step
-9. **Data flow**: Where does data come from? Where does it go? What transformations?
-10. **Integration points**: What existing systems does this touch?
+Risk may rise with evidence but never falls silently.
 
-### Phase C: Validation (challenge assumptions)
+## Interview
 
-11. **Edge cases**: What happens when things go wrong? Empty data? Concurrent users?
-12. **Ambiguity check**: Re-state the requirements back to the user. Ask: "Is this what you mean?"
-13. **Priority**: If we can only ship half of this, which half matters most?
-14. **Dependencies**: What must exist before this can work? What's blocked?
+For each round:
 
-### Phase D: Confidence Check
+1. State confidence and the largest uncertainty.
+2. Ask 3–5 questions whose answers can change scope, risk, behavior, interfaces,
+   delivery, or validation.
+3. Prefer concrete options when known; use open questions for motives,
+   tradeoffs, and risk tolerance.
+4. Update the working summary and challenge consequential vagueness.
+5. Stop at 95% when remaining uncertainty cannot change implementation choices.
 
-After each round of questions, assess confidence:
-- **< 70%**: Keep interviewing. There are gaps.
-- **70-90%**: Summarize understanding, ask targeted clarifying questions.
-- **> 90%**: Present the spec draft for review before writing files.
+Cover only what applies: problem and success; stakeholders and downstreams;
+goals and non-goals; bounded and adjacent contexts; domain terms and events;
+workflows and integrations; compatibility and migration; security/privacy;
+failure, recovery, rollback, observability, operations, maintenance, retirement;
+validation; delivery intent; and parallel ownership.
 
-## Interview Rules
+## Artifacts
 
-- Ask questions in batches of 3-5 (not all at once, not one at a time)
-- Use the Question tool for structured choices when the answer is categorical
-- Push back on vague answers: "What specifically do you mean by X?"
-- Challenge scope creep: "Is this needed for v1, or can it wait?"
-- If the user says "just do what makes sense" — identify the specific ambiguity and ask again
-- Never assume requirements — if unsure, ask
-- Interview until you have 95% confidence about what the user actually wants,
-  not what they think they should want
+`README.md` contains:
 
-## Output Artifacts
+- overview, problem, goals, and non-goals
+- Engineering Profile defaults and current-cycle overrides
+- ubiquitous language, entities, values, events, sources, and sinks
+- implementation-free Given/When/Then behavior
+- architecture/data flow and concrete interfaces
+- contracts, risks, Gate Ledger, and validation strategy
+- facts, assumptions, accepted risks, and unresolved decisions
 
-When confidence reaches 95%, produce these files:
+The Gate Ledger enumerates Development Kernel and completion gates. Each gate is
+`required`, `not_applicable` with reason, `deferred` with owner/follow-up, or
+`accepted_risk` with rationale, owner, and expiry/review condition.
 
-### 1. README.md (Spec)
+`BACKLOG.md` contains one table with `id`, `title`, `priority`, `status`,
+`depends_on`, `owns`, `reads`, `parallel_safe`, `reason`, `effort`, and
+`validation`. Ownership and dependencies prevent concurrent collisions.
 
-Create `docs/specs/{spec_name}/README.md` using the project's spec template (`_template_spec.md`).
-Must include at minimum:
-- Overview with problem statement and ubiquitous language glossary
-- Architecture section with at least a component diagram and data flow diagram
-- Behavior scenarios (Given/When/Then) for the core happy paths
-- Contracts & invariants for the key domain rules
+`CHANGELOG.md` starts with the current date and records decisions and evidence.
+Keep facts, assumptions, non-goals, and open risks distinct.
 
-### 2. BACKLOG.md
+## OpenCode Execution
 
-Create `docs/specs/{spec_name}/BACKLOG.md` using `_template_backlog.md` with:
-- Prioritized task table (all tasks visible in one table)
-- Dependency chain documented
-- Parallel execution guide (which tasks can be worked concurrently by sub-agents)
-- Effort estimates (S/M/L)
+Use todos for current interview/artifact state and specs/Git for durable state.
+Delegate only independent research. Log agent/model routes and trust sourced
+research unless uncertain, contradictory, or controlling a risky decision.
 
-### 3. CHANGELOG.md
+Plan is read-only. When writes are unavailable, return artifact-ready decisions
+and a Build Handoff without claiming files changed. Build verifies freshness
+before persisting them.
 
-Create `docs/specs/{spec_name}/CHANGELOG.md` with just the header:
+## Handoff
 
-```markdown
-# Changelog — {Spec Name}
-```
+Report bounded context, confidence, Engineering Profile, applicable modules and
+gates, remaining risks, next DBSCTR task, and parallel-safe ownership. End a
+read-only plan with a Build Handoff containing scope, constraints, affected
+artifacts, validation, risks, unresolved decisions, and recommended Build agent.
 
-### Naming Convention
-
-Spec directory names use snake_case matching the bounded context:
-- `article_explorer` (not `article-explorer`)
-- `content_audit_workflow` (not `content-audit-workflow`)
-- `kw_metrics_pipeline` (not `keyword-metrics-pipeline`)
-
-## Handoff to DBSCTR
-
-After Discovery produces the spec and backlog:
-1. The DBSCTR pipeline is invoked for each task in the backlog
-2. Phase 1 (Domain) may be partially complete — Discovery already defined entities and glossary
-3. Phase 2 (Behavior) may be partially complete — Discovery already wrote core scenarios
-4. The DBSCTR pipeline fills in any gaps and proceeds through Spec → Contract → Test → Refactor
-5. After each task completes, update BACKLOG.md (mark done) and CHANGELOG.md (add entry)
-
-## Post-Session Backlog Update
-
-At the end of each session (or when the user indicates work is done for now):
-1. Update BACKLOG.md task statuses
-2. Add completed work to CHANGELOG.md with date, description, test counts, and ADR references
-3. Update README.md if the spec needs revision based on what was learned during implementation
+Stop and ask when the bounded context is unknown, two interpretations change the
+solution, destructive/external action lacks approval, or ownership overlaps
+cannot be serialized.

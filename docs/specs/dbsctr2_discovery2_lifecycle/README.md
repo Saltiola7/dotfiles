@@ -1,5 +1,9 @@
 # DBSCTR2 and Discovery2 Lifecycle
 
+**Status:** Archived and superseded by `docs/specs/dbsctr_v3_lifecycle/` on
+2026-07-11. V2 source is retained under `docs/archive/opencode/skills/v2/` and is
+not deployed. The remainder of this document is historical.
+
 ## Overview
 
 The bounded context is the v2 lifecycle for OpenCode-native DBSCTR and

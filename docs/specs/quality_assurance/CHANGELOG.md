@@ -2,6 +2,15 @@
 
 All notable changes to this bounded context.
 
+## 2026-07-11 — DBSCTR V3 Capability Coverage
+
+- Added optional Engineering Profile and Capability Requirement inputs.
+- Added evidenced, missing, unavailable, failed, deferred, and accepted-risk
+  capability statuses.
+- Preserved configured-tool scoped/full behavior when no V3 profile is supplied.
+- Retargeted active interfaces and escalation language to unversioned DBSCTR V3.
+- Verified the V3 lifecycle contracts and a live `/qa` capability-status probe.
+
 ## 2026-07-10
 
 ### Added

@@ -1,6 +1,6 @@
 # analytics_agent_data
 
-**Status:** Draft
+**Status:** Implemented; module interfaces normalized by DBSCTR V3
 **Created:** 2026-06-10
 **Last updated:** 2026-06-10
 
@@ -37,9 +37,10 @@ work is recorded as a spec for traceability.
 
 | Path | Purpose |
 |------|---------|
-| `~/.agents/skills/dbsctr/modules/data.md` | Extended: canonical entity (P1), semantic-first + metadata-as-product + provenance + delivery contract (P4), evals/ablation (P5) |
-| `~/.agents/skills/dbsctr/modules/analytics_references.md` | NEW: pairwise skill pattern, reference-doc skeleton, adversarial reviewer |
-| `~/.agents/skills/dbsctr/SKILL.md` | Module routing split for analytics signal; "module loaded" verification row |
+| `~/.agents/skills/dbsctr/modules/data.md` | Provider-neutral data lifecycle outcomes and controls |
+| `~/.agents/skills/dbsctr/modules/analytics.md` | Governed analytics definitions, routing, provenance, review, and correction outcomes |
+| `~/.agents/skills/dbsctr/references/analytics.md` | Optional pairwise-skill, reference-doc, and query examples |
+| `~/.agents/skills/dbsctr/SKILL.md` | V3 module routing and lifecycle gates |
 
 ## Architecture
 
@@ -48,7 +49,7 @@ work is recorded as a spec for traceability.
 ```
                         ┌─────────────────────────────┐
   data/analytics eng    │  DBSCTR data module +        │
-  (AI authoring loop) ──│  analytics_references skel   │
+  (AI authoring loop) ──│  analytics module + refs    │
                         └─────────────────────────────┘
                                      │ governs
                                      ▼
@@ -197,11 +198,12 @@ live).
 rg -n "Canonical|Semantic Layer|metadata-as-product|provenance|Delivery|Offline eval|Ablation" \
   ~/.agents/skills/dbsctr/modules/data.md
 
-# New references skeleton module exists
-test -f ~/.agents/skills/dbsctr/modules/analytics_references.md && echo OK
+# Normalized analytics module and optional references exist
+test -f ~/.agents/skills/dbsctr/modules/analytics.md && \
+test -f ~/.agents/skills/dbsctr/references/analytics.md && echo OK
 
-# SKILL.md routes analytics signal and has module-loaded checklist row
-rg -n "analytics_references|module loaded" ~/.agents/skills/dbsctr/SKILL.md
+# SKILL.md routes analytics signals
+rg -n "modules/analytics.md" ~/.agents/skills/dbsctr/SKILL.md
 ```
 
 ## Gotchas

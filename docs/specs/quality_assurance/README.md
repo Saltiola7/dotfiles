@@ -8,19 +8,21 @@
 
 The `quality_assurance` bounded context defines one global `qa` skill for
 repository-aware quality and security checks. It replaces the standalone
-Dependabot workflow, provides a touched-scope DBSCTR2 gate, and supports an
-explicit full-repository cleanup mode.
+Dependabot workflow, provides a touched-scope DBSCTR gate, supports optional V3
+Engineering Profile capability coverage, and retains an explicit full-repository
+cleanup mode.
 
 The skill discovers the repository's existing toolchain instead of imposing a
 universal stack. It deduplicates findings across tools, ignores unrelated
 pre-existing noise during scoped work, applies deterministic safe fixes, and
 plans risky fixes before editing.
 
-Discovery2 confidence: **97%**.
+Initial Discovery2 confidence: **97%**. DBSCTR V3 capability extension approved
+at 97% confidence on 2026-07-11.
 
 ## Problem Statement
 
-Quality checks currently live across DBSCTR2, Dependabot, project CI, task
+Quality checks currently live across DBSCTR, Dependabot, project CI, task
 runners, and project-specific instructions. Coding agents can miss configured
 checks, run overlapping scanners, expand scope into unrelated debt, or treat a
 passing but broadly suppressed tool such as mypy as complete evidence.
@@ -29,7 +31,8 @@ passing but broadly suppressed tool such as mypy as complete evidence.
 
 - Add one global `qa` skill and thin `/qa` command.
 - Replace standalone Dependabot routing and skill ownership with QA.
-- Make QA a scoped DBSCTR2 gate for touched code and dependencies.
+- Make QA a scoped DBSCTR gate for touched code and dependencies.
+- Compare V3 Capability Requirements with available authorities and expose gaps.
 - Keep explicit QA audits capable of inventorying and reducing repo-wide debt.
 - Discover and use project-configured lint, typing, testing, coverage, security,
   dependency, dead-code, complexity, documentation, mutation, and packaging
@@ -44,7 +47,7 @@ passing but broadly suppressed tool such as mypy as complete evidence.
 - Do not configure the `seo-data-science` Python toolchain in this cycle.
 - Do not fix project-specific mypy debt in this cycle.
 - Do not retain `/dependabot` or a standalone `dependabot` skill.
-- Do not modify v1 `dbsctr` or `discovery`.
+- Do not deploy archived V2 lifecycle skills or reintroduce versioned commands.
 - Do not require every supported QA tool in every repository.
 - Do not auto-delete suspected dead code or auto-apply risky security,
   dependency, mutation, or complexity changes.
@@ -52,7 +55,7 @@ passing but broadly suppressed tool such as mypy as complete evidence.
 ## Architecture
 
 ```text
-User or DBSCTR2
+User or DBSCTR
   -> qa
     -> discover project instructions and configured tools
     -> select scoped gate or full audit
@@ -71,9 +74,10 @@ normalization, scoped gating, full audits, and safe-fix orchestration.
 
 Adjacent contexts:
 
-- `dbsctr2`: delegates touched-scope quality gates and receives results.
-- `discovery2`: records available validation tools and repository constraints.
-- `opencode_routing`: loads QA for explicit requests and DBSCTR2 gates.
+- `dbsctr`: delegates touched-scope quality gates and receives results.
+- `discovery`: records Engineering Profile requirements, available validation,
+  and repository constraints.
+- `opencode_routing`: loads QA for explicit requests and DBSCTR gates.
 - `project_toolchain`: repository-owned configuration remains authoritative.
 - `supply_chain_security`: JFrog Xray, pip-audit, and GitHub Dependabot alerts
   are alternative or complementary inputs selected by repository policy.
@@ -95,7 +99,9 @@ Adjacent contexts:
 - **Run Mode**: `scoped` or `full`.
 - **Affected Scope**: touched files, imports, manifests, packages, tests, specs,
   and downstream contracts.
-- **Fix Safety**: `safe`, `review_required`, or `escalate_dbsctr2`.
+- **Fix Safety**: `safe`, `review_required`, or `escalate_dbsctr`.
+- **Capability Status**: `evidenced`, `missing`, `unavailable`, `failed`,
+  `deferred`, or `accepted_risk`.
 - **Vulnerability Authority**: project-selected scanner such as JFrog Xray or
   pip-audit.
 - **Validation Evidence**: command, result, scope, and residual risk.
@@ -120,7 +126,8 @@ Adjacent contexts:
 | Full Audit | Explicit periodic repository-wide inventory and debt-reduction run. |
 | Unrelated Noise | Existing finding outside the Affected Scope; reported only in full mode. |
 | Safe Fix | Deterministic change such as formatter or unambiguous linter output with focused validation. |
-| Risky Fix | Dependency, dead-code, security, mutation, complexity, or broad typing change requiring a plan or DBSCTR2. |
+| Risky Fix | Dependency, dead-code, security, mutation, complexity, or broad typing change requiring a plan or DBSCTR. |
+| Capability Gap | Applicable Engineering Profile requirement with no authority or equivalent evidence. |
 | Concern Authority | Single preferred tool or service whose result gates a concern. |
 
 ## Behavior Scenarios
@@ -140,19 +147,19 @@ Adjacent contexts:
 - Then QA records the blocker and next-best validation
 - And it does not claim the concern passed
 
-### Feature: DBSCTR2 Scoped Gate
+### Feature: DBSCTR Scoped Gate
 
 **Scenario: Gate only affected scope**
-- Given DBSCTR2 supplies an Affected Scope
+- Given DBSCTR supplies an Affected Scope and optional Engineering Profile
 - When QA runs in scoped mode
 - Then it selects checks relevant to that scope
-- And unrelated pre-existing findings do not fail the DBSCTR2 cycle
+- And unrelated pre-existing findings do not fail the DBSCTR cycle
 
 **Scenario: Scoped finding requires behavior change**
 - Given a finding cannot be fixed without changing behavior, contracts, schemas,
   or downstream-visible output
 - When QA classifies the Fix Safety
-- Then it escalates the fix to DBSCTR2
+- Then it escalates the fix to DBSCTR
 - And it does not silently broaden the QA batch
 
 ### Feature: Full Quality Audit
@@ -174,7 +181,22 @@ Adjacent contexts:
   policy, mutation survivors, complexity redesign, or broad typing changes
 - When QA creates Fix Batches
 - Then it proposes the risky batch before editing
-- And behavior-changing work is handed to DBSCTR2
+- And behavior-changing work is handed to DBSCTR
+
+### Feature: Capability Coverage
+
+**Scenario: Expose missing required evidence**
+- Given the Engineering Profile marks a Capability Requirement applicable
+- And no configured authority or project-approved evidence covers it
+- When QA evaluates affected scope
+- Then QA records a Capability Gap rather than a pass
+- And lifecycle completion requires remediation, deferral, or accepted risk
+
+**Scenario: Preserve calls without an Engineering Profile**
+- Given QA is called without V3 Capability Requirements
+- When configured checks run
+- Then QA retains its configured-tool scoped or full behavior
+- And it does not invent additional project policy
 
 ### Feature: Vulnerability Authority
 
@@ -204,8 +226,8 @@ Adjacent contexts:
 |---|---|---|
 | `dot_agents/skills/qa/SKILL.md` | QA orchestration source of truth | All QA features |
 | `private_dot_config/opencode/commands/qa.md` | Thin `/qa` command | Full audit and explicit scoped runs |
-| `dot_agents/skills/dbsctr2/SKILL.md` | Delegates Affected Scope to QA | DBSCTR2 Scoped Gate |
-| `dot_agents/skills/discovery2/SKILL.md` | Captures Toolchain Profile inputs | Repository Toolchain Discovery |
+| `dot_agents/skills/dbsctr/SKILL.md` | Delegates scope and Capability Requirements | DBSCTR Scoped Gate |
+| `dot_agents/skills/discovery/SKILL.md` | Captures Engineering Profile and Toolchain Profile inputs | Repository Toolchain Discovery |
 | `private_dot_config/opencode/AGENTS.md` | Global skill routing and team standards | Toolchain discovery and scoped QA |
 | `MGM/git/seo-data-science/AGENTS.md` | Chezmoi source for project adaptations | Project-specific routing only |
 | `seo-data-science/docs/specs/toolchain/**` | Project implementation handoff | Tool evaluation and later rollout |
@@ -220,7 +242,9 @@ Adjacent contexts:
 - QA must classify fixes before editing.
 - Suspected dead code requires source verification before deletion.
 - Safe fixes require focused validation.
-- Behavior-changing fixes return to DBSCTR2.
+- Behavior-changing fixes return to DBSCTR.
+- Missing, unavailable, or failed required Capability Requirements prevent a
+  scoped pass unless validly deferred or accepted as risk.
 - Subagents never commit.
 - Slash commands remain thin; skill files are workflow source of truth.
 - Global and project `AGENTS.md` files must not duplicate the same standards.

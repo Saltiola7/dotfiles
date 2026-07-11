@@ -28,7 +28,7 @@ def test_provider_and_primary_contracts():
 
 
 def test_commands_inherit_current_agent():
-    for name in ("dbsctr2", "discovery2", "qa"):
+    for name in ("dbsctr", "discovery", "qa"):
         assert "\nagent:" not in (OC / f"commands/{name}.md").read_text()
 
 
