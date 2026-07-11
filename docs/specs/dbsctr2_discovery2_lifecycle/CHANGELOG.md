@@ -1,5 +1,23 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-10 Implementation: Provider-Affine OpenCode Agents
+
+- Added `gpt` on `openai/gpt-5.6-sol` and `opus-bedrock` on
+  `amazon-bedrock/global.anthropic.claude-opus-4-8` as selectable primary
+  agents, while preserving the existing `opus` primary.
+- Added OpenAI Luna/Terra and Bedrock Sonnet 5 Explore, Scout, and Builder
+  subagents with provider-local task permissions and Builder write boundaries.
+- Removed fixed Sonnet 4.6 overrides from generic agents and added a generic
+  inheriting Scout.
+- Added native Bedrock provider configuration for the existing `us-west-2`
+  profile and made `gpt` the startup default.
+- Added phase-ledger, child evidence, same-provider fallback, and Plan-to-Build
+  requirements to DBSCTR2 and global routing.
+- Verified exact models through OpenCode runtime listings and Models.dev, parsed
+  the rendered configuration, deployed through chezmoi, and completed a live
+  Bedrock Explore route. OpenAI Explore launched correctly twice but did not
+  return before timeout/abort; this remains a runtime follow-up.
+
 ## 2026-07-10 Discovery: Provider-Affine OpenCode Agents
 
 - Reached 96% confidence after reviewing OpenCode's agents, commands,

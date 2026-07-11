@@ -256,6 +256,18 @@ phase order, artifact freshness, safety, and commit ownership.
 - Deployed DBSCTR2 skill text contains the Domain Modules routing table and
   Phase 1 module loading action.
 
+2026-07-10 provider-affine checks:
+- `opencode models` and a temporary native Bedrock provider configuration
+  confirmed the OpenAI Sol/Luna/Terra and Bedrock Opus 4.8/Sonnet 5 identifiers.
+- `jq empty`, `git diff --check`, `chezmoi apply --dry-run --verbose`, targeted
+  `chezmoi apply`, and `opencode debug config` passed.
+- Rendered assertions confirmed startup defaults, provider-local task
+  permissions, Builder command denials, and generic model inheritance.
+- A live `opus-bedrock` to `explore-bedrock` route returned the expected source
+  value. `gpt` launched `explore-openai` twice, but the child did not return
+  before timeout/abort; configuration and permission checks still passed.
+- `chezmoi status` returned clean output after deployment.
+
 ## Behavior Scenarios
 
 ### Feature: OpenCode Routing
