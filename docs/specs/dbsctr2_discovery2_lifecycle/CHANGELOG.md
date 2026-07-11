@@ -10,6 +10,8 @@
 - Retargeted implementation commands and provider-affine routing to `Build-GPT`.
 - Deployed the renamed agents, removed stale deployed primary files, and verified
   the resolved primary set, variants, command targets, and clean chezmoi status.
+- Corrected Bedrock `medium` to Claude 4.8/5's native adaptive reasoning shape
+  after the TUI continued to show the legacy fixed-budget override as `Default`.
 
 ## 2026-07-10 Implementation: Provider-Affine OpenCode Agents
 

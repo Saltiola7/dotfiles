@@ -277,6 +277,8 @@ phase order, artifact freshness, safety, and commit ownership.
   disabled native `Build`, exact `Build-GPT` and `Build-Claude` names, removal of
   legacy primaries, case-sensitive command targets, and explicit provider
   variants for all configured OpenAI and Bedrock agents.
+- Bedrock `medium` uses adaptive reasoning with `maxReasoningEffort: medium` and
+  summarized display, matching OpenCode's runtime model metadata.
 
 ## Behavior Scenarios
 

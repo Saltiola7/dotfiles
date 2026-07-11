@@ -34,14 +34,22 @@
         "global.anthropic.claude-opus-4-8": {
           "variants": {
             "medium": {
-              "thinking": { "type": "enabled", "budgetTokens": 16000 }
+              "reasoningConfig": {
+                "type": "adaptive",
+                "maxReasoningEffort": "medium",
+                "display": "summarized"
+              }
             }
           }
         },
         "global.anthropic.claude-sonnet-5": {
           "variants": {
             "medium": {
-              "thinking": { "type": "enabled", "budgetTokens": 16000 }
+              "reasoningConfig": {
+                "type": "adaptive",
+                "maxReasoningEffort": "medium",
+                "display": "summarized"
+              }
             }
           }
         }
