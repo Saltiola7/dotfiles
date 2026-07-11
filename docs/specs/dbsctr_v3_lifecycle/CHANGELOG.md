@@ -61,3 +61,17 @@
   returned the required artifacts, phases/gates, and capability statuses.
 - `graphify update .` rebuilt the code graph with 1,366 nodes and 1,557 edges.
 - No release, remote deployment, push, stage, or commit was performed.
+
+## 2026-07-11 — Automatic Git Lifecycle Follow-Up
+
+- Approved coherent Gate Commits during DBSCTR cycles and one normal Final Push
+  after all required gates pass.
+- Required cycle-start branch/upstream/ahead-state capture, intended-file staging,
+  passing affected evidence, a clean worktree, and post-push verification.
+- Prohibited automatic force-push and unsafe pushes that include unrelated
+  pre-cycle commits, lack an upstream, change destination, or follow failed DVC
+  synchronization.
+- Added and passed a deterministic Git-lifecycle contract; the full configured
+  suite passed 186 tests.
+- Deployed the updated skill/routing and verified a live `/dbsctr` probe reports
+  Gate Commit, Final Push, and stop conditions from the loaded skill.

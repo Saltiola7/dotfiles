@@ -42,7 +42,8 @@ or exposed through public commands after V3 is available.
   risk with explicit evidence.
 - Let QA compare required capabilities with configured authorities without
   installing tools.
-- Use evidence checkpoints while leaving commit shape to repository policy.
+- Create coherent commits at sensible lifecycle gates and push once after the
+  completed cycle passes all required evidence.
 - Preserve source history for V2 without deploying it.
 
 ## Non-Goals
@@ -95,6 +96,9 @@ Adjacent contexts:
 | Accepted Risk | A failed or unavailable requirement accepted with rationale, owner, and expiry. |
 | OpenCode Adapter | Skills, commands, todos, agents, and permissions implementing the lifecycle in OpenCode. |
 | V2 Archive | Source-only historical V2 skills that are excluded from deployment. |
+| Gate Commit | Atomic commit containing one coherent gate increment; tiny adjacent gates may combine. |
+| Final Push | One normal push of completed cycle commits to the recorded upstream after all required gates pass. |
+| Push Readiness | Verified branch, upstream, clean worktree, passing evidence, and no unrelated pre-cycle commits included. |
 
 ## Domain Model
 
@@ -258,11 +262,26 @@ records, and retirement decisions. External writes remain approval-gated.
   validation, risks, unresolved decisions, and recommended Build agent
 - And Build verifies source freshness before writing
 
-**Scenario: Use evidence checkpoints without forced commits**
+**Scenario: Commit sensible gate increments**
 - Given a lifecycle phase or completion gate finishes
-- When its evidence is accepted
-- Then the Gate Ledger records the result
-- And commits are created only according to repository policy or user request
+- And its evidence passes
+- When its changes form a coherent reviewable increment
+- Then the primary stages only intended files and creates a Gate Commit
+- And tiny adjacent gates may share one commit instead of creating noise
+
+**Scenario: Push the completed cycle**
+- Given every required gate passes and all Gate Commits exist
+- And the current branch and upstream were recorded at cycle start
+- When the worktree is clean and the push contains no unrelated pre-cycle commits
+- Then the primary performs one normal Final Push without another confirmation
+- And verifies the branch is synchronized with its upstream
+
+**Scenario: Stop an unsafe automatic push**
+- Given Final Push would include unrelated pre-cycle commits, lacks an upstream,
+  requires force, or follows a failed DVC push
+- When DBSCTR evaluates Push Readiness
+- Then it stops before Git push
+- And reports the exact approval or remediation required
 
 ## Engineering Profile
 
@@ -458,7 +477,8 @@ tool and provider examples and load only when useful.
 - Tests or equivalent failing evidence precede implementation where a harness can
   express the behavior; exceptions are recorded rather than fabricated.
 - Refactor begins only after affected behavior passes.
-- Phase evidence checkpoints are mandatory; commits are not.
+- Evidence checkpoints and coherent Gate Commits are mandatory when a gate
+  changes files; gates with no changes create no commit.
 - Direct and delegated changes receive final orchestrator review and affected-
   scope validation.
 
@@ -552,6 +572,27 @@ tool and provider examples and load only when useful.
   deploy, publish, or write outside approved paths.
 - The primary reviews every Builder patch and owns integration and validation.
 - No plugin is introduced until measured workflow failures justify it.
+
+### Git Lifecycle Contract
+
+- At cycle start, record HEAD, branch, upstream, worktree status, and any commits
+  already ahead of upstream.
+- After a gate or small adjacent gate group passes, inspect status/diff/log, run
+  affected QA, stage only intended files, and create one coherent Gate Commit.
+- Never commit secrets, unrelated changes, generated drift, or a knowingly
+  failing required state.
+- The primary alone stages, commits, and pushes; subagents never do.
+- After all required gates pass, ensure the worktree is clean and perform one
+  normal Final Push to the recorded upstream without another confirmation. The
+  user's standing DBSCTR policy authorizes that normal push.
+- Stop before push when there is no upstream, HEAD is detached, pre-cycle ahead
+  commits would be included, force would be required, the destination changed,
+  required evidence failed, or repository policy requires another approval.
+- Never force-push automatically. If hooks reject a commit, fix the issue and
+  create a new commit rather than bypassing hooks or amending published work.
+- In a DVC repository, `dvc push` must succeed before Final Push.
+- After push, verify the local branch is synchronized with its upstream and
+  report commit IDs and push outcome.
 
 ## Validation Strategy
 

@@ -19,6 +19,7 @@ Discovery confidence: 97%.
 | V3-13 | Refresh active downstream specs | medium | done | V3-12 | QA, control-plane, routing, prompting, analytics specs | final interfaces | no | Prevent stale active contracts | M | Independent reference audit remediated |
 | V3-14 | Deploy and validate V3 | high | done | V3-12, V3-13 | deployed managed targets, validation evidence | all implementation | no | Prove runtime behavior | M | 185 tests, dry-run, apply, smoke probes, status passed |
 | V3-15 | Finalize lifecycle artifacts | medium | done | V3-14 | V3 backlog, changelog, README | validation evidence | no | Close with no stale artifacts | S | Final diff and affected-scope QA passed |
+| V3-16 | Automate sensible commits and final push | high | done | V3-15 | DBSCTR skill, routing, lifecycle contracts/tests | Git safety policy | no | Preserve coherent history and complete delivery without a second request | S | Intended failure, 186 tests, deployment, live smoke, Gate Commit, Final Push |
 
 Tasks V3-4 through V3-11 own non-overlapping files and may run concurrently once
 V3-3 fixes the shared contracts. The primary owns shared routing, migration,

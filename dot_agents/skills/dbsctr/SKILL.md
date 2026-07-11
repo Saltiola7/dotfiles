@@ -175,18 +175,42 @@ specs and Git are durable authority.
 
 ## Evidence And Git
 
-Evidence checkpoints are mandatory; phase commits are not. Inspect status/diff
-and run minimum affected checks at each checkpoint. Follow repository commit
-policy and commit only when requested or required by that policy. The primary
-alone stages/commits. Never push without explicit request.
+At cycle start, record HEAD, branch, upstream, worktree status, and pre-cycle
+ahead commits. This baseline defines which commits the cycle owns and whether an
+automatic Final Push can be safe.
 
-In DVC repositories, run `dvc status`; couple changed outputs with their metadata
-and run `dvc push` before an explicitly requested Git push.
+Evidence checkpoints and coherent Gate Commits are mandatory when a gate changes
+files. After one gate or a small adjacent gate group passes:
+
+1. Inspect status, diff, and recent log.
+2. Run affected-scope QA and required gate evidence.
+3. Stage only intended files; never stage secrets, unrelated drift, or known
+   failing required work.
+4. Create one atomic Gate Commit using the repository convention. Combine tiny
+   adjacent gates when separate commits would add noise; skip gates with no file
+   changes.
+5. Verify the commit and remaining worktree state before continuing.
+
+The primary alone stages, commits, and pushes. If hooks reject a commit, fix the
+issue and create a new commit; never bypass hooks or rewrite published history.
+
+After all required gates pass, perform one Final Push to the recorded upstream
+without another confirmation when the worktree is clean and only cycle-owned
+commits are ahead. The user's standing DBSCTR policy authorizes this normal push.
+Verify synchronization with the upstream and report pushed commit IDs.
+
+Stop before push when HEAD is detached, no upstream exists, the destination
+changed, pre-cycle ahead commits would be included, required evidence failed,
+force would be needed, or repository policy requires another approval.
+Never force-push automatically.
+
+In DVC repositories, run `dvc status`, couple changed outputs with their metadata,
+and require `dvc push` to succeed before Final Push.
 
 ## Final Response
 
 Lead with outcome. Include applicable modules and gates, validation evidence,
 changed files, residual risks, blockers, accepted risks, deployment/restart
-requirements, and commits if any. Stop for unresolved context, failed required
+requirements, Gate Commits, and Final Push outcome. Stop for unresolved context, failed required
 evidence, unsafe ownership overlap, or destructive, irreversible, external,
 costly, or materially expanded action requiring approval.

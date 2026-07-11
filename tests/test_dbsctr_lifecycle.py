@@ -141,3 +141,22 @@ def test_ci_and_specs_cover_lifecycle_sources():
     spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
     for term in ("Engineering Profile", "Gate Ledger", "MethodWeave", "RigorWeave"):
         assert term in spec
+
+
+def test_dbsctr_commits_gate_increments_and_pushes_completed_cycles():
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    for term in (
+        "Gate Commit",
+        "Final Push",
+        "At cycle start",
+        "pre-cycle ahead commits",
+        "without another confirmation",
+        "Never force-push automatically",
+        "dvc push",
+        "worktree is clean",
+    ):
+        assert term in dbsctr
+
+    agents = text("private_dot_config/opencode/AGENTS.md")
+    assert "coherent Gate Commits" in agents
+    assert "one Final Push" in agents

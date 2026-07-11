@@ -14,6 +14,12 @@ contracts, tests, backlogs, and changelogs current in the same cycle.
 Use `qa` for DBSCTR touched-scope gates. Run repository-wide QA only when the
 user explicitly requests it; Dependabot alerts are QA inputs.
 
+DBSCTR cycles create coherent Gate Commits after passing gate increments.
+They perform one Final Push after every required gate passes. This standing
+policy authorizes only a normal push to the cycle-start upstream. Stop and ask when the push lacks an
+upstream, includes pre-cycle commits, changes destination, requires force, or
+fails required Git/DVC evidence.
+
 ## Execution
 
 For requests to explain, review, diagnose, or plan, inspect relevant materials
@@ -22,7 +28,8 @@ change, build, or fix, make in-scope local changes and run non-destructive
 validation without asking first.
 
 Require confirmation before external writes, destructive or irreversible
-actions, purchases, or material scope expansion.
+actions, purchases, or material scope expansion. The DBSCTR Final Push above is
+already confirmed by standing policy; other external writes still require it.
 
 Use `ponytail` full for coding and choose the lowest sufficient implementation
 rung. Never remove necessary validation, security, data-loss handling,
