@@ -33,3 +33,5 @@
 - V1 skill diffs were empty and source diff checks passed.
 - Chezmoi dry-run showed only intended targets; apply completed with clean status
   and byte-matching deployed prompts and rendered config.
+- Dependabot retrieval was unavailable because alerts are disabled for this
+  repository; no dependencies changed in the affected scope.
