@@ -25,6 +25,7 @@ Discovery2 confidence: 96%.
 | 19 | Restore Plan and explicit Build roles | high | done | 18 | primary agents, commands, routing, lifecycle docs | deployed agent behavior | no | Preserve the familiar Plan-to-Build workflow | S | Resolved primaries are Plan, Build-GPT, and Build-Claude |
 | 20 | Register runtime model variants | high | done | 19 | OpenAI and Bedrock model overrides | model registry and variant docs | no | Prevent configured agents from displaying inert Default variants | S | Resolved provider variants and agent selections passed assertions |
 | 21 | Replace unavailable Luna routes | high | done | 20 | OpenAI agents, small model, lifecycle docs | runtime model errors and Terra smoke test | no | Stop permanent model-not-found retries | S | No active Luna references; Terra resolves for small and Explore routes |
+| 22 | Add optional Sol Pro primaries | high | done | 21 | OpenAI primary agents and lifecycle docs | OpenAI Pro guidance and OpenCode model registry | no | Improve difficult planning and implementation without taxing routine work | S | Resolved agents use the Sol Pro alias at medium effort; live probe passed |
 
 Tasks 12 and 13 may run concurrently because they own separate agent families.
 The orchestrator alone owns shared config integration, task permissions,

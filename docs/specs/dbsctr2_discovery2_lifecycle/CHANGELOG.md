@@ -1,5 +1,13 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-11 Follow-Up: Optional Sol Pro Primaries
+
+- Added selectable `Plan-GPT-Pro` and `Build-GPT-Pro` agents using GPT-5.6 Sol
+  Pro at medium effort for difficult or high-risk work.
+- Kept native Plan and standard `Build-GPT` unchanged as routine defaults.
+- Preserved read-only planning and provider-affine OpenAI delegation boundaries.
+- Verified a live `Plan-GPT-Pro` request completed through the Sol Pro alias.
+
 ## 2026-07-10 Fix: Replace Unavailable Luna
 
 - Replaced GPT-5.6 Luna with Terra low for OpenAI Explore after ChatGPT Pro OAuth
