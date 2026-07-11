@@ -40,7 +40,6 @@ other artifacts current when implementation changes.
 
 ## Non-Goals
 
-- Do not modify `~/.claude/CLAUDE.md`.
 - Do not delete, rename, or deprecate v1 skills.
 - Do not create provider-specific copies of DBSCTR2 or Discovery2.
 - Do not add a routing plugin, permanent model benchmark framework, phase-specific
@@ -124,7 +123,6 @@ phase order, artifact freshness, safety, and commit ownership.
 - **Pre:** V1 skills remain installed and unchanged.
 - **Post:** DBSCTR-required work routes to `dbsctr2` by default.
 - **Post:** Explicit `/dbsctr` and `/discovery` still load v1.
-- **Invariant:** `~/.claude/CLAUDE.md` is not modified by this v2 rollout.
 
 ### Discovery2 Confidence Contract
 - **Pre:** Discovery2 has a bounded context or asks until it can name one.

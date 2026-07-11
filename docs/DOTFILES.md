@@ -60,7 +60,6 @@ Secrets are cached for the lifetime of the shell session via `_SECRETS_LOADED` g
 - `$GOOGLE_GENERATIVE_AI_API_KEY`
 - `$OPENAI_API_KEY`
 - `$AWS_PROFILE` / `$AWS_REGION`
-- `$CLAUDE_CODE_USE_BEDROCK=1`
 
 The ClickHouse alias (`ch`) fetches its host inline via `op read` at invocation time — no `secret` call needed.
 

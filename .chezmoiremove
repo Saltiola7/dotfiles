@@ -1,2 +1,6 @@
 .agents/skills/dependabot
 .config/opencode/commands/dependabot.md
+.local/bin/claude-personal
+.local/bin/opencode-personal
+Library/LaunchAgents/ai.headroom.proxy.bedrock.plist
+Library/LaunchAgents/ai.headroom.proxy.lmstudio.plist

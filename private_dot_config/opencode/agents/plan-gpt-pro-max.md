@@ -6,7 +6,7 @@ model: openai/gpt-5.6-sol-pro
 variant: max
 permission:
   edit: deny
-  bash: deny
+  bash: ask
   task:
     "*": deny
     explore-openai: allow

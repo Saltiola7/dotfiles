@@ -1,10 +1,9 @@
 #!/bin/bash
 # Installs agent skills from upstream GitHub repos.
-# Re-runs when the lockfile changes (new skill added or source updated).
-#
-# skill-lock hash: {{ include "dot_agents/dot_skill-lock.json" | sha256sum }}
+# The selected skills below are the declarative manifest. The skills CLI owns
+# ~/.agents/.skill-lock.json; chezmoi must not manage that mutable runtime file.
 
-set -e
+set -euo pipefail
 
 if ! command -v npx &>/dev/null; then
     echo "[chezmoi] npx not found. Cannot install skills." >&2
@@ -13,8 +12,13 @@ fi
 
 echo "[chezmoi] Installing agent skills from upstream..."
 
-npx -y skills add vercel-labs/skills --skill find-skills -g --all
-npx -y skills add JuliusBrussee/caveman -g --all
-npx -y skills add marimo-team/marimo-pair -g --all
+npx -y skills add vercel-labs/skills --skill find-skills -g --agent opencode -y
+npx -y skills add JuliusBrussee/caveman \
+    --skill caveman \
+    --skill caveman-commit \
+    --skill caveman-help \
+    --skill caveman-review \
+    -g --agent opencode -y
+npx -y skills add marimo-team/marimo-pair --skill marimo-pair -g --agent opencode -y
 
 echo "[chezmoi] Agent skills installed."

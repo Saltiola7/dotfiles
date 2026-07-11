@@ -1,2 +1,0 @@
-@rynfar/meridian
-opencode-with-claude

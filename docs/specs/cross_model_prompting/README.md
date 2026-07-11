@@ -83,8 +83,8 @@ then chezmoi applies them and deployed targets match source.
 - Prefer positive outcome instructions; retain prohibitions only for safety or a
   demonstrated failure mode.
 - Prompt text controls outcomes and boundaries; model variants control effort.
-- `gpt` uses `openai/gpt-5.6` at `medium`; `opus` uses
-  `opencode/claude-opus-4-8` at `xhigh`.
+- `Build-GPT` uses `openai/gpt-5.6-sol` at `medium`; `Build-Claude` uses
+  `amazon-bedrock/global.anthropic.claude-opus-4-8` at adaptive `medium`.
 - Shared workflow skills must not contain provider-specific branching.
 - Existing user changes in `opencode.json.tmpl` are preserved and deployed.
 

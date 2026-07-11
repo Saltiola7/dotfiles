@@ -80,9 +80,8 @@
   evidence, permission, snapshot, and session-diff requirements.
 - Deferred Review, phase-specific agents, routing plugins, and a permanent model
   evaluation framework. Validation will use a small temporary scenario suite.
-- Kept the existing `opus` primary during migration and ignored the unused
-  Headroom provider; exact native Bedrock model identifiers remain a pre-build
-  validation item.
+- Kept the existing `opus` primary during migration; exact native Bedrock model
+  identifiers remained a pre-build validation item.
 
 ## 2026-07-10 Follow-Up: QA Gate
 

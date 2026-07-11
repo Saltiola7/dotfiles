@@ -44,11 +44,15 @@ safer. Give each write subagent explicit writable paths and off-limits scope.
 The orchestrator reviews and validates integrated work and alone stages or
 commits; subagents never commit.
 
-Use `explore-openai`, `scout-openai`, and `builder-openai` only from `Build-GPT`.
-Use `explore-bedrock`, `scout-bedrock`, and `builder-bedrock` only from
-`Build-Claude`. Log each optimized route. On failure, report it and retry once by
-continuing directly with the same-provider flagship. Never cross providers
+OpenAI Plan agents may use `explore-openai` and `scout-openai`; OpenAI Build
+agents may also use `builder-openai`. `Build-Claude` may use only the matching
+Bedrock agents. Log each optimized route. On failure, report it and retry once
+by continuing directly with the same-provider flagship. Never cross providers
 silently. For other selected models, use generic inheriting subagents.
+
+Treat a graph as a routing hint, not a mandatory dependency. Check its recorded
+commit and whether the query matches the task; fall back immediately when stale,
+weak, or irrelevant. Source remains authoritative.
 
 ## Compatibility
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Installs graphify skill for OpenCode after graphifyy package is available.
-# Re-runs when Brewfile changes (which declares uv "graphifyy" version).
+# Re-runs when Brewfile or this installer changes and refreshes the global
+# OpenCode skill to match the installed Graphify CLI.
 #
 # Brewfile hash: {{ include "Brewfile" | sha256sum }}
 
@@ -13,6 +14,6 @@ if ! command -v graphify &>/dev/null; then
 fi
 
 echo "[chezmoi] Installing graphify skill for OpenCode..."
-graphify install --platform opencode
+(cd "${TMPDIR:-/tmp}" && graphify install --platform opencode)
 
 echo "[chezmoi] Graphify skill installed."
