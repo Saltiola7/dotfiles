@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.3 implemented
+**Status:** V3.3 implemented; V3.4 in progress
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -745,6 +745,20 @@ Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
 Contention fails without waiting or mutating cycle state. Completion removes only
 the current worktree pointer and retains the completed common record.
+
+Method Revision `3.4` adds `dbsctrctl begin` as the normal write-cycle entry.
+It accepts the same context, risk, delivery intent, and plan as `start`, refreshes
+the configured upstream, rejects unknown ahead commits, creates
+`dbsctr/<context>/<cycle-id>` from that upstream beneath the DBSCTR state root,
+sets the delivery upstream, starts the cycle, and returns a JSON OpenCode handoff.
+Dirty source-worktree files are neither copied nor changed. `start` remains the
+low-level command for an already prepared clean worktree.
+
+`dbsctrctl cleanup --cycle-id ID` retains successful worktrees for 24 hours by
+default. Cleanup must run from another worktree and requires a completed record,
+a clean cycle worktree, and proof that every cycle commit is contained in the
+delivery target. `--now` waives only the retention delay. Failed, active, dirty,
+missing-target, or current worktrees are never removed.
 
 ### Git Lifecycle Contract
 

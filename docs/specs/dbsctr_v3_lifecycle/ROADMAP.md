@@ -39,7 +39,7 @@
 - Record worktree, branch, base, target, and integration ownership.
 - Add target-branch locks and stale-base detection.
 
-### V3.4 — Isolation Automation
+### V3.4 — Isolation Automation (in progress)
 
 - Add `dbsctrctl begin` to create cycle branch/worktree and start state.
 - Add deterministic handoff, reconciliation, retention, and cleanup commands.

@@ -6,6 +6,9 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
+| V3.4-1 | Specify automatic cycle isolation and cleanup | high | in_progress | V3.3-4 | lifecycle spec, roadmap | V3.3 registry | no | Remove dirty-main startup friction | M | Contract review |
+| V3.4-2 | Implement `begin` and safe cleanup | high | in_progress | V3.4-1 | helper and tests | Git worktree behavior | no | Automate cycle execution workspace | L | Temporary-Git tests |
+| V3.4-3 | Align skills, deploy, and verify V3.4 | high | pending | V3.4-2 | skills and lifecycle artifacts | all V3.4 work | no | Complete cycle coherently | M | Full QA and smoke |
 Future milestones V3.3–V3.6 are specified in `ROADMAP.md` and become active only
 after their preceding milestone completes.
 

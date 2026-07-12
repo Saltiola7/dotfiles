@@ -1,5 +1,12 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.4 Isolation Automation
+
+- Began automatic creation of upstream-based cycle branches and linked worktrees
+  so dirty integration worktrees no longer block independent DBSCTR work.
+- Kept unknown ahead commits blocked, retained low-level `start`, and limited
+  cleanup to clean completed DBSCTR-owned worktrees whose commits reached target.
+
 ## 2026-07-12 — V3.3 Worktree Registry
 
 - Began the approved always-isolated cycle architecture with common Git state,
