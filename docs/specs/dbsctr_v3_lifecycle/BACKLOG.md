@@ -6,10 +6,6 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.5-1 | Specify OpenCode/Herdr execution boundaries | high | in_progress | V3.4-3 | lifecycle spec, roadmap | native extension docs | no | Preserve one lifecycle authority | M | Contract review |
-| V3.5-2 | Add typed DBSCTR status/begin tools | high | in_progress | V3.5-1 | OpenCode tools/config/tests | `dbsctrctl` JSON | no | Expose safe native calls | M | Config and build smoke |
-| V3.5-3 | Manage Herdr preferences and refresh integration | medium | pending | V3.5-1 | Herdr config and generated integration deployment | Herdr docs/runtime | yes | Add safe execution UI | S | Integration status |
-| V3.5-4 | Deploy and verify fresh OpenCode/Herdr behavior | high | pending | V3.5-2, V3.5-3 | lifecycle artifacts | all V3.5 work | no | Complete cycle coherently | M | Full QA and fresh process |
 Future milestones V3.3–V3.6 are specified in `ROADMAP.md` and become active only
 after their preceding milestone completes.
 
@@ -23,6 +19,6 @@ after their preceding milestone completes.
 | V3.2-1–V3.2-5 | Add planned, ordered, monotonic cycle transitions | 2026-07-12 | `da65d0b`, `66df166`, `00c2950` |
 | V3.3-1–V3.3-4 | Isolate concurrent worktree cycle state and delivery | 2026-07-12 | `d444950`, `7d80d21` |
 | V3.4-1–V3.4-3 | Automate isolated cycle setup and safe cleanup | 2026-07-12 | `da4ddf8`, `2b4191a` |
+| V3.5-1–V3.5-4 | Add typed OpenCode and Herdr execution adapters | 2026-07-12 | `d9a7363`, `9916235` |
 
-V3.4 implementation is complete. V3.5 OpenCode/Herdr integration is next and
-must preserve DBSCTR as lifecycle authority.
+V3.5 implementation is complete. V3.6 lifecycle reconciliation audit is next.

@@ -10,6 +10,18 @@
 - Selected chezmoi management for stable Herdr preferences only, disabled pane
   history to avoid prompt/secret retention, and left generated integration and
   runtime state Herdr-owned.
+- Implemented typed `dbsctr_status` and explicit-launch `dbsctr_begin` tools over
+  a dependency-free argument-vector runtime; lifecycle state remains in
+  `dbsctrctl`.
+- Managed stable Herdr preferences, disabled pane history, refreshed the generated
+  OpenCode integration from v4 to v8, and reloaded running Herdr configuration.
+- Validation: 11 OpenCode control tests and 229 full tests passed; Bun build,
+  config resolution, chezmoi dry-run/apply, real typed-status invocation,
+  fresh-process skill smoke, and independent review passed.
+- Exceptions: none. Release: not applicable. Deployment: OpenCode tools/config,
+  Herdr preferences/integration, and DBSCTR skill applied locally. Final Push
+  target: `origin/main`.
+- Gate Commits: `d9a7363`, `9916235`.
 
 ## 2026-07-12 — V3.4 Isolation Automation
 
