@@ -106,3 +106,4 @@
   smoke, and reviewer delegation passed.
 - Exceptions: none. Deployment: local chezmoi targets applied. Final Push target:
   recorded `origin/main`; actual result is reported after push.
+- Gate Commit: `c9827e0`.
