@@ -6,6 +6,17 @@
   so dirty integration worktrees no longer block independent DBSCTR work.
 - Kept unknown ahead commits blocked, retained low-level `start`, and limited
   cleanup to clean completed DBSCTR-owned worktrees whose commits reached target.
+- Implemented `begin` with upstream refresh, configured remote/branch handling,
+  deterministic branch/worktree creation, rollback on failed start, and JSON
+  OpenCode handoff without touching dirty source files.
+- Implemented 24-hour default retention and cleanup checks for DBSCTR ownership,
+  completion, current/dirty/branch/HEAD state, recorded destination, refreshed
+  target containment, and safe branch deletion.
+- Validation: 33 helper tests and 226 full tests passed; compilation, diff check,
+  chezmoi dry-run/apply, fresh-process smoke, and independent review passed.
+- Exceptions: none. Release: not applicable. Deployment: helper and skill applied
+  locally. Final Push target: `origin/main`.
+- Gate Commits: `da4ddf8`, `2b4191a`.
 
 ## 2026-07-12 — V3.3 Worktree Registry
 
