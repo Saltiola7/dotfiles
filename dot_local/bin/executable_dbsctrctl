@@ -122,10 +122,19 @@ def is_v32(record):
     return record.get("schema_version") == 1
 
 
+def no_duplicate_keys(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            fail(f"duplicate JSON key in applicability plan: {key}")
+        value[key] = item
+    return value
+
+
 def read_plan(source):
     try:
         text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
-        value = json.loads(text)
+        value = json.loads(text, object_pairs_hook=no_duplicate_keys)
     except (OSError, json.JSONDecodeError) as error:
         fail(f"cannot read applicability plan: {error}")
     if not isinstance(value, dict):
@@ -140,7 +149,9 @@ def validate_plan(root, context, intent, plan):
     if status := git(root, "status", "--porcelain=v1", "--", expected_profile).stdout.strip():
         fail(f"Engineering Profile must be tracked and committed: {status}")
     blob = git(root, "rev-parse", f"HEAD:{expected_profile}", check=False).stdout.strip()
-    if not re.fullmatch(r"[0-9a-f]{40}", blob):
+    if not re.fullmatch(r"[0-9a-f]+", blob) or git(
+        root, "cat-file", "-e", f"{blob}^{{blob}}", check=False
+    ).returncode:
         fail("Engineering Profile is not committed at HEAD")
     gates = plan.get("gates")
     if not isinstance(gates, dict) or set(gates) != set(GATES):
@@ -180,6 +191,43 @@ def invalidate_later(record, gate_name):
             gate["result"] = "pending"
             gate.pop("evidence", None)
             gate.pop("exception", None)
+
+
+def require_current_profile(root, record):
+    if not is_v32(record):
+        return
+    profile = record["engineering_profile"]
+    current = git(root, "rev-parse", f"HEAD:{profile['path']}", check=False).stdout.strip()
+    if current != profile["blob"]:
+        fail("Engineering Profile changed; update the applicability plan")
+
+
+def apply_stricter_plan(root, record, plan):
+    profile_path, profile_blob, gates = validate_plan(
+        root, record["context"], record["delivery_intent"], plan
+    )
+    if profile_path != record["engineering_profile"]["path"]:
+        fail("Engineering Profile path changed; start a new cycle")
+    for name, new_gate in gates.items():
+        if (record["gates"][name]["applicability"] == "required"
+                and new_gate["applicability"] != "required"):
+            fail(f"applicability plan cannot loosen gate: {name}")
+    for name, new_gate in gates.items():
+        old_gate = record["gates"][name]
+        if old_gate["applicability"] == "not_applicable" and new_gate["applicability"] == "required":
+            old_gate.update({"applicability": "required", "result": "pending"})
+            old_gate.pop("reason", None)
+            old_gate.pop("exception", None)
+            invalidate_later(record, name)
+    if profile_blob != record["engineering_profile"]["blob"]:
+        record.setdefault("profile_history", []).append({
+            "blob": record["engineering_profile"]["blob"], "replaced_at": now(),
+        })
+        record["engineering_profile"]["blob"] = profile_blob
+    record["applicability_plan"] = {"profile": profile_path, "gates": {
+        name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
+        for name, gate in gates.items()
+    }}
 
 
 def artifact_check(record):
@@ -346,36 +394,22 @@ def command_raise_risk(args):
         fail("raise-risk requires a V3.2 Cycle Record")
     if RISK_RANK[args.to] <= RISK_RANK[record["risk"]]:
         fail("risk may only increase")
-    profile_path, profile_blob, gates = validate_plan(
-        root, record["context"], record["delivery_intent"], read_plan(args.plan)
-    )
-    if profile_path != record["engineering_profile"]["path"]:
-        fail("Engineering Profile path changed; start a new cycle")
-    for name, new_gate in gates.items():
-        old_gate = record["gates"][name]
-        if old_gate["applicability"] == "required" and new_gate["applicability"] != "required":
-            fail(f"applicability plan cannot loosen gate: {name}")
     previous = record["risk"]
-    for name, new_gate in gates.items():
-        old_gate = record["gates"][name]
-        if old_gate["applicability"] == "not_applicable" and new_gate["applicability"] == "required":
-            old_gate.update({"applicability": "required", "result": "pending"})
-            old_gate.pop("reason", None)
-            old_gate.pop("exception", None)
-            invalidate_later(record, name)
+    apply_stricter_plan(root, record, read_plan(args.plan))
     record["risk"] = args.to
-    if profile_blob != record["engineering_profile"]["blob"]:
-        record.setdefault("profile_history", []).append({
-            "blob": record["engineering_profile"]["blob"], "replaced_at": now(),
-        })
-        record["engineering_profile"]["blob"] = profile_blob
     record.setdefault("risk_history", []).append({
         "from": previous, "to": args.to, "reason": args.reason, "raised_at": now(),
     })
-    record["applicability_plan"] = {"profile": profile_path, "gates": {
-        name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
-        for name, gate in gates.items()
-    }}
+    save(path, record)
+
+
+def command_update_plan(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    if not is_v32(record):
+        fail("update-plan requires a V3.2 Cycle Record")
+    apply_stricter_plan(root, record, read_plan(args.plan))
     save(path, record)
 
 
@@ -430,6 +464,7 @@ def command_gate_commit(args):
     root = root_dir()
     path, record = load(root)
     require_active(record)
+    require_current_profile(root, record)
     for name in args.gates:
         gate = record["gates"][name]
         complete = gate["applicability"] == "not_applicable" or gate["result"] == "passed" or "exception" in gate
@@ -467,6 +502,7 @@ def command_final_push(args):
     root = root_dir()
     path, record = load(root)
     require_pushable(record)
+    require_current_profile(root, record)
     if any(gate["applicability"] == "required" and gate["result"] != "passed" and "exception" not in gate
            for gate in record["gates"].values()):
         fail("required gates have not all passed")
@@ -552,6 +588,9 @@ def parser():
     risk.add_argument("--reason", required=True)
     risk.add_argument("--plan", required=True, help="stricter applicability-plan JSON path or - for stdin")
     risk.set_defaults(func=command_raise_risk)
+    update_plan = commands.add_parser("update-plan")
+    update_plan.add_argument("--plan", required=True, help="equal or stricter applicability-plan JSON path or - for stdin")
+    update_plan.set_defaults(func=command_update_plan)
     exception = commands.add_parser("approve-exception")
     exception.add_argument("gate", choices=GATES)
     exception.add_argument("--kind", required=True, choices=("deferred", "accepted_risk"))

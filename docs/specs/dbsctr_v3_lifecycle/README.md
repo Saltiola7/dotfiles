@@ -696,7 +696,8 @@ Engineering Profile identity, applicability plan, Git baseline, current state,
 gates, Artifact Reviews, and created commits. Commands are `start`, `status`,
 `review-artifact`, `set-applicability`, `set-gate`, user-confirmed
 `approve-exception`, `raise-risk`, `check artifacts`, `gate-commit`, and
-`final-push`.
+`final-push`; `update-plan` rebinds a committed profile using an equal or stricter
+plan.
 `gate-commit --gates ...` binds each commit to completed gates.
 
 New cycles require `start --plan PATH`, where `-` reads JSON from stdin. The plan
@@ -711,6 +712,8 @@ only rise through `raise-risk --plan`; its plan may tighten
 `not_applicable` to `required` but cannot loosen applicability. Tightening or
 reopening an earlier gate invalidates later passed gates. Schema-less V3.1 records
 continue under legacy transitions and are never migrated implicitly.
+Gate Commit and Final Push verify that the current profile blob still matches the
+record; a committed profile change requires `update-plan` or `raise-risk` first.
 
 ### Git Lifecycle Contract
 

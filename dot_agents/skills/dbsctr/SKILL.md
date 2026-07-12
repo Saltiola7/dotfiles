@@ -128,8 +128,10 @@ For new schema-versioned cycles, a gate passes only after every predecessor is
 disposed. Record a failure or unavailable authority immediately even when an
 earlier gate is open. New evidence may tighten applicability from
 `not_applicable` to `required` and reopen dependent passed gates; applicability
-and risk never loosen silently. Use `dbsctrctl raise-risk --plan PATH` when risk
-rises. Schema-less V3.1 records continue under their legacy transition rules.
+and risk never loosen silently. Use `dbsctrctl update-plan --plan PATH` after a
+committed Engineering Profile change and `dbsctrctl raise-risk --plan PATH` when
+risk rises. Gate Commit and Final Push reject stale profile identity. Schema-less
+V3.1 records continue under their legacy transition rules.
 
 ## Artifact Lifecycle
 

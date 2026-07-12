@@ -91,7 +91,7 @@ class DbsctrctlTest(unittest.TestCase):
         self.assertEqual(record["method_revision"], "3.2")
         self.assertEqual(record["schema_version"], 1)
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
-        self.assertEqual(len(record["engineering_profile"]["blob"]), 40)
+        self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")
         self.assertEqual(record["state"], "active")
         self.assertIsNone(record["git"]["upstream"])
         self.assertEqual(record["gates"]["release"], {
@@ -128,6 +128,14 @@ class DbsctrctlTest(unittest.TestCase):
             input_text=json.dumps(plan),
         )
         self.assertIn("every gate", result.stderr)
+
+        duplicate = '{"profile":"docs/specs/test/README.md","profile":"docs/specs/test/README.md","gates":{}}'
+        result = run(
+            self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", "-", ok=False,
+            input_text=duplicate,
+        )
+        self.assertIn("duplicate JSON key", result.stderr)
 
     def test_start_rejects_dirty_or_wrong_profile_and_delivery_conflict(self):
         gates = {gate: {"applicability": "required"} for gate in GATES}
@@ -211,6 +219,54 @@ class DbsctrctlTest(unittest.TestCase):
         record_path.write_text(json.dumps(record))
         result = run(self.repo, "status", ok=False)
         self.assertIn("unsupported Cycle Record schema", result.stderr)
+
+    def test_profile_change_requires_plan_update_before_commit(self):
+        remote = Path(self.temp.name) / "remote.git"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        self.start()
+        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
+        profile = self.repo / "docs/specs/test/README.md"
+        profile.write_text("new profile\n")
+        run(
+            self.repo, "gate-commit", "--message", "profile", "--gates", "domain",
+            "--paths", "docs/specs/test/README.md",
+        )
+        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
+        plan = {"profile": "docs/specs/test/README.md", "gates": {
+            name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
+            for name, gate in record["gates"].items()
+        }}
+        (self.repo / "tracked.txt").write_text("change\n")
+        result = run(
+            self.repo, "gate-commit", "--message", "change", "--gates", "domain",
+            "--paths", "tracked.txt", ok=False,
+        )
+        self.assertIn("update the applicability plan", result.stderr)
+        run(self.repo, "update-plan", "--plan", "-", input_text=json.dumps(plan))
+        run(
+            self.repo, "gate-commit", "--message", "change", "--gates", "domain",
+            "--paths", "tracked.txt",
+        )
+        changelog = self.repo / "docs/specs/test/CHANGELOG.md"
+        changelog.write_text("completed\n")
+        run(
+            self.repo, "gate-commit", "--message", "changelog", "--gates", "domain",
+            "--paths", "docs/specs/test/CHANGELOG.md",
+        )
+        run(
+            self.repo, "review-artifact", "README", "--result", "changed", "--reason", "profile",
+            "--path", "docs/specs/test/README.md",
+        )
+        run(self.repo, "review-artifact", "BACKLOG", "--result", "unchanged", "--reason", "accurate")
+        run(
+            self.repo, "review-artifact", "CHANGELOG", "--result", "changed", "--reason", "recorded",
+            "--path", "docs/specs/test/CHANGELOG.md",
+        )
+        self.pass_gates()
+        run(self.repo, "final-push")
 
     def test_artifact_check_and_gate_transition_validation(self):
         self.start()
