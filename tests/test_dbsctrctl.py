@@ -1,11 +1,15 @@
 """Focused subprocess contracts for dbsctrctl."""
 
 import json
+import fcntl
+import importlib.machinery
+import importlib.util
 import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -69,6 +73,9 @@ class DbsctrctlTest(unittest.TestCase):
         return run(self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
                    "--risk", "routine", "--delivery-intent", intent, "--plan", str(plan))
 
+    def record_path(self, repo=None):
+        return (repo or self.repo) / ".git/dbsctr/cycles/cycle-1.json"
+
     def review_artifacts(self):
         for name, result, reason in (
             ("README", "unchanged", "no durable truth changed"),
@@ -87,9 +94,9 @@ class DbsctrctlTest(unittest.TestCase):
 
     def test_start_records_schema_and_release_default(self):
         self.start()
-        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
-        self.assertEqual(record["method_revision"], "3.2")
-        self.assertEqual(record["schema_version"], 1)
+        record = json.loads(self.record_path().read_text())
+        self.assertEqual(record["method_revision"], "3.3")
+        self.assertEqual(record["schema_version"], 2)
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
         self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")
         self.assertEqual(record["state"], "active")
@@ -98,6 +105,17 @@ class DbsctrctlTest(unittest.TestCase):
             "applicability": "not_applicable", "result": "not_run", "reason": "delivery intent is not release"
         })
         self.assertEqual(set(record["artifact_reviews"]), {"README", "BACKLOG", "CHANGELOG"})
+
+    def test_exclusive_record_failure_leaves_no_reserved_target(self):
+        loader = importlib.machinery.SourceFileLoader("dbsctrctl_test_module", str(SCRIPT))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        target = Path(self.temp.name) / "record.json"
+        with mock.patch.object(module.json, "dump", side_effect=OSError("interrupted")):
+            with self.assertRaises(OSError):
+                module.exclusive_json(target, {"cycle": "test"})
+        self.assertFalse(target.exists())
 
     def test_start_refuses_dirty_worktree(self):
         (self.repo / "tracked.txt").write_text("pre-cycle\n")
@@ -171,12 +189,12 @@ class DbsctrctlTest(unittest.TestCase):
         )
         run(self.repo, "set-gate", "spec", "--result", "passed", "--evidence", "spec")
         run(self.repo, "set-gate", "domain", "--result", "pending")
-        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
+        record = json.loads(self.record_path().read_text())
         self.assertEqual(record["gates"]["spec"]["result"], "pending")
 
     def test_risk_and_applicability_only_tighten(self):
         self.start()
-        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record_path = self.record_path()
         record = json.loads(record_path.read_text())
         gates = {
             gate: {"applicability": value["applicability"], **(
@@ -202,7 +220,7 @@ class DbsctrctlTest(unittest.TestCase):
 
     def test_schema_less_v31_record_uses_legacy_transitions(self):
         self.start()
-        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record_path = self.record_path()
         record = json.loads(record_path.read_text())
         record.pop("schema_version")
         record.pop("engineering_profile")
@@ -213,12 +231,98 @@ class DbsctrctlTest(unittest.TestCase):
 
     def test_unknown_cycle_schema_is_rejected(self):
         self.start()
-        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record_path = self.record_path()
         record = json.loads(record_path.read_text())
         record["schema_version"] = 99
         record_path.write_text(json.dumps(record))
         result = run(self.repo, "status", ok=False)
         self.assertIn("unsupported Cycle Record schema", result.stderr)
+
+    def test_linked_worktrees_have_isolated_active_cycles_and_global_ids(self):
+        second = Path(self.temp.name) / "second"
+        third = Path(self.temp.name) / "third"
+        subprocess.run(["git", "worktree", "add", "-b", "second", str(second), "HEAD"],
+                       cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(["git", "worktree", "add", "-b", "third", str(third), "HEAD"],
+                       cwd=self.repo, check=True, capture_output=True)
+        self.start()
+        plan = Path(self.temp.name) / "plan.json"
+        duplicate = run(
+            second, "start", "--cycle-id", "cycle-1", "--context", "test", "--risk", "routine",
+            "--delivery-intent", "local", "--plan", str(plan), ok=False,
+        )
+        self.assertIn("cycle record already exists", duplicate.stderr)
+        run(
+            second, "start", "--cycle-id", "cycle-2", "--context", "test", "--risk", "routine",
+            "--delivery-intent", "local", "--plan", str(plan),
+        )
+        first_status = json.loads(run(self.repo, "status", "--json").stdout)
+        second_status = json.loads(run(second, "status", "--json").stdout)
+        self.assertEqual(first_status["cycle_id"], "cycle-1")
+        self.assertEqual(second_status["cycle_id"], "cycle-2")
+        self.assertEqual(run(third, "status", "--json").stdout.strip(), "null")
+        self.assertNotEqual(first_status["worktree"]["id"], second_status["worktree"]["id"])
+        self.assertTrue((self.repo / ".git/dbsctr/cycles/cycle-2.json").exists())
+
+    def test_concurrent_linked_starts_reserve_cycle_id_atomically(self):
+        second = Path(self.temp.name) / "second"
+        subprocess.run(["git", "worktree", "add", "-b", "second", str(second), "HEAD"],
+                       cwd=self.repo, check=True, capture_output=True)
+        self.start()
+        first_record = self.record_path().read_text()
+        first_pointer = next((self.repo / ".git/dbsctr/worktrees").glob("*/active"))
+        first_pointer.unlink()
+        self.record_path().unlink()
+        plan = str(Path(self.temp.name) / "plan.json")
+        command = [sys.executable, str(SCRIPT), "start", "--cycle-id", "race", "--context", "test",
+                   "--risk", "routine", "--delivery-intent", "local", "--plan", plan]
+        processes = [
+            subprocess.Popen(command, cwd=repo, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            for repo in (self.repo, second)
+        ]
+        results = [process.communicate() + (process.returncode,) for process in processes]
+        self.assertEqual(sorted(result[2] for result in results), [0, 1])
+        self.assertIn("cycle record already exists", "".join(result[1] for result in results))
+        self.assertTrue((self.repo / ".git/dbsctr/cycles/race.json").exists())
+        self.assertEqual(sum(1 for path in (self.repo / ".git/dbsctr/worktrees").glob("*/active")
+                             if path.read_text().strip() == "race"), 1)
+        self.assertTrue(first_record)
+
+    def test_remote_aliases_share_delivery_lock(self):
+        remote = Path(self.temp.name) / "remote.git"
+        second = Path(self.temp.name) / "second"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "remote", "add", "mirror", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        subprocess.run(["git", "fetch", "mirror"], cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(["git", "worktree", "add", "-b", "second", str(second), "HEAD"],
+                       cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(["git", "branch", "--set-upstream-to=mirror/master", "second"],
+                       cwd=self.repo, check=True, capture_output=True)
+        self.start()
+        plan = str(Path(self.temp.name) / "plan.json")
+        run(second, "start", "--cycle-id", "cycle-2", "--context", "test", "--risk", "routine",
+            "--delivery-intent", "local", "--plan", plan)
+        first = json.loads(self.record_path().read_text())
+        second_record = json.loads((self.repo / ".git/dbsctr/cycles/cycle-2.json").read_text())
+        self.assertEqual(first["delivery"]["lock_id"], second_record["delivery"]["lock_id"])
+
+    def test_final_push_refuses_contended_target_lock(self):
+        remote = Path(self.temp.name) / "remote.git"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        self.start()
+        record = json.loads(self.record_path().read_text())
+        lock = self.repo / ".git/dbsctr/locks" / f"{record['delivery']['lock_id']}.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        with lock.open("a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            result = run(self.repo, "final-push", ok=False)
+        self.assertIn("locked by another DBSCTR cycle", result.stderr)
 
     def test_profile_change_requires_plan_update_before_commit(self):
         remote = Path(self.temp.name) / "remote.git"
@@ -234,7 +338,7 @@ class DbsctrctlTest(unittest.TestCase):
             self.repo, "gate-commit", "--message", "profile", "--gates", "domain",
             "--paths", "docs/specs/test/README.md",
         )
-        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
+        record = json.loads(self.record_path().read_text())
         plan = {"profile": "docs/specs/test/README.md", "gates": {
             name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
             for name, gate in record["gates"].items()
@@ -295,7 +399,7 @@ class DbsctrctlTest(unittest.TestCase):
             "--review-condition", "next cycle",
         )
         run(self.repo, "set-gate", "domain", "--result", "failed", "--evidence", "new failure")
-        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
+        record = json.loads(self.record_path().read_text())
         self.assertNotIn("exception", record["gates"]["domain"])
 
     def test_changed_artifact_review_rejects_wrong_context_path(self):
@@ -421,8 +525,15 @@ class DbsctrctlTest(unittest.TestCase):
             run(self.repo, *command)
         self.pass_gates()
         run(self.repo, "final-push")
-        self.assertFalse((self.repo / ".git/dbsctr/active").exists())
+        self.assertFalse(any((self.repo / ".git/dbsctr/worktrees").glob("*/active")))
+        self.assertEqual(json.loads(self.record_path().read_text())["state"], "completed")
         self.assertEqual(run(self.repo, "status", "--json").stdout.strip(), "null")
+        record = json.loads(self.record_path().read_text())
+        pointer = self.repo / ".git/dbsctr/worktrees" / record["worktree"]["id"] / "active"
+        pointer.parent.mkdir(parents=True, exist_ok=True)
+        pointer.write_text("cycle-1\n")
+        run(self.repo, "final-push")
+        self.assertFalse(pointer.exists())
 
     def test_final_push_targets_recorded_upstream_branch(self):
         remote = Path(self.temp.name) / "remote.git"

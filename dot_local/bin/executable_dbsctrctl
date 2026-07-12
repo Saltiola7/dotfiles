@@ -2,6 +2,9 @@
 """Deterministic local DBSCTR V3.1 cycle record helper."""
 
 import argparse
+import contextlib
+import fcntl
+import hashlib
 import json
 import os
 import re
@@ -49,7 +52,24 @@ def git_dir(root):
     return path if path.is_absolute() else root / path
 
 
+def common_git_dir(root):
+    path = Path(git(root, "rev-parse", "--git-common-dir").stdout.strip())
+    return path if path.is_absolute() else root / path
+
+
+def worktree_id(root):
+    return hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:16]
+
+
 def cycle_dir(root):
+    return common_git_dir(root) / "dbsctr"
+
+
+def active_path(root):
+    return cycle_dir(root) / "worktrees" / worktree_id(root) / "active"
+
+
+def legacy_cycle_dir(root):
     return git_dir(root) / "dbsctr"
 
 
@@ -60,6 +80,25 @@ def atomic_json(path, value):
         handle.write("\n")
         temp = handle.name
     os.replace(temp, path)
+
+
+def exclusive_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = None
+    try:
+        with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False, encoding="utf-8") as handle:
+            temp = Path(handle.name)
+            json.dump(value, handle, sort_keys=True, indent=2)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temp, path)
+        except FileExistsError:
+            fail(f"cycle record already exists: {path.stem}")
+    finally:
+        if temp:
+            temp.unlink(missing_ok=True)
 
 
 def status_paths(root):
@@ -91,15 +130,19 @@ def remote_destination(root, upstream_name):
 
 
 def load(root):
-    active = cycle_dir(root) / "active"
+    active = active_path(root)
+    records = cycle_dir(root) / "cycles"
+    if not active.exists():
+        active = legacy_cycle_dir(root) / "active"
+        records = legacy_cycle_dir(root)
     if not active.exists():
         fail("no active DBSCTR cycle")
     cycle_id = active.read_text(encoding="utf-8").strip()
-    path = cycle_dir(root) / f"{cycle_id}.json"
+    path = records / f"{cycle_id}.json"
     if not cycle_id or not path.is_file():
         fail("active DBSCTR record is missing")
     record = json.loads(path.read_text(encoding="utf-8"))
-    if "schema_version" in record and record["schema_version"] != 1:
+    if "schema_version" in record and record["schema_version"] not in (1, 2):
         fail(f"unsupported Cycle Record schema: {record['schema_version']}")
     return path, record
 
@@ -119,7 +162,27 @@ def require_pushable(record):
 
 
 def is_v32(record):
-    return record.get("schema_version") == 1
+    return record.get("schema_version") in (1, 2)
+
+
+@contextlib.contextmanager
+def target_lock(root, record):
+    target = record.get("delivery", {}).get("lock_id")
+    if not target:
+        target = delivery_lock_id(record["git"]["remote"].get("push_url"), record["git"]["upstream"])
+    path = cycle_dir(root) / "locks" / f"{target}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            fail("delivery target is locked by another DBSCTR cycle")
+        yield
+
+
+def delivery_lock_id(push_url, upstream_name):
+    remote_branch = upstream_name.partition("/")[2] if upstream_name else ""
+    return hashlib.sha256(f"{push_url or 'no-remote'}\0{remote_branch}".encode()).hexdigest()[:24]
 
 
 def no_duplicate_keys(pairs):
@@ -260,10 +323,10 @@ def command_start(args):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.context):
         fail("context must be a simple bounded-context name")
     directory = cycle_dir(root)
-    active = directory / "active"
-    if active.exists():
+    active = active_path(root)
+    if active.exists() or (legacy_cycle_dir(root) / "active").exists():
         fail("an active DBSCTR cycle already exists")
-    record_path = directory / f"{args.cycle_id}.json"
+    record_path = directory / "cycles" / f"{args.cycle_id}.json"
     if record_path.exists():
         fail(f"cycle record already exists: {args.cycle_id}")
     dirty_paths = status_paths(root)
@@ -275,7 +338,7 @@ def command_start(args):
     current_branch = branch(root)
     current_upstream = upstream(root)
     record = {
-        "method_revision": "3.2", "schema_version": 1, "created_at": now(), "cycle_id": args.cycle_id,
+        "method_revision": "3.3", "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
         "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
         "engineering_profile": {"path": profile_path, "blob": profile_blob},
         "applicability_plan": {"profile": profile_path, "gates": {
@@ -285,13 +348,21 @@ def command_start(args):
         "git": {"head": git(root, "rev-parse", "HEAD").stdout.strip(), "branch": current_branch,
                 "upstream": current_upstream, "dirty_paths": dirty_paths,
                 "pre_cycle_ahead_commits": ahead(root, current_upstream),
-                "remote": remote_destination(root, current_upstream)},
+                 "remote": remote_destination(root, current_upstream)},
+        "worktree": {"id": worktree_id(root), "path": str(root.resolve()),
+                     "git_dir": str(git_dir(root).resolve()), "branch": current_branch,
+                     "base_commit": git(root, "rev-parse", "HEAD").stdout.strip(),
+                     "created_by_dbsctr": False},
+        "delivery": {"upstream": current_upstream, "lock_id": delivery_lock_id(
+            remote_destination(root, current_upstream).get("push_url"), current_upstream
+        )},
         "state": "active", "commits": [], "gates": gates,
         "artifact_reviews": {name: {"result": "pending", "reason": None, "reviewed_at": None}
                              for name in ARTIFACTS},
     }
-    atomic_json(record_path, record)
+    exclusive_json(record_path, record)
     try:
+        active.parent.mkdir(parents=True, exist_ok=True)
         with open(active.with_suffix(".tmp"), "x", encoding="utf-8") as handle:
             handle.write(args.cycle_id + "\n")
         os.replace(active.with_suffix(".tmp"), active)
@@ -303,7 +374,9 @@ def command_start(args):
 
 def command_status(args):
     root = root_dir()
-    active = cycle_dir(root) / "active"
+    active = active_path(root)
+    if not active.exists():
+        active = legacy_cycle_dir(root) / "active"
     if not active.exists() and args.json:
         print("null")
         return
@@ -498,9 +571,14 @@ def command_check(args):
         artifact_check(record)
 
 
-def command_final_push(args):
-    root = root_dir()
-    path, record = load(root)
+def finish_push(root, path, record):
+    pointer = active_path(root)
+    if not pointer.exists():
+        pointer = legacy_cycle_dir(root) / "active"
+    if record["state"] == "completed":
+        pointer.unlink(missing_ok=True)
+        print("pushed " + " ".join(entry["id"] for entry in record["commits"]))
+        return
     require_pushable(record)
     require_current_profile(root, record)
     if any(gate["applicability"] == "required" and gate["result"] != "passed" and "exception" not in gate
@@ -550,8 +628,15 @@ def command_final_push(args):
     record["state"] = "completed"
     record["completed_at"] = now()
     save(path, record)
-    (cycle_dir(root) / "active").unlink()
+    pointer.unlink()
     print("pushed " + " ".join(recorded_commits))
+
+
+def command_final_push(args):
+    root = root_dir()
+    path, record = load(root)
+    with target_lock(root, record):
+        finish_push(root, path, record)
 
 
 def parser():

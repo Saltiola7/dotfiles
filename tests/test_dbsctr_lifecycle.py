@@ -171,7 +171,7 @@ def test_v31_separates_gate_dimensions_and_scales_artifacts():
     for term in ("Gate Applicability", "Gate Result", "Gate Exception", "Cycle Record", "Method Revision"):
         assert term in spec
         assert term in dbsctr
-    assert ".git/dbsctr/" in dbsctr
+    assert "Git common directory" in dbsctr
     assert "README" in dbsctr and "BACKLOG" in dbsctr and "CHANGELOG" in dbsctr
     assert "no unresolved question can materially change" in discovery
     assert "95%" not in discovery
@@ -204,10 +204,19 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.2`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.3`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
     assert "schema_version" in helper and "raise-risk" in helper
     for milestone in ("V3.2", "V3.3", "V3.4", "V3.5", "V3.6"):
         assert milestone in roadmap
+
+
+def test_v33_uses_common_worktree_registry_and_delivery_lock():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    helper = text("dot_local/bin/executable_dbsctrctl")
+    for term in ("<git-common-dir>/dbsctr/cycles/", "worktrees/<worktree-id>/active", "Delivery Target Lock"):
+        assert term in spec
+    assert "--git-common-dir" in helper
+    assert "LOCK_EX | fcntl.LOCK_NB" in helper

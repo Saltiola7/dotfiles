@@ -28,7 +28,7 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.2`. Use `dbsctrctl status` to resume an active Cycle
+5. Report Method Revision `3.3`. Use `dbsctrctl status` to resume the active Cycle
    Record. For a new cycle, create an explicit JSON applicability plan bound to
    the committed Engineering Profile, then use `dbsctrctl start --plan PATH` to
    capture it with the Git baseline. Create only actionable todos; adjacent
@@ -142,7 +142,10 @@ completed work to a concise Completed section. CHANGELOG gets one compact entry
 at completion with outcome, validation, exceptions, commits, deployment, and
 intended Final Push target. The Cycle Record and final response capture the
 actual push result. Record each review with `dbsctrctl review-artifact`; validate with
-`dbsctrctl check artifacts`. Cycle Record state stays under `.git/dbsctr/`.
+`dbsctrctl check artifacts`. New Cycle Record state uses the Git common directory;
+completed records remain there while each worktree has one active pointer.
+Multiple sessions may resume one cycle, but one primary owns integration.
+Delivery to the same upstream is serialized by the helper's target lock.
 
 ## Completion Gates
 
