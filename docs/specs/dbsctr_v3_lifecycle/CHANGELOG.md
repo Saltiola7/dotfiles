@@ -1,5 +1,14 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.6 Lifecycle Reconciliation Audit
+
+- Began report-only lifecycle audits at a fixed Git commit, excluding dirty
+  overlay from claims while keeping it visible to the operator.
+- Separated deterministic lifecycle artifact/graph inventory from semantic
+  source reconciliation and from `/qa` quality-tool execution.
+- Kept all remediation explicit: structural or semantic updates start scoped
+  DBSCTR cycles rather than mutating artifacts during audit.
+
 ## 2026-07-12 — V3.5 OpenCode And Herdr Integration
 
 - Began typed OpenCode status/begin wrappers over authoritative `dbsctrctl` JSON

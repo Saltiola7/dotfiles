@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.5 implemented
+**Status:** V3.5 implemented; V3.6 in progress
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -772,6 +772,21 @@ agent status as evidence, commits, pushes, or removes worktrees. Chezmoi manages
 stable `~/.config/herdr/config.toml` preferences with pane history disabled.
 Herdr owns its generated OpenCode integration, sockets, sessions, logs, plugin
 registry, and worktrees; those runtime files are not templated by chezmoi.
+
+Method Revision `3.6` adds a report-only Lifecycle Reconciliation Audit. The
+typed `dbsctr_audit` tool or `dbsctrctl audit --commit REF --json` resolves one Git commit,
+inventories bounded-context README/BACKLOG/CHANGELOG triplets, checks
+recorded Graphify freshness, and reports the current dirty overlay as excluded.
+It reads committed blobs, never the overlay, and performs no mutation.
+
+After deterministic inventory, DBSCTR may trace artifact claims to authoritative
+source and classify confirmed drift, stale evidence, missing artifacts, authority
+conflicts, historical-but-unlabelled content, and unverified claims. This audit
+does not duplicate `/qa`: QA executes configured quality authorities, while the
+lifecycle audit reconciles specifications, profiles, backlogs, changelogs,
+decisions, tests, and implementation claims. A request to update or reconcile
+findings starts explicit context-scoped DBSCTR cycles; audit alone never rewrites
+semantic truth, archives files, executes external systems, commits, or pushes.
 
 ### Git Lifecycle Contract
 
