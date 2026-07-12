@@ -626,6 +626,36 @@ class DbsctrctlTest(unittest.TestCase):
         self.pass_gates()
         run(self.repo, "final-push", ok=False)
 
+    def test_final_push_fetches_and_rejects_advanced_target_before_finalizing(self):
+        remote = Path(self.temp.name) / "remote.git"
+        other = Path(self.temp.name) / "other"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        self.start()
+        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
+        changelog = self.repo / "docs/specs/test/CHANGELOG.md"
+        changelog.write_text("completed\n")
+        run(self.repo, "gate-commit", "--message", "cycle", "--gates", "domain", "--paths",
+            "docs/specs/test/CHANGELOG.md")
+        run(self.repo, "review-artifact", "README", "--result", "unchanged", "--reason", "accurate")
+        run(self.repo, "review-artifact", "BACKLOG", "--result", "unchanged", "--reason", "accurate")
+        run(self.repo, "review-artifact", "CHANGELOG", "--result", "changed", "--reason", "recorded",
+            "--path", "docs/specs/test/CHANGELOG.md")
+        self.pass_gates()
+        subprocess.run(["git", "clone", str(remote), str(other)], check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "other@example.com"], cwd=other, check=True)
+        subprocess.run(["git", "config", "user.name", "Other"], cwd=other, check=True)
+        (other / "other.txt").write_text("advance\n")
+        subprocess.run(["git", "add", "other.txt"], cwd=other, check=True)
+        subprocess.run(["git", "commit", "-m", "advance"], cwd=other, check=True,
+                       capture_output=True)
+        subprocess.run(["git", "push"], cwd=other, check=True, capture_output=True)
+        result = run(self.repo, "final-push", ok=False)
+        self.assertIn("delivery target advanced", result.stderr)
+        self.assertEqual(json.loads(self.record_path().read_text())["state"], "active")
+
     def test_final_push_refuses_changed_remote_url(self):
         remote = Path(self.temp.name) / "remote.git"
         other = Path(self.temp.name) / "other.git"

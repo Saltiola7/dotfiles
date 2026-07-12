@@ -447,7 +447,8 @@ def command_begin(args):
     branch_name = f"dbsctr/{args.context}/{args.cycle_id}"
     if git(source, "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}", check=False).returncode == 0:
         fail(f"cycle branch already exists: {branch_name}")
-    repo_id = f"{source.name}-{hashlib.sha256(str(common_git_dir(source).resolve()).encode()).hexdigest()[:12]}"
+    common = common_git_dir(source).resolve()
+    repo_id = f"{common.parent.name}-{hashlib.sha256(str(common).encode()).hexdigest()[:12]}"
     parent = Path(args.worktree_root).expanduser() if args.worktree_root else Path.home() / ".local/state/dbsctr/worktrees" / repo_id
     worktree = parent / args.cycle_id
     if worktree.exists():
@@ -802,6 +803,18 @@ def finish_push(root, path, record):
         fail("upstream is missing or changed")
     if baseline["pre_cycle_ahead_commits"]:
         fail("pre-cycle ahead commits would be pushed")
+    delivery = record.get("delivery", {})
+    remote = delivery.get("remote")
+    remote_branch = delivery.get("branch")
+    if not remote or not remote_branch:
+        remote, remote_branch = remote_for_upstream(root, current_upstream)
+    if not remote or not remote_branch:
+        fail("upstream is not a remote branch")
+    if baseline.get("remote") != remote_destination(root, current_upstream):
+        fail("remote push destination changed")
+    git(root, "fetch", remote, remote_branch)
+    if record["state"] == "active" and git(root, "rev-parse", current_upstream).stdout.strip() != baseline["head"]:
+        fail("delivery target advanced since cycle start; reconcile and revalidate")
     current_ahead = ahead(root, current_upstream)
     recorded_commits = [entry["id"] for entry in record["commits"]]
     if current_ahead and (set(current_ahead) != set(recorded_commits) or len(current_ahead) != len(recorded_commits)):
@@ -812,15 +825,6 @@ def finish_push(root, path, record):
     changelog_path = record["artifact_reviews"]["CHANGELOG"]["path"]
     if changelog_path not in changed:
         fail("reviewed CHANGELOG path is not committed in this cycle")
-    delivery = record.get("delivery", {})
-    remote = delivery.get("remote")
-    remote_branch = delivery.get("branch")
-    if not remote or not remote_branch:
-        remote, remote_branch = remote_for_upstream(root, current_upstream)
-    if not remote or not remote_branch:
-        fail("upstream is not a remote branch")
-    if baseline.get("remote") != remote_destination(root, current_upstream):
-        fail("remote push destination changed")
     if (root / ".dvc").exists() or (root / "dvc.yaml").exists():
         dvc_status = subprocess.run(["dvc", "status"], cwd=root, text=True, capture_output=True)
         if dvc_status.returncode:
