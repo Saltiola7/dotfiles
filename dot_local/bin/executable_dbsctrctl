@@ -18,6 +18,8 @@ GATES = (
 )
 ARTIFACTS = ("README", "BACKLOG", "CHANGELOG")
 SECRET_NAMES = ("credentials", "credentials.json", "id_rsa", "private_key", "password")
+MANDATORY_GATES = set(GATES[:6]) | {"review_integrate"}
+RISK_RANK = {"routine": 0, "elevated": 1, "critical": 2}
 
 
 def fail(message):
@@ -96,7 +98,10 @@ def load(root):
     path = cycle_dir(root) / f"{cycle_id}.json"
     if not cycle_id or not path.is_file():
         fail("active DBSCTR record is missing")
-    return path, json.loads(path.read_text(encoding="utf-8"))
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if "schema_version" in record and record["schema_version"] != 1:
+        fail(f"unsupported Cycle Record schema: {record['schema_version']}")
+    return path, record
 
 
 def save(path, record):
@@ -111,6 +116,70 @@ def require_active(record):
 def require_pushable(record):
     if record["state"] not in ("active", "finalizing"):
         fail(f"cycle is {record['state']}, not pushable")
+
+
+def is_v32(record):
+    return record.get("schema_version") == 1
+
+
+def read_plan(source):
+    try:
+        text = sys.stdin.read() if source == "-" else Path(source).read_text(encoding="utf-8")
+        value = json.loads(text)
+    except (OSError, json.JSONDecodeError) as error:
+        fail(f"cannot read applicability plan: {error}")
+    if not isinstance(value, dict):
+        fail("applicability plan must be a JSON object")
+    return value
+
+
+def validate_plan(root, context, intent, plan):
+    expected_profile = f"docs/specs/{context}/README.md"
+    if plan.get("profile") != expected_profile:
+        fail(f"Engineering Profile must be {expected_profile}")
+    if status := git(root, "status", "--porcelain=v1", "--", expected_profile).stdout.strip():
+        fail(f"Engineering Profile must be tracked and committed: {status}")
+    blob = git(root, "rev-parse", f"HEAD:{expected_profile}", check=False).stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", blob):
+        fail("Engineering Profile is not committed at HEAD")
+    gates = plan.get("gates")
+    if not isinstance(gates, dict) or set(gates) != set(GATES):
+        fail("applicability plan must define every gate exactly once")
+    normalized = {}
+    for name in GATES:
+        item = gates[name]
+        if not isinstance(item, dict) or item.get("applicability") not in ("required", "not_applicable"):
+            fail(f"invalid applicability for gate: {name}")
+        applicability = item["applicability"]
+        if name in MANDATORY_GATES and applicability != "required":
+            fail(f"gate is always required: {name}")
+        normalized[name] = {"applicability": applicability}
+        if applicability == "not_applicable":
+            reason = item.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                fail(f"not_applicable gate needs a reason: {name}")
+            normalized[name].update({"result": "not_run", "reason": reason.strip()})
+        else:
+            normalized[name]["result"] = "pending"
+    if intent == "release" and normalized["release"]["applicability"] != "required":
+        fail("release delivery requires the release gate")
+    if intent == "deploy" and normalized["deploy"]["applicability"] != "required":
+        fail("deploy delivery requires the deploy gate")
+    return expected_profile, blob, normalized
+
+
+def disposed(gate):
+    return (gate["applicability"] == "not_applicable" or gate["result"] == "passed"
+            or gate["result"] in ("failed", "unavailable") and "exception" in gate)
+
+
+def invalidate_later(record, gate_name):
+    for name in GATES[GATES.index(gate_name) + 1:]:
+        gate = record["gates"][name]
+        if gate["applicability"] == "required" and gate["result"] == "passed":
+            gate["result"] = "pending"
+            gate.pop("evidence", None)
+            gate.pop("exception", None)
 
 
 def artifact_check(record):
@@ -152,15 +221,19 @@ def command_start(args):
     dirty_paths = status_paths(root)
     if dirty_paths:
         fail("cycle must start with a clean worktree: " + ", ".join(dirty_paths))
+    profile_path, profile_blob, gates = validate_plan(
+        root, args.context, args.delivery_intent, read_plan(args.plan)
+    )
     current_branch = branch(root)
     current_upstream = upstream(root)
-    gates = {gate: {"applicability": "required", "result": "pending"} for gate in GATES}
-    if args.delivery_intent != "release":
-        gates["release"] = {"applicability": "not_applicable", "result": "not_run",
-                            "reason": "delivery intent is not release"}
     record = {
-        "method_revision": "3.1", "created_at": now(), "cycle_id": args.cycle_id,
+        "method_revision": "3.2", "schema_version": 1, "created_at": now(), "cycle_id": args.cycle_id,
         "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
+        "engineering_profile": {"path": profile_path, "blob": profile_blob},
+        "applicability_plan": {"profile": profile_path, "gates": {
+            name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
+            for name, gate in gates.items()
+        }},
         "git": {"head": git(root, "rev-parse", "HEAD").stdout.strip(), "branch": current_branch,
                 "upstream": current_upstream, "dirty_paths": dirty_paths,
                 "pre_cycle_ahead_commits": ahead(root, current_upstream),
@@ -216,16 +289,25 @@ def command_set_gate(args):
     path, record = load(root)
     require_active(record)
     gate = record["gates"][args.gate]
+    if is_v32(record) and args.result == "passed":
+        incomplete = [name for name in GATES[:GATES.index(args.gate)] if not disposed(record["gates"][name])]
+        if incomplete:
+            fail("gate predecessors are incomplete: " + ", ".join(incomplete))
     if gate["applicability"] == "required" and args.result == "not_run":
         fail("required gates cannot use not_run")
     if gate["applicability"] == "not_applicable" and args.result != "not_run":
         fail("not_applicable gates can only use not_run")
     if gate["applicability"] == "required" and args.result in ("passed", "failed", "unavailable") and not args.evidence:
         fail(f"{args.result} required gate needs evidence")
+    was_disposed = disposed(gate)
     gate.pop("exception", None)
     gate["result"] = args.result
     if args.evidence is not None:
         gate["evidence"] = args.evidence
+    elif args.result == "pending":
+        gate.pop("evidence", None)
+    if is_v32(record) and was_disposed and not disposed(gate):
+        invalidate_later(record, args.gate)
     save(path, record)
 
 
@@ -234,6 +316,16 @@ def command_set_applicability(args):
     path, record = load(root)
     require_active(record)
     gate = record["gates"][args.gate]
+    if is_v32(record):
+        if args.value != "required" or gate["applicability"] != "not_applicable":
+            fail("V3.2 applicability may only tighten from not_applicable to required")
+        gate.update({"applicability": "required", "result": "pending"})
+        gate.pop("reason", None)
+        gate.pop("exception", None)
+        invalidate_later(record, args.gate)
+        record["applicability_plan"]["gates"][args.gate] = {"applicability": "required"}
+        save(path, record)
+        return
     gate["applicability"] = args.value
     if args.value == "not_applicable":
         if not args.reason:
@@ -243,6 +335,47 @@ def command_set_applicability(args):
         gate.update({"result": "pending"})
         gate.pop("reason", None)
     gate.pop("exception", None)
+    save(path, record)
+
+
+def command_raise_risk(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    if not is_v32(record):
+        fail("raise-risk requires a V3.2 Cycle Record")
+    if RISK_RANK[args.to] <= RISK_RANK[record["risk"]]:
+        fail("risk may only increase")
+    profile_path, profile_blob, gates = validate_plan(
+        root, record["context"], record["delivery_intent"], read_plan(args.plan)
+    )
+    if profile_path != record["engineering_profile"]["path"]:
+        fail("Engineering Profile path changed; start a new cycle")
+    for name, new_gate in gates.items():
+        old_gate = record["gates"][name]
+        if old_gate["applicability"] == "required" and new_gate["applicability"] != "required":
+            fail(f"applicability plan cannot loosen gate: {name}")
+    previous = record["risk"]
+    for name, new_gate in gates.items():
+        old_gate = record["gates"][name]
+        if old_gate["applicability"] == "not_applicable" and new_gate["applicability"] == "required":
+            old_gate.update({"applicability": "required", "result": "pending"})
+            old_gate.pop("reason", None)
+            old_gate.pop("exception", None)
+            invalidate_later(record, name)
+    record["risk"] = args.to
+    if profile_blob != record["engineering_profile"]["blob"]:
+        record.setdefault("profile_history", []).append({
+            "blob": record["engineering_profile"]["blob"], "replaced_at": now(),
+        })
+        record["engineering_profile"]["blob"] = profile_blob
+    record.setdefault("risk_history", []).append({
+        "from": previous, "to": args.to, "reason": args.reason, "raised_at": now(),
+    })
+    record["applicability_plan"] = {"profile": profile_path, "gates": {
+        name: {key: value for key, value in gate.items() if key in ("applicability", "reason")}
+        for name, gate in gates.items()
+    }}
     save(path, record)
 
 
@@ -393,6 +526,7 @@ def parser():
     start.add_argument("--context", required=True)
     start.add_argument("--risk", required=True, choices=("routine", "elevated", "critical"))
     start.add_argument("--delivery-intent", required=True, choices=("local", "merge", "release", "deploy"))
+    start.add_argument("--plan", required=True, help="applicability-plan JSON path or - for stdin")
     start.set_defaults(func=command_start)
     status = commands.add_parser("status")
     status.add_argument("--json", action="store_true")
@@ -413,6 +547,11 @@ def parser():
     applicability.add_argument("--value", required=True, choices=("required", "not_applicable"))
     applicability.add_argument("--reason")
     applicability.set_defaults(func=command_set_applicability)
+    risk = commands.add_parser("raise-risk")
+    risk.add_argument("--to", required=True, choices=tuple(RISK_RANK))
+    risk.add_argument("--reason", required=True)
+    risk.add_argument("--plan", required=True, help="stricter applicability-plan JSON path or - for stdin")
+    risk.set_defaults(func=command_raise_risk)
     exception = commands.add_parser("approve-exception")
     exception.add_argument("gate", choices=GATES)
     exception.add_argument("--kind", required=True, choices=("deferred", "accepted_risk"))

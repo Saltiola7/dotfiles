@@ -16,10 +16,10 @@ GATES = (
 )
 
 
-def run(repo, *args, ok=True, env=None):
+def run(repo, *args, ok=True, env=None, input_text=None):
     result = subprocess.run(
         [sys.executable, str(SCRIPT), *args], cwd=repo, text=True, capture_output=True,
-        env=env,
+        env=env, input=input_text,
     )
     if ok and result.returncode:
         raise AssertionError(f"{args}: {result.stderr}")
@@ -52,8 +52,22 @@ class DbsctrctlTest(unittest.TestCase):
         self.temp.cleanup()
 
     def start(self, intent="local"):
+        gates = {
+            gate: {"applicability": "required"}
+            for gate in GATES
+        }
+        if intent != "release":
+            gates["release"] = {
+                "applicability": "not_applicable",
+                "reason": "delivery intent is not release",
+            }
+        plan = Path(self.temp.name) / "plan.json"
+        plan.write_text(json.dumps({
+            "profile": "docs/specs/test/README.md",
+            "gates": gates,
+        }))
         return run(self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
-                   "--risk", "routine", "--delivery-intent", intent)
+                   "--risk", "routine", "--delivery-intent", intent, "--plan", str(plan))
 
     def review_artifacts(self):
         for name, result, reason in (
@@ -74,7 +88,10 @@ class DbsctrctlTest(unittest.TestCase):
     def test_start_records_schema_and_release_default(self):
         self.start()
         record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
-        self.assertEqual(record["method_revision"], "3.1")
+        self.assertEqual(record["method_revision"], "3.2")
+        self.assertEqual(record["schema_version"], 1)
+        self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
+        self.assertEqual(len(record["engineering_profile"]["blob"]), 40)
         self.assertEqual(record["state"], "active")
         self.assertIsNone(record["git"]["upstream"])
         self.assertEqual(record["gates"]["release"], {
@@ -86,16 +103,114 @@ class DbsctrctlTest(unittest.TestCase):
         (self.repo / "tracked.txt").write_text("pre-cycle\n")
         result = run(
             self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
-            "--risk", "routine", "--delivery-intent", "local", ok=False,
+            "--risk", "routine", "--delivery-intent", "local", "--plan", "missing.json", ok=False,
         )
         self.assertIn("clean worktree", result.stderr)
 
     def test_start_rejects_unknown_delivery_intent(self):
         result = run(
             self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
-            "--risk", "routine", "--delivery-intent", "relase", ok=False,
+            "--risk", "routine", "--delivery-intent", "relase", "--plan", "missing.json", ok=False,
         )
         self.assertIn("invalid choice", result.stderr)
+
+    def test_start_requires_complete_valid_plan(self):
+        result = run(
+            self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", ok=False,
+        )
+        self.assertIn("--plan", result.stderr)
+
+        plan = {"profile": "docs/specs/test/README.md", "gates": {}}
+        result = run(
+            self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", "-", ok=False,
+            input_text=json.dumps(plan),
+        )
+        self.assertIn("every gate", result.stderr)
+
+    def test_start_rejects_dirty_or_wrong_profile_and_delivery_conflict(self):
+        gates = {gate: {"applicability": "required"} for gate in GATES}
+        gates["release"] = {"applicability": "not_applicable", "reason": "not releasing"}
+        plan = {"profile": "docs/specs/test/README.md", "gates": gates}
+        result = run(
+            self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "release", "--plan", "-", ok=False,
+            input_text=json.dumps(plan),
+        )
+        self.assertIn("release delivery", result.stderr)
+
+        plan["profile"] = "tracked.txt"
+        result = run(
+            self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", "-", ok=False,
+            input_text=json.dumps(plan),
+        )
+        self.assertIn("Engineering Profile", result.stderr)
+
+    def test_gate_pass_requires_predecessors_but_failure_does_not(self):
+        self.start()
+        result = run(
+            self.repo, "set-gate", "behavior", "--result", "passed",
+            "--evidence", "too early", ok=False,
+        )
+        self.assertIn("predecessor", result.stderr)
+        run(self.repo, "set-gate", "behavior", "--result", "failed", "--evidence", "early failure")
+        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
+        run(
+            self.repo, "approve-exception", "behavior", "--kind", "deferred",
+            "--rationale", "approved", "--owner", "owner", "--review-condition", "next cycle",
+        )
+        run(self.repo, "set-gate", "spec", "--result", "passed", "--evidence", "spec")
+        run(self.repo, "set-gate", "domain", "--result", "pending")
+        record = json.loads((self.repo / ".git/dbsctr/cycle-1.json").read_text())
+        self.assertEqual(record["gates"]["spec"]["result"], "pending")
+
+    def test_risk_and_applicability_only_tighten(self):
+        self.start()
+        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record = json.loads(record_path.read_text())
+        gates = {
+            gate: {"applicability": value["applicability"], **(
+                {"reason": value["reason"]} if value["applicability"] == "not_applicable" else {}
+            )}
+            for gate, value in record["gates"].items()
+        }
+        gates["release"] = {"applicability": "required"}
+        plan = {"profile": "docs/specs/test/README.md", "gates": gates}
+        run(
+            self.repo, "raise-risk", "--to", "elevated", "--reason", "public contract",
+            "--plan", "-", input_text=json.dumps(plan),
+        )
+        result = run(
+            self.repo, "raise-risk", "--to", "routine", "--reason", "changed mind",
+            "--plan", "-", input_text=json.dumps(plan), ok=False,
+        )
+        self.assertIn("only increase", result.stderr)
+        record = json.loads(record_path.read_text())
+        self.assertEqual(record["risk"], "elevated")
+        self.assertEqual(record["gates"]["release"]["applicability"], "required")
+        self.assertEqual(record["risk_history"][0]["from"], "routine")
+
+    def test_schema_less_v31_record_uses_legacy_transitions(self):
+        self.start()
+        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record = json.loads(record_path.read_text())
+        record.pop("schema_version")
+        record.pop("engineering_profile")
+        record.pop("applicability_plan")
+        record["method_revision"] = "3.1"
+        record_path.write_text(json.dumps(record))
+        run(self.repo, "set-gate", "behavior", "--result", "passed", "--evidence", "legacy")
+
+    def test_unknown_cycle_schema_is_rejected(self):
+        self.start()
+        record_path = self.repo / ".git/dbsctr/cycle-1.json"
+        record = json.loads(record_path.read_text())
+        record["schema_version"] = 99
+        record_path.write_text(json.dumps(record))
+        result = run(self.repo, "status", ok=False)
+        self.assertIn("unsupported Cycle Record schema", result.stderr)
 
     def test_artifact_check_and_gate_transition_validation(self):
         self.start()
@@ -114,7 +229,7 @@ class DbsctrctlTest(unittest.TestCase):
         )
         run(
             self.repo, "set-applicability", "operate", "--value", "not_applicable",
-            "--reason", "no runtime",
+            "--reason", "no runtime", ok=False,
         )
         run(self.repo, "set-gate", "operate", "--result", "passed", "--evidence", "x", ok=False)
         run(self.repo, "set-gate", "domain", "--result", "failed", "--evidence", "failed check")

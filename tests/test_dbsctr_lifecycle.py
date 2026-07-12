@@ -195,3 +195,19 @@ def test_v31_helper_and_reviewer_surfaces_exist():
     assert reviewer.exists()
     assert "mode: subagent" in reviewer.read_text()
     assert "edit: deny" in reviewer.read_text()
+
+
+def test_v32_requires_planned_ordered_monotonic_cycles():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    discovery = text(SKILLS / "discovery/SKILL.md")
+    helper = text("dot_local/bin/executable_dbsctrctl")
+    roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
+
+    for term in ("Method Revision `3.2`", "applicability plan", "predecessor", "V3.1"):
+        assert term in dbsctr
+    assert "schema version `1`" in spec
+    assert "dbsctrctl start --plan PATH" in discovery
+    assert "schema_version" in helper and "raise-risk" in helper
+    for milestone in ("V3.2", "V3.3", "V3.4", "V3.5", "V3.6"):
+        assert milestone in roadmap

@@ -28,9 +28,11 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.1`. Use `dbsctrctl status` to resume an active Cycle
-   Record or `dbsctrctl start` to capture the Git baseline. Create only actionable
-   todos; adjacent kernel concerns may share one item when evidence is compact.
+5. Report Method Revision `3.2`. Use `dbsctrctl status` to resume an active Cycle
+   Record. For a new cycle, create an explicit JSON applicability plan bound to
+   the committed Engineering Profile, then use `dbsctrctl start --plan PATH` to
+   capture it with the Git baseline. Create only actionable todos; adjacent
+   kernel concerns may share one item when evidence is compact.
 
 ## Progressive Modules
 
@@ -122,6 +124,13 @@ Missing or failed required evidence blocks completion unless a Gate Exception is
 explicitly approved. The agent may propose but never approve an exception. An
 unavailable preferred tool creates a capability gap, not a pass.
 
+For new schema-versioned cycles, a gate passes only after every predecessor is
+disposed. Record a failure or unavailable authority immediately even when an
+earlier gate is open. New evidence may tighten applicability from
+`not_applicable` to `required` and reopen dependent passed gates; applicability
+and risk never loosen silently. Use `dbsctrctl raise-risk --plan PATH` when risk
+rises. Schema-less V3.1 records continue under their legacy transition rules.
+
 ## Artifact Lifecycle
 
 Every cycle reviews README, BACKLOG, and CHANGELOG. README holds stable truth and
@@ -197,10 +206,11 @@ reviewer is available, record a capability gap; do not silently waive review.
 
 ## Evidence And Git
 
-At cycle start, use `dbsctrctl start` to record HEAD, branch, upstream, worktree
-status, pre-cycle ahead commits, Method Revision, gates, and Artifact Reviews in
-the Cycle Record. This baseline defines which commits the cycle owns and whether
-an automatic Final Push can be safe.
+At cycle start, use `dbsctrctl start --plan PATH` to record schema version,
+committed Engineering Profile identity, explicit gate applicability, HEAD,
+branch, upstream, worktree status, pre-cycle ahead commits, Method Revision,
+gates, and Artifact Reviews in the Cycle Record. This baseline defines which
+commits the cycle owns and whether an automatic Final Push can be safe.
 
 Evidence checkpoints and coherent Gate Commits are mandatory when a gate changes
 files. After one gate or a small adjacent gate group passes:

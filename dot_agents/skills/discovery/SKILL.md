@@ -49,6 +49,13 @@ For the current cycle, record only overrides:
 - delivery intent: local, merge, release, or deploy
 - changed profile values and candidate Gate Statuses
 
+Before Build starts a new V3.2 cycle, produce an artifact-ready applicability
+plan naming the committed bounded-context README and every gate. Kernel gates and
+Review/Integrate are required; each `not_applicable` completion gate has a reason
+tied to the Engineering Profile. Build persists this JSON outside the repository
+and passes it to `dbsctrctl start --plan PATH`; Discovery does not parse Markdown
+at runtime or fabricate a profile identity.
+
 Risk guidance:
 
 - `routine`: localized, reversible, and no material public, production,
@@ -122,7 +129,8 @@ before persisting them.
 ## Handoff
 
 Report bounded context, readiness, Engineering Profile, applicable modules and
-gates, remaining risks, next DBSCTR task, and parallel-safe ownership. End a
+gates, the V3.2 applicability plan, remaining risks, next DBSCTR task, and
+parallel-safe ownership. End a
 read-only plan with a Build Handoff containing scope, constraints, affected
 artifacts, validation, risks, unresolved decisions, and recommended Build agent.
 
