@@ -1,5 +1,13 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.3 Worktree Registry
+
+- Began the approved always-isolated cycle architecture with common Git state,
+  one active cycle per worktree, globally unique cycle IDs, retained completed
+  records, and serialized delivery targets.
+- Kept worktree creation, handoff, reconciliation, retention, and cleanup in
+  V3.4; V3.3 changes state ownership only.
+
 ## 2026-07-12 — V3.2 Discovery And Roadmap
 
 - Approved V3.2 protocol correctness: schema-versioned new records, explicit

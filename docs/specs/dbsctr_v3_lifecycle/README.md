@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.2 implemented
+**Status:** V3.2 implemented; V3.3 in progress
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -99,7 +99,9 @@ Adjacent contexts:
 | Gate Commit | Atomic commit containing one coherent gate increment; tiny adjacent gates may combine. |
 | Final Push | One normal push of completed cycle commits to the recorded upstream after all required gates pass. |
 | Push Readiness | Verified branch, upstream, clean worktree, passing evidence, and no unrelated pre-cycle commits included. |
-| Cycle Record | Local operational state for one cycle, stored under `.git/dbsctr/` and not treated as durable evidence. |
+| Cycle Record | Local operational state for one cycle, retained in the Git common directory and not treated as durable repository evidence. |
+| Worktree Identity | Stable hash of a cycle worktree's canonical path, used to isolate its active pointer. |
+| Delivery Target Lock | Nonblocking local lock serializing readiness checks and delivery to one upstream target. |
 | Artifact Review | A recorded decision that README, BACKLOG, and CHANGELOG are accurate, including an explicit no-change reason where applicable. |
 | Gate Applicability | Whether a gate is `required` or `not_applicable`, with rationale. |
 | Gate Result | `pending`, `passed`, `failed`, `unavailable`, or `not_run`; separate from applicability. |
@@ -730,6 +732,19 @@ reopening an earlier gate invalidates later passed gates. Schema-less V3.1 recor
 continue under legacy transitions and are never migrated implicitly.
 Gate Commit and Final Push verify that the current profile blob still matches the
 record; a committed profile change requires `update-plan` or `raise-risk` first.
+
+Schema version `2` / Method Revision `3.3` stores new records beneath
+`<git-common-dir>/dbsctr/cycles/`. Each worktree owns one pointer beneath
+`worktrees/<worktree-id>/active`, so linked worktrees can run independent cycles
+while cycle IDs remain globally unique. Records include worktree path, Git
+directory, branch, base commit, creation authority, upstream, and lock identity.
+Schema version `1` and schema-less records remain readable from their original
+worktree-private paths.
+
+Final Push acquires a nonblocking lock derived from push URL and upstream before
+readiness evaluation and holds it through push verification and completion.
+Contention fails without waiting or mutating cycle state. Completion removes only
+the current worktree pointer and retains the completed common record.
 
 ### Git Lifecycle Contract
 

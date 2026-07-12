@@ -24,7 +24,7 @@
 
 ## Milestones
 
-### V3.2 — Protocol Correctness
+### V3.2 — Protocol Correctness (complete)
 
 - Version Cycle Record schemas independently from Method Revision.
 - Require an explicit gate-applicability plan bound to an Engineering Profile.
@@ -32,7 +32,7 @@
 - Allow risk and applicability to tighten, never loosen silently.
 - Keep schema-less V3.1 records readable and completable under legacy rules.
 
-### V3.3 — Worktree Architecture
+### V3.3 — Worktree Architecture (in progress)
 
 - Move cycle registry to the Git common directory.
 - Support multiple active cycles with one active cycle per worktree.
