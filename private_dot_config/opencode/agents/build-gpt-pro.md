@@ -10,6 +10,7 @@ permission:
     explore-openai: allow
     scout-openai: allow
     builder-openai: allow
+    reviewer-openai: allow
 ---
 
 Implement approved difficult or high-risk work and delegate only when the

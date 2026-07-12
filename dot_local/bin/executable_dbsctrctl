@@ -1,0 +1,451 @@
+#!/usr/bin/env python3
+"""Deterministic local DBSCTR V3.1 cycle record helper."""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path, PurePosixPath
+
+
+GATES = (
+    "domain", "behavior", "spec", "contract", "test_driven_implementation",
+    "refactor", "review_integrate", "release", "deploy", "operate", "maintain_retire",
+)
+ARTIFACTS = ("README", "BACKLOG", "CHANGELOG")
+SECRET_NAMES = ("credentials", "credentials.json", "id_rsa", "private_key", "password")
+
+
+def fail(message):
+    raise RuntimeError(message)
+
+
+def git(root, *args, check=True):
+    result = subprocess.run(["git", *args], cwd=root, text=True, capture_output=True)
+    if check and result.returncode:
+        fail(result.stderr.strip() or f"git {' '.join(args)} failed")
+    return result
+
+
+def now():
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def root_dir():
+    result = subprocess.run(["git", "rev-parse", "--show-toplevel"], text=True, capture_output=True)
+    if result.returncode:
+        fail("not inside a Git repository")
+    return Path(result.stdout.strip())
+
+
+def git_dir(root):
+    path = Path(git(root, "rev-parse", "--git-dir").stdout.strip())
+    return path if path.is_absolute() else root / path
+
+
+def cycle_dir(root):
+    return git_dir(root) / "dbsctr"
+
+
+def atomic_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", dir=path.parent, delete=False, encoding="utf-8") as handle:
+        json.dump(value, handle, sort_keys=True, indent=2)
+        handle.write("\n")
+        temp = handle.name
+    os.replace(temp, path)
+
+
+def status_paths(root):
+    return [line[3:] for line in git(root, "status", "--porcelain=v1").stdout.splitlines()]
+
+
+def branch(root):
+    value = git(root, "symbolic-ref", "--quiet", "--short", "HEAD", check=False)
+    return value.stdout.strip() or None
+
+
+def upstream(root):
+    value = git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}", check=False)
+    return value.stdout.strip() or None
+
+
+def ahead(root, upstream_name):
+    if not upstream_name:
+        return []
+    return git(root, "rev-list", f"{upstream_name}..HEAD").stdout.splitlines()
+
+
+def remote_destination(root, upstream_name):
+    if not upstream_name or "/" not in upstream_name:
+        return {"name": None, "push_url": None}
+    remote = upstream_name.partition("/")[0]
+    url = git(root, "remote", "get-url", "--push", remote, check=False)
+    return {"name": remote, "push_url": url.stdout.strip() or None}
+
+
+def load(root):
+    active = cycle_dir(root) / "active"
+    if not active.exists():
+        fail("no active DBSCTR cycle")
+    cycle_id = active.read_text(encoding="utf-8").strip()
+    path = cycle_dir(root) / f"{cycle_id}.json"
+    if not cycle_id or not path.is_file():
+        fail("active DBSCTR record is missing")
+    return path, json.loads(path.read_text(encoding="utf-8"))
+
+
+def save(path, record):
+    atomic_json(path, record)
+
+
+def require_active(record):
+    if record["state"] != "active":
+        fail(f"cycle is {record['state']}, not active")
+
+
+def require_pushable(record):
+    if record["state"] not in ("active", "finalizing"):
+        fail(f"cycle is {record['state']}, not pushable")
+
+
+def artifact_check(record):
+    reviews = record["artifact_reviews"]
+    incomplete = [name for name in ARTIFACTS if reviews[name]["result"] == "pending"]
+    if incomplete:
+        fail("artifact reviews pending: " + ", ".join(incomplete))
+    if not reviews["BACKLOG"]["reviewed_at"]:
+        fail("BACKLOG review is incomplete")
+    readme = reviews["README"]
+    if readme["result"] == "unchanged" and not readme["reason"]:
+        fail("README unchanged review requires a reason")
+    if record["state"] in ("finalizing", "completed") and reviews["CHANGELOG"]["result"] == "pending":
+        fail("CHANGELOG review is required when finalizing")
+
+
+def completion_artifact_check(record):
+    artifact_check(record)
+    if record["artifact_reviews"]["CHANGELOG"]["result"] != "changed":
+        fail("CHANGELOG must record the completed cycle before Final Push")
+    changelog_path = record["artifact_reviews"]["CHANGELOG"].get("path")
+    if not changelog_path:
+        fail("changed CHANGELOG review needs its repository path")
+
+
+def command_start(args):
+    root = root_dir()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.cycle_id):
+        fail("cycle ID must be a simple filename")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.context):
+        fail("context must be a simple bounded-context name")
+    directory = cycle_dir(root)
+    active = directory / "active"
+    if active.exists():
+        fail("an active DBSCTR cycle already exists")
+    record_path = directory / f"{args.cycle_id}.json"
+    if record_path.exists():
+        fail(f"cycle record already exists: {args.cycle_id}")
+    dirty_paths = status_paths(root)
+    if dirty_paths:
+        fail("cycle must start with a clean worktree: " + ", ".join(dirty_paths))
+    current_branch = branch(root)
+    current_upstream = upstream(root)
+    gates = {gate: {"applicability": "required", "result": "pending"} for gate in GATES}
+    if args.delivery_intent != "release":
+        gates["release"] = {"applicability": "not_applicable", "result": "not_run",
+                            "reason": "delivery intent is not release"}
+    record = {
+        "method_revision": "3.1", "created_at": now(), "cycle_id": args.cycle_id,
+        "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
+        "git": {"head": git(root, "rev-parse", "HEAD").stdout.strip(), "branch": current_branch,
+                "upstream": current_upstream, "dirty_paths": dirty_paths,
+                "pre_cycle_ahead_commits": ahead(root, current_upstream),
+                "remote": remote_destination(root, current_upstream)},
+        "state": "active", "commits": [], "gates": gates,
+        "artifact_reviews": {name: {"result": "pending", "reason": None, "reviewed_at": None}
+                             for name in ARTIFACTS},
+    }
+    atomic_json(record_path, record)
+    try:
+        with open(active.with_suffix(".tmp"), "x", encoding="utf-8") as handle:
+            handle.write(args.cycle_id + "\n")
+        os.replace(active.with_suffix(".tmp"), active)
+    except Exception:
+        record_path.unlink(missing_ok=True)
+        raise
+    print(args.cycle_id)
+
+
+def command_status(args):
+    root = root_dir()
+    active = cycle_dir(root) / "active"
+    if not active.exists() and args.json:
+        print("null")
+        return
+    _, record = load(root)
+    if args.json:
+        print(json.dumps(record, sort_keys=True, separators=(",", ":")))
+    else:
+        print(f"{record['cycle_id']} {record['state']} {record['risk']} {record['delivery_intent']}")
+
+
+def command_review(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    if args.result == "changed" and not args.path:
+        fail("changed artifact review requires --path")
+    if args.path:
+        expected = f"docs/specs/{record['context']}/{args.name}.md"
+        if args.path != expected:
+            fail(f"{args.name} path must be {expected}")
+        safe_paths(root, [args.path])
+    record["artifact_reviews"][args.name] = {
+        "result": args.result, "reason": args.reason, "path": args.path,
+        "reviewed_at": now()
+    }
+    save(path, record)
+
+
+def command_set_gate(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    gate = record["gates"][args.gate]
+    if gate["applicability"] == "required" and args.result == "not_run":
+        fail("required gates cannot use not_run")
+    if gate["applicability"] == "not_applicable" and args.result != "not_run":
+        fail("not_applicable gates can only use not_run")
+    if gate["applicability"] == "required" and args.result in ("passed", "failed", "unavailable") and not args.evidence:
+        fail(f"{args.result} required gate needs evidence")
+    gate.pop("exception", None)
+    gate["result"] = args.result
+    if args.evidence is not None:
+        gate["evidence"] = args.evidence
+    save(path, record)
+
+
+def command_set_applicability(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    gate = record["gates"][args.gate]
+    gate["applicability"] = args.value
+    if args.value == "not_applicable":
+        if not args.reason:
+            fail("not_applicable needs a reason")
+        gate.update({"result": "not_run", "reason": args.reason})
+    else:
+        gate.update({"result": "pending"})
+        gate.pop("reason", None)
+    gate.pop("exception", None)
+    save(path, record)
+
+
+def command_approve_exception(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    gate = record["gates"][args.gate]
+    if gate["applicability"] != "required" or gate["result"] not in ("failed", "unavailable"):
+        fail("only a failed or unavailable required gate can receive an exception")
+    gate["exception"] = {
+        "kind": args.kind, "rationale": args.rationale, "owner": args.owner,
+        "review_condition": args.review_condition, "approved_at": now(),
+    }
+    save(path, record)
+
+
+def command_record_dvc_push(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    if not ((root / ".dvc").exists() or (root / "dvc.yaml").exists()):
+        fail("repository does not use DVC")
+    head = git(root, "rev-parse", "HEAD").stdout.strip()
+    if args.head != head:
+        fail("DVC push evidence must match current HEAD")
+    record["dvc_push"] = {"head": head, "evidence": args.evidence, "recorded_at": now()}
+    save(path, record)
+
+
+def safe_paths(root, paths):
+    if not paths:
+        fail("at least one path is required")
+    cleaned = []
+    for name in paths:
+        pure = PurePosixPath(name)
+        if pure.is_absolute() or ".." in pure.parts or name.startswith(".") and name == ".":
+            fail(f"path must be repo-relative: {name}")
+        basename = pure.name.lower()
+        if basename == ".env" or basename.startswith(".env.") or basename in SECRET_NAMES or pure.suffix.lower() in (".key", ".pem"):
+            fail(f"refusing possible secret path: {name}")
+        tracked = git(root, "ls-files", "--error-unmatch", "--", name, check=False).returncode == 0
+        if not (root / pure).is_file() and not tracked:
+            fail(f"path does not exist: {name}")
+        if git(root, "check-ignore", "--quiet", "--", name, check=False).returncode == 0:
+            fail(f"path is ignored: {name}")
+        cleaned.append(name)
+    return cleaned
+
+
+def command_gate_commit(args):
+    root = root_dir()
+    path, record = load(root)
+    require_active(record)
+    for name in args.gates:
+        gate = record["gates"][name]
+        complete = gate["applicability"] == "not_applicable" or gate["result"] == "passed" or "exception" in gate
+        if not complete:
+            fail(f"gate is not complete: {name}")
+    paths = safe_paths(root, args.paths)
+    staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
+    if staged and set(staged) != set(paths):
+        fail("unrelated staged paths present: " + ", ".join(staged))
+    if git(root, "diff", "--check", check=False).returncode:
+        fail("git diff --check failed")
+    git(root, "add", "--", *paths)
+    if git(root, "diff", "--cached", "--check", check=False).returncode:
+        fail("staged git diff --check failed")
+    staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
+    if set(staged) != set(paths):
+        fail("staged paths differ from requested paths")
+    if not staged or not git(root, "diff", "--cached", "--quiet", check=False).returncode:
+        fail("staged diff is empty")
+    git(root, "commit", "-m", args.message)
+    commit = git(root, "rev-parse", "HEAD").stdout.strip()
+    record["commits"].append({"id": commit, "gates": args.gates})
+    save(path, record)
+    print(commit)
+
+
+def command_check(args):
+    root = root_dir()
+    _, record = load(root)
+    if args.subject == "artifacts":
+        artifact_check(record)
+
+
+def command_final_push(args):
+    root = root_dir()
+    path, record = load(root)
+    require_pushable(record)
+    if any(gate["applicability"] == "required" and gate["result"] != "passed" and "exception" not in gate
+           for gate in record["gates"].values()):
+        fail("required gates have not all passed")
+    completion_artifact_check(record)
+    if status_paths(root):
+        fail("worktree is not clean")
+    baseline = record["git"]
+    if not baseline["branch"] or branch(root) != baseline["branch"]:
+        fail("HEAD is detached or not on the original branch")
+    current_upstream = upstream(root)
+    if not baseline["upstream"] or current_upstream != baseline["upstream"]:
+        fail("upstream is missing or changed")
+    if baseline["pre_cycle_ahead_commits"]:
+        fail("pre-cycle ahead commits would be pushed")
+    current_ahead = ahead(root, current_upstream)
+    recorded_commits = [entry["id"] for entry in record["commits"]]
+    if current_ahead and (set(current_ahead) != set(recorded_commits) or len(current_ahead) != len(recorded_commits)):
+        fail("ahead commits are not exactly the recorded cycle commits")
+    if not current_ahead and record["state"] != "finalizing":
+        fail("recorded cycle commits are not ahead of upstream")
+    changed = set(git(root, "diff", "--name-only", f"{baseline['head']}..HEAD").stdout.splitlines())
+    changelog_path = record["artifact_reviews"]["CHANGELOG"]["path"]
+    if changelog_path not in changed:
+        fail("reviewed CHANGELOG path is not committed in this cycle")
+    remote, separator, remote_branch = current_upstream.partition("/")
+    if not separator or not remote or not remote_branch:
+        fail("upstream is not a remote branch")
+    if baseline.get("remote") != remote_destination(root, current_upstream):
+        fail("remote push destination changed")
+    if (root / ".dvc").exists() or (root / "dvc.yaml").exists():
+        dvc_status = subprocess.run(["dvc", "status"], cwd=root, text=True, capture_output=True)
+        if dvc_status.returncode:
+            fail(dvc_status.stderr.strip() or "dvc status failed")
+        if "Data and pipelines are up to date." not in dvc_status.stdout:
+            fail("dvc status reports changed or missing data")
+        dvc_push = record.get("dvc_push")
+        if not dvc_push or dvc_push["head"] != git(root, "rev-parse", "HEAD").stdout.strip():
+            fail("DVC repository requires separately approved `dvc push` evidence at current HEAD")
+    if current_ahead:
+        record["state"] = "finalizing"
+        save(path, record)
+        git(root, "push", remote, f"HEAD:{remote_branch}")
+    if git(root, "rev-parse", "HEAD").stdout.strip() != git(root, "rev-parse", current_upstream).stdout.strip():
+        fail("push did not synchronize upstream")
+    record["state"] = "completed"
+    record["completed_at"] = now()
+    save(path, record)
+    (cycle_dir(root) / "active").unlink()
+    print("pushed " + " ".join(recorded_commits))
+
+
+def parser():
+    result = argparse.ArgumentParser(prog="dbsctrctl")
+    commands = result.add_subparsers(dest="command", required=True)
+    start = commands.add_parser("start")
+    start.add_argument("--cycle-id", required=True)
+    start.add_argument("--context", required=True)
+    start.add_argument("--risk", required=True, choices=("routine", "elevated", "critical"))
+    start.add_argument("--delivery-intent", required=True, choices=("local", "merge", "release", "deploy"))
+    start.set_defaults(func=command_start)
+    status = commands.add_parser("status")
+    status.add_argument("--json", action="store_true")
+    status.set_defaults(func=command_status)
+    review = commands.add_parser("review-artifact")
+    review.add_argument("name", choices=ARTIFACTS)
+    review.add_argument("--result", required=True, choices=("changed", "unchanged"))
+    review.add_argument("--reason", required=True)
+    review.add_argument("--path")
+    review.set_defaults(func=command_review)
+    gate = commands.add_parser("set-gate")
+    gate.add_argument("gate", choices=GATES)
+    gate.add_argument("--result", required=True, choices=("pending", "passed", "failed", "unavailable", "not_run"))
+    gate.add_argument("--evidence")
+    gate.set_defaults(func=command_set_gate)
+    applicability = commands.add_parser("set-applicability")
+    applicability.add_argument("gate", choices=GATES)
+    applicability.add_argument("--value", required=True, choices=("required", "not_applicable"))
+    applicability.add_argument("--reason")
+    applicability.set_defaults(func=command_set_applicability)
+    exception = commands.add_parser("approve-exception")
+    exception.add_argument("gate", choices=GATES)
+    exception.add_argument("--kind", required=True, choices=("deferred", "accepted_risk"))
+    exception.add_argument("--rationale", required=True)
+    exception.add_argument("--owner", required=True)
+    exception.add_argument("--review-condition", required=True)
+    exception.set_defaults(func=command_approve_exception)
+    dvc = commands.add_parser("record-dvc-push")
+    dvc.add_argument("--head", required=True)
+    dvc.add_argument("--evidence", required=True)
+    dvc.set_defaults(func=command_record_dvc_push)
+    check = commands.add_parser("check")
+    check.add_argument("subject", choices=("artifacts",))
+    check.set_defaults(func=command_check)
+    commit = commands.add_parser("gate-commit")
+    commit.add_argument("--message", required=True)
+    commit.add_argument("--gates", required=True, nargs="+", choices=GATES)
+    commit.add_argument("--paths", required=True, nargs="+")
+    commit.set_defaults(func=command_gate_commit)
+    final = commands.add_parser("final-push")
+    final.set_defaults(func=command_final_push)
+    return result
+
+
+def main():
+    try:
+        args = parser().parse_args()
+        args.func(args)
+    except (RuntimeError, OSError, json.JSONDecodeError) as error:
+        print(f"dbsctrctl: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

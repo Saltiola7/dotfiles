@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** Approved for implementation  
+**Status:** Implemented; V3.1 evolution approved  
 **Discovery confidence:** 97%  
 **Created:** 2026-07-11
 
@@ -84,8 +84,7 @@ Adjacent contexts:
 | Development Kernel | Domain, Behavior, Spec, Contract, Test-driven implementation, and Refactor. |
 | Engineering Profile | Stable bounded-context defaults plus current-cycle overrides that determine applicable modules, risks, and gates. |
 | Lifecycle Cycle | One bounded change carried from discovery through every applicable completion gate. |
-| Lifecycle Gate | A required decision point with evidence and one explicit Gate Status. |
-| Gate Status | `required`, `not_applicable`, `deferred`, or `accepted_risk`. |
+| Lifecycle Gate | A decision point with separate applicability, result, evidence, and optional exception. |
 | Gate Ledger | Evidence table recording applicability, authority, result, owner, and expiry where relevant. |
 | Capability Requirement | An outcome that needs evidence, independent of the tool used to prove it. |
 | Capability Authority | The project-selected command or service whose result gates one concern. |
@@ -99,6 +98,12 @@ Adjacent contexts:
 | Gate Commit | Atomic commit containing one coherent gate increment; tiny adjacent gates may combine. |
 | Final Push | One normal push of completed cycle commits to the recorded upstream after all required gates pass. |
 | Push Readiness | Verified branch, upstream, clean worktree, passing evidence, and no unrelated pre-cycle commits included. |
+| Cycle Record | Local operational state for one cycle, stored under `.git/dbsctr/` and not treated as durable evidence. |
+| Artifact Review | A recorded decision that README, BACKLOG, and CHANGELOG are accurate, including an explicit no-change reason where applicable. |
+| Gate Applicability | Whether a gate is `required` or `not_applicable`, with rationale. |
+| Gate Result | `pending`, `passed`, `failed`, `unavailable`, or `not_run`; separate from applicability. |
+| Gate Exception | A user-approved `deferred` or `accepted_risk` disposition with owner and review condition. |
+| Method Revision | The lifecycle contract revision loaded by the active process. |
 
 ## Domain Model
 
@@ -137,6 +142,10 @@ Adjacent contexts:
 - `ReleaseApproved`
 - `DeploymentVerified`
 - `LifecycleCompleted`
+- `CycleStarted`
+- `ArtifactReviewed`
+- `GateEvaluated`
+- `GateExceptionApproved`
 
 ### Sources And Sinks
 
@@ -283,6 +292,38 @@ records, and retirement decisions. External writes remain approval-gated.
 - Then it stops before Git push
 - And reports the exact approval or remediation required
 
+**Scenario: Keep active state out of stable specifications**
+- Given a Lifecycle Cycle begins
+- When DBSCTR records its Git baseline, current gate, and evidence
+- Then it stores that operational state beneath `.git/dbsctr/`
+- And durable specifications contain only stable context and completed evidence
+
+**Scenario: Review every lifecycle artifact without meaningless edits**
+- Given a Lifecycle Cycle is active
+- When its Artifact Review runs
+- Then README, BACKLOG, and CHANGELOG are each marked reviewed
+- And README changes only when durable domain, behavior, interface, contract,
+  profile, or validation truth changed
+
+**Scenario: Evaluate a required gate**
+- Given a Lifecycle Gate has `required` applicability
+- When its selected evidence passes
+- Then its Gate Result becomes `passed`
+- And applicability remains separate from the result
+
+**Scenario: Handle a gate exception**
+- Given a required Lifecycle Gate cannot pass
+- When DBSCTR proposes deferral or Accepted Risk
+- Then completion remains blocked until the user approves the Gate Exception
+- And the exception records rationale, owner, and expiry or review condition
+
+**Scenario: Scale evidence without skipping the kernel**
+- Given a Lifecycle Cycle is routine, elevated, or critical
+- When DBSCTR plans its artifacts and evidence
+- Then all Development Kernel concerns are considered in dependency order
+- And adjacent concerns may be compressed when existing artifacts and focused
+  evidence already cover the change
+
 ## Engineering Profile
 
 ### Defaults
@@ -297,30 +338,30 @@ records, and retirement decisions. External writes remain approval-gated.
 | Trust/data classification | Local configuration and public methodology; no sensitive application data |
 | Operational owner | Dotfiles owner maintains deployment and OpenCode compatibility |
 
-### Current Cycle Overrides
+### Approved V3.1 Evolution
 
 | Field | Value |
 |---|---|
 | Risk | Elevated: changes global workflow routing and deployed skill behavior |
 | Delivery intent | Local deployment through chezmoi; no publication or remote deployment |
 | Scope | Lifecycle skills/modules, QA, commands, routing, archive, specs, tests, CI |
-| Overrides | V1 removal and V2 source-only archival explicitly authorized |
+| Overrides | Preserve public commands; add local cycle state, deterministic checks, artifact review, and safe Git actions without a plugin |
 
 ## Gate Ledger
 
-| Gate | Capability | Authority/evidence | Status | Owner | Expiry/follow-up |
-|---|---|---|---|---|---|
-| Domain | Bounded context and language | This specification | required | Primary | Complete |
-| Behavior | Observable lifecycle scenarios | This specification | required | Primary | Complete |
-| Spec | Interfaces and collision-safe backlog | README and BACKLOG | required | Primary | Complete |
-| Contract | Profile, gate, module, QA, migration invariants | This specification | required | Primary | Complete |
-| Test-driven implementation | Failing then passing lifecycle contracts | 8 expected failures, then focused and full pytest passes | required | Primary | Complete |
-| Refactor | No stale runtime surfaces or active docs | Diff/reference review | required | Primary | Complete |
-| Review/Integrate | Builder and integrated diff review | Primary review plus independent audit remediation | required | Primary | Complete |
-| Release | Publish a versioned external artifact | No release requested | not_applicable | User | Local deployment only |
-| Deploy | Apply managed skills and commands locally | Chezmoi dry-run/apply and clean status | required | Primary | Complete |
-| Operate | Verify new OpenCode processes load V3 | Live discovery, DBSCTR, and QA command probes | required | Primary | Complete |
-| Maintain/Retire | Keep V3 maintainable; remove V1/V2 runtime | Archive/removal, downstream docs, and CI contracts | required | Primary | Complete |
+| Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
+|---|---|---|---|---|---|---|
+| Domain | Bounded context and language | required | passed | V3.1 specification | - | Primary |
+| Behavior | Observable lifecycle scenarios | required | passed | V3.1 scenarios | - | Primary |
+| Spec | Interfaces and collision-safe backlog | required | passed | README and BACKLOG | - | Primary |
+| Contract | Profile, gate, module, QA, migration invariants | required | passed | V3.1 contracts | - | Primary |
+| Test-driven implementation | Failing then passing lifecycle contracts | required | passed | Intended failures; 206 tests | - | Primary |
+| Refactor | No stale runtime surfaces or active docs | required | passed | Diff and artifact review | - | Primary |
+| Review/Integrate | Integrated diff review | required | passed | Primary review; reviewer-openai no findings | - | Primary |
+| Release | Publish a versioned external artifact | not_applicable | not_run | No release requested | - | User |
+| Deploy | Apply managed skills and commands locally | required | passed | Chezmoi apply/status | - | Primary |
+| Operate | Verify new OpenCode processes load V3.1 | required | passed | Live command and reviewer probes | - | Primary |
+| Maintain/Retire | Keep V3.1 maintainable and compatible | required | passed | Compatibility and CI contracts | - | Primary |
 
 ## Architecture
 
@@ -335,8 +376,9 @@ OpenCode AGENTS routing
   └─ /qa → qa skill
        └─ configured authorities + optional capability profile
 
-Durable state: docs/specs/<bounded_context>/{README,BACKLOG,CHANGELOG}.md
-Session state: OpenCode todos and child sessions
+Stable state: docs/specs/<bounded_context>/README.md
+Development history: BACKLOG.md, CHANGELOG.md, tests, commits, and CI
+Active cycle state: .git/dbsctr/<cycle>.json plus OpenCode todos
 Integration authority: Git
 ```
 
@@ -363,7 +405,7 @@ The matching bounded-context README contains this compact shape:
 | Trust/data classification | boundaries and sensitivity |
 | Operational owner | accountable owner or not applicable |
 
-### Current Cycle Overrides
+### Cycle Overrides
 | Field | Value |
 |---|---|
 | Risk | routine, elevated, critical |
@@ -372,8 +414,8 @@ The matching bounded-context README contains this compact shape:
 | Overrides | only values differing from defaults |
 
 ## Gate Ledger
-| Gate | Capability | Authority/evidence | Status | Owner | Expiry/follow-up |
-|---|---|---|---|---|---|
+| Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
+|---|---|---|---|---|---|---|
 ```
 
 ## Module Layout
@@ -419,13 +461,14 @@ tool and provider examples and load only when useful.
 ## OpenCode Execution Interfaces
 
 - `/discovery $ARGUMENTS` loads `discovery` and creates or updates the matching
-  artifacts after reaching at least 95% confidence.
+  artifacts after no unresolved question can materially change implementation.
 - `/dbsctr $ARGUMENTS` loads `dbsctr`, verifies the Engineering Profile, creates
-  six Development Kernel todos, and evaluates completion gates.
+  actionable todos, and evaluates completion gates. Cycle state and safe Git
+  actions use `dbsctrctl`.
 - `/qa $ARGUMENTS` loads `qa`; DBSCTR supplies affected scope and required
   capabilities, while an explicit user request may run a full audit.
 - Plan remains read-only and produces a Build Handoff. Build verifies freshness,
-  owns integration, and alone stages or commits when requested.
+  owns integration, and alone invokes safe Gate Commit or Final Push operations.
 
 ## Contracts And Invariants
 
@@ -460,15 +503,44 @@ tool and provider examples and load only when useful.
 ### Gate Ledger Contract
 
 - **Pre:** Every Development Kernel and completion gate is enumerated.
-- **Post:** Each applicable gate records capability, authority or evidence,
-  status, result, and owner.
-- `required` means evidence must pass before completion.
-- `not_applicable` requires a reason tied to the Engineering Profile.
-- `deferred` requires an owner and concrete follow-up.
-- `accepted_risk` requires rationale, owner, and expiry or review condition.
+- **Post:** Each gate records capability, applicability, result, authority or
+  evidence, and owner.
+- Applicability is exactly `required` or `not_applicable`; the latter requires a
+  reason tied to the Engineering Profile and has result `not_run`.
+- Result is exactly `pending`, `passed`, `failed`, `unavailable`, or `not_run`.
+- A Gate Exception is `deferred` or `accepted_risk` and requires explicit user
+  approval, rationale, owner, and expiry or review condition.
 - **Invariant:** A required gate with missing or failed evidence blocks lifecycle
-  completion.
+  completion unless an approved Gate Exception disposes it.
 - **Invariant:** No gate is omitted because its preferred tool is unavailable.
+- A missing Capability Authority is represented as an `unavailable` Gate Result
+  with evidence; `pending` never qualifies for a Gate Exception.
+
+### Artifact Lifecycle Contract
+
+- Every cycle has one BACKLOG item before implementation and updates its state as
+  work progresses.
+- README, BACKLOG, and CHANGELOG each receive an Artifact Review before completion.
+- README changes only when durable truth changes; a no-change review is valid.
+- Completed backlog work moves to a concise Completed section with date and commit.
+- Every completed cycle receives one compact CHANGELOG entry with outcome,
+  evidence, exceptions, commits, deployment, and intended Final Push target.
+- The actual Final Push result is written to the local Cycle Record and final
+  response because it cannot truthfully appear in a commit made before that push.
+- Active Cycle Records stay beneath `.git/dbsctr/`; they are not portable or
+  durable authority.
+
+### Readiness And Scaling Contract
+
+- Discovery is ready when no unresolved question can materially change scope,
+  behavior, interfaces, safety, delivery, or validation; percentages are
+  descriptive only.
+- Routine work may compress adjacent phase artifacts when existing durable
+  context plus focused regression evidence covers them.
+- Elevated work records explicit behavior, contracts, compatibility/recovery,
+  and structured gate evidence where applicable.
+- Critical work additionally requires independent review when available and
+  explicit threat, recovery, staged-delivery, and operational acceptance evidence.
 
 ### Development Kernel Contract
 
@@ -572,6 +644,18 @@ tool and provider examples and load only when useful.
   deploy, publish, or write outside approved paths.
 - The primary reviews every Builder patch and owns integration and validation.
 - No plugin is introduced until measured workflow failures justify it.
+- The loaded Method Revision and active cycle are reported at DBSCTR entry.
+- Raw Git writes remain permission-gated; narrowly allowed `dbsctrctl` actions
+  perform deterministic checks before commit or push.
+
+### Cycle Record Interface
+
+`dbsctrctl` stores JSON beneath `.git/dbsctr/` with `method_revision`, `cycle_id`,
+`context`, `risk`, `delivery_intent`, Git baseline, current state, gates,
+Artifact Reviews, and created commits. Commands are `start`, `status`,
+`review-artifact`, `set-applicability`, `set-gate`, user-confirmed
+`approve-exception`, `check artifacts`, `gate-commit`, and `final-push`.
+`gate-commit --gates ...` binds each commit to completed gates.
 
 ### Git Lifecycle Contract
 
@@ -590,7 +674,9 @@ tool and provider examples and load only when useful.
   required evidence failed, or repository policy requires another approval.
 - Never force-push automatically. If hooks reject a commit, fix the issue and
   create a new commit rather than bypassing hooks or amending published work.
-- In a DVC repository, `dvc push` must succeed before Final Push.
+- In a DVC repository, separately approved `dvc push` must succeed before Final
+  Push; `record-dvc-push` binds the separately approved evidence to the current
+  HEAD without hiding the external write.
 - After push, verify the local branch is synchronized with its upstream and
   report commit IDs and push outcome.
 

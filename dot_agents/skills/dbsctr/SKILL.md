@@ -23,12 +23,14 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    relevant source. Reuse existing artifacts.
 2. Check an existing Graphify graph before broad search; verify useful results
    against source and fall back when stale, weak, or irrelevant.
-3. Verify the bounded-context Engineering Profile. Run `discovery` to 95%
-   confidence when intent, ownership, risk, interfaces, or gate applicability is
-   materially unclear.
+3. Verify the bounded-context Engineering Profile. Run `discovery` when an
+   unresolved question can materially change scope, behavior, interfaces,
+   safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Create six Development Kernel todos with exactly one active until complete.
+5. Report Method Revision `3.1`. Use `dbsctrctl status` to resume an active Cycle
+   Record or `dbsctrctl start` to capture the Git baseline. Create only actionable
+   todos; adjacent kernel concerns may share one item when evidence is compact.
 
 ## Progressive Modules
 
@@ -63,7 +65,10 @@ Risk may rise with new evidence and never falls silently.
 
 ## Development Kernel
 
-Complete phases in order; each consumes the prior artifact.
+Consider phases in dependency order; each consumes the prior artifact. Iterate
+back when examples or tests reveal a domain, behavior, interface, or contract
+error. Routine work may compress adjacent artifacts when existing stable context
+and focused evidence already cover them; no concern is skipped silently.
 
 ### 1. Domain
 
@@ -106,16 +111,27 @@ contracts and evidence. Finish with only intended worktree changes.
 
 ## Gate Ledger
 
-Enumerate Development Kernel and completion gates. Each receives exactly one
-status:
+Enumerate Development Kernel and completion gates with separate dimensions:
 
-- `required`: evidence must pass
-- `not_applicable`: reason tied to the Engineering Profile
-- `deferred`: owner and concrete follow-up
-- `accepted_risk`: rationale, owner, and expiry or review condition
+- Gate Applicability: `required` or `not_applicable` with reason
+- Gate Result: `pending`, `passed`, `failed`, `unavailable`, or `not_run`
+- Gate Exception: user-approved `deferred` or `accepted_risk` with rationale,
+  owner, and expiry or review condition
 
-Missing or failed required evidence blocks completion. An unavailable preferred
-tool creates a capability gap, not a pass.
+Missing or failed required evidence blocks completion unless a Gate Exception is
+explicitly approved. The agent may propose but never approve an exception. An
+unavailable preferred tool creates a capability gap, not a pass.
+
+## Artifact Lifecycle
+
+Every cycle reviews README, BACKLOG, and CHANGELOG. README holds stable truth and
+changes only when durable domain, behavior, interface, contract, Engineering
+Profile, or validation truth changes. BACKLOG has one live cycle item and moves
+completed work to a concise Completed section. CHANGELOG gets one compact entry
+at completion with outcome, validation, exceptions, commits, deployment, and
+intended Final Push target. The Cycle Record and final response capture the
+actual push result. Record each review with `dbsctrctl review-artifact`; validate with
+`dbsctrctl check artifacts`. Cycle Record state stays under `.git/dbsctr/`.
 
 ## Completion Gates
 
@@ -157,6 +173,9 @@ Capability Requirements. Use project-selected authorities; do not install tools.
 Unrelated pre-existing findings do not fail scoped work. Explicit full audits
 remain user-requested.
 
+QA returns a human summary plus structured Gate Result evidence for each
+applicable Capability Requirement.
+
 ## Delegation And OpenCode
 
 Delegate only independent work where benefit exceeds overhead. A write subagent
@@ -173,11 +192,15 @@ Plan is read-only and ends with a Build Handoff. Build verifies source and
 artifact freshness before writing. Todos and child sessions hold current state;
 specs and Git are durable authority.
 
+For critical work, use an independent read-only reviewer when available. If no
+reviewer is available, record a capability gap; do not silently waive review.
+
 ## Evidence And Git
 
-At cycle start, record HEAD, branch, upstream, worktree status, and pre-cycle
-ahead commits. This baseline defines which commits the cycle owns and whether an
-automatic Final Push can be safe.
+At cycle start, use `dbsctrctl start` to record HEAD, branch, upstream, worktree
+status, pre-cycle ahead commits, Method Revision, gates, and Artifact Reviews in
+the Cycle Record. This baseline defines which commits the cycle owns and whether
+an automatic Final Push can be safe.
 
 Evidence checkpoints and coherent Gate Commits are mandatory when a gate changes
 files. After one gate or a small adjacent gate group passes:
@@ -186,7 +209,8 @@ files. After one gate or a small adjacent gate group passes:
 2. Run affected-scope QA and required gate evidence.
 3. Stage only intended files; never stage secrets, unrelated drift, or known
    failing required work.
-4. Create one atomic Gate Commit using the repository convention. Combine tiny
+4. Create one atomic Gate Commit with `dbsctrctl gate-commit --gates ...`; the
+   helper rejects incomplete associated gates. Use the repository convention. Combine tiny
    adjacent gates when separate commits would add noise; skip gates with no file
    changes.
 5. Verify the commit and remaining worktree state before continuing.
@@ -194,7 +218,7 @@ files. After one gate or a small adjacent gate group passes:
 The primary alone stages, commits, and pushes. If hooks reject a commit, fix the
 issue and create a new commit; never bypass hooks or rewrite published history.
 
-After all required gates pass, perform one Final Push to the recorded upstream
+After all required gates pass, perform one Final Push with `dbsctrctl final-push` to the recorded upstream
 without another confirmation when the worktree is clean and only cycle-owned
 commits are ahead. The user's standing DBSCTR policy authorizes this normal push.
 Verify synchronization with the upstream and report pushed commit IDs.
@@ -205,7 +229,9 @@ force would be needed, or repository policy requires another approval.
 Never force-push automatically.
 
 In DVC repositories, run `dvc status`, couple changed outputs with their metadata,
-and require `dvc push` to succeed before Final Push.
+and obtain separate approval for `dvc push`. After it succeeds, use
+`dbsctrctl record-dvc-push` to bind its evidence to current HEAD; never hide the
+DVC external write inside standing Git-push authorization.
 
 ## Final Response
 

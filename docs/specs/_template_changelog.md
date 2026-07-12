@@ -4,14 +4,11 @@ All notable changes to this bounded context.
 
 ## [YYYY-MM-DD]
 
-### Added
-- Description of what was added
+### [Cycle ID] — Outcome
 
-### Changed
-- Description of what changed
-
-### Fixed
-- Description of what was fixed
-
-### Removed
-- Description of what was removed
+- Downstream-visible outcome or durable decision.
+- Validation: commands and results.
+- Exceptions: none, or approved owner and review condition.
+- Gate commits: commit IDs.
+- Deployment: result or not applicable.
+- Final Push: intended target or not applicable; actual result is reported after push.

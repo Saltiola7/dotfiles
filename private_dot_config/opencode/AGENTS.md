@@ -8,7 +8,7 @@ output. Skip it for trivial, formatting-only, git-only, dependency-only, and
 non-behavioral configuration work, or when the user requests a lighter workflow.
 
 If intent is unclear or no matching `docs/specs/` context exists, run
-`discovery` to at least 95% confidence before DBSCTR. Keep affected specs,
+`discovery` until no unresolved question can materially change implementation before DBSCTR. Keep affected specs,
 contracts, tests, backlogs, and changelogs current in the same cycle.
 
 Use `qa` for DBSCTR touched-scope gates. Run repository-wide QA only when the
@@ -19,6 +19,9 @@ They perform one Final Push after every required gate passes. This standing
 policy authorizes only a normal push to the cycle-start upstream. Stop and ask when the push lacks an
 upstream, includes pre-cycle commits, changes destination, requires force, or
 fails required Git/DVC evidence.
+
+DVC synchronization is a separate external write: require confirmation for
+`dvc push`, then record its evidence before Final Push.
 
 ## Execution
 

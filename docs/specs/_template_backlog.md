@@ -4,9 +4,9 @@
 
 ## Active
 
-| # | Task | Priority | Status | Notes |
-|---|------|----------|--------|-------|
-| 1 | Description | high/medium/low | pending/in_progress/done | — |
+| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
+|---|---|---|---|---|---|---|---|---|---|---|
+| BC-1 | Description | high/medium/low | pending/in_progress/blocked/cancelled | - | paths | paths | yes/no | why | S/M/L | command/evidence |
 
 ## Parallel Execution Guide
 
@@ -18,5 +18,5 @@ Tasks that must be sequential (shared models/contracts/migrations):
 
 ## Completed
 
-| # | Task | Completed | Commit |
-|---|------|-----------|--------|
+| id | outcome | completed | commit |
+|---|---|---|---|

@@ -123,7 +123,7 @@ def test_qa_accepts_v3_capabilities_without_breaking_scoped_mode():
 def test_global_routing_defaults_to_unversioned_v3():
     agents = text("private_dot_config/opencode/AGENTS.md")
     assert "Use `dbsctr`" in agents
-    assert "`discovery` to at least 95% confidence" in agents
+    assert "`discovery` until no unresolved question can materially change implementation" in agents
     assert "dbsctr2" not in agents.lower()
     assert "discovery2" not in agents.lower()
     assert "Keep `/dbsctr` and `/discovery` unchanged" not in agents
@@ -160,3 +160,38 @@ def test_dbsctr_commits_gate_increments_and_pushes_completed_cycles():
     agents = text("private_dot_config/opencode/AGENTS.md")
     assert "coherent Gate Commits" in agents
     assert "one Final Push" in agents
+
+
+def test_v31_separates_gate_dimensions_and_scales_artifacts():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    discovery = text(SKILLS / "discovery/SKILL.md")
+    qa = text(SKILLS / "qa/SKILL.md")
+
+    for term in ("Gate Applicability", "Gate Result", "Gate Exception", "Cycle Record", "Method Revision"):
+        assert term in spec
+        assert term in dbsctr
+    assert ".git/dbsctr/" in dbsctr
+    assert "README" in dbsctr and "BACKLOG" in dbsctr and "CHANGELOG" in dbsctr
+    assert "no unresolved question can materially change" in discovery
+    assert "95%" not in discovery
+    assert "structured" in qa.lower() and "Gate Result" in qa
+
+
+def test_v31_templates_match_artifact_and_gate_contracts():
+    spec_template = text("docs/specs/_template_spec.md")
+    backlog_template = text("docs/specs/_template_backlog.md")
+    changelog_template = text("docs/specs/_template_changelog.md")
+    assert "Applicability | Result" in spec_template
+    assert "Artifact Review" in spec_template
+    assert "parallel_safe" in backlog_template
+    assert "Gate commits" in changelog_template
+
+
+def test_v31_helper_and_reviewer_surfaces_exist():
+    helper = ROOT / "dot_local/bin/executable_dbsctrctl"
+    reviewer = ROOT / "private_dot_config/opencode/agents/reviewer-openai.md"
+    assert helper.exists()
+    assert reviewer.exists()
+    assert "mode: subagent" in reviewer.read_text()
+    assert "edit: deny" in reviewer.read_text()

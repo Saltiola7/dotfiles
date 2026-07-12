@@ -4,6 +4,20 @@
 **Created:** YYYY-MM-DD
 **Last updated:** YYYY-MM-DD
 
+## Engineering Profile
+
+### Defaults
+
+| Field | Value |
+|---|---|
+| Deliverable | |
+| Languages/frameworks | |
+| Applicable modules | |
+| Runtime/platform support | |
+| Public compatibility | |
+| Trust/data classification | |
+| Operational owner | |
+
 ## Overview
 
 Brief description of what this bounded context covers.
@@ -64,6 +78,21 @@ Name the bounded context and adjacent contexts.
 
 ### Entity/Module: Name
 - **Invariant:** what must always be true
+
+## Gate Ledger
+
+| Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
+|---|---|---|---|---|---|---|
+
+Applicability is `required` or `not_applicable`. Result is `pending`, `passed`,
+`failed`, `unavailable`, or `not_run`. Exceptions are user-approved `deferred`
+or `accepted_risk` records with rationale, owner, and review condition.
+
+## Artifact Review
+
+- README: reviewed; changed or no-change reason
+- BACKLOG: reviewed; active cycle item
+- CHANGELOG: reviewed; completion entry required at cycle close
 
 ## Verification
 

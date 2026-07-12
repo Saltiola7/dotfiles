@@ -99,6 +99,11 @@ unavailable checks, capability coverage, each finding's location/confidence and
 status, Fix Batches/escalations, validation, changed files, accepted risks, and
 residual risk.
 
+Also return a structured block for DBSCTR consumption. Each entry contains
+`capability`, `authority`, `scope`, `Gate Result`, `evidence`, and `residual_risk`.
+Gate Result is `passed`, `failed`, `unavailable`, or `not_run`; applicability and
+any Gate Exception remain separate lifecycle decisions.
+
 A scoped gate passes only when applicable findings and Capability Requirements
 are resolved, validly deferred, or accepted as risk and all required available
 authorities ran. A full audit may complete with debt but exposes every verified

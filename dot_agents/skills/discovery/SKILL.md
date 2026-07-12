@@ -1,6 +1,6 @@
 ---
 name: discovery
-description: Discover and persist a DBSCTR-ready bounded context, Engineering Profile, behaviors, contracts, backlog, risks, and validation strategy at 95% confidence.
+description: Discover and persist a DBSCTR-ready bounded context, Engineering Profile, behaviors, contracts, backlog, risks, and validation strategy.
 trigger: /discovery
 ---
 
@@ -8,13 +8,13 @@ trigger: /discovery
 
 ## Outcome
 
-Reach at least 95% confidence in user intent, then create or update
+Reach implementation readiness, then create or update
 `docs/specs/{bounded_context}/README.md`, `BACKLOG.md`, and `CHANGELOG.md` so
 DBSCTR can proceed without repeating discovery.
 
-Skip the interview when existing artifacts answer all material questions. Do not
-use for tiny unrelated changes. If the user accepts lower confidence, label the
-result a draft rather than DBSCTR-ready.
+Readiness means no unresolved question can materially change scope, behavior,
+interfaces, safety, delivery, or validation. Skip the interview when existing
+artifacts satisfy that test. Do not use for tiny unrelated changes.
 
 ## Retrieve
 
@@ -64,13 +64,13 @@ Risk may rise with evidence but never falls silently.
 
 For each round:
 
-1. State confidence and the largest uncertainty.
+1. State readiness and the largest material uncertainty.
 2. Ask 3–5 questions whose answers can change scope, risk, behavior, interfaces,
    delivery, or validation.
 3. Prefer concrete options when known; use open questions for motives,
    tradeoffs, and risk tolerance.
 4. Update the working summary and challenge consequential vagueness.
-5. Stop at 95% when remaining uncertainty cannot change implementation choices.
+5. Stop when no unresolved question can materially change implementation choices.
 
 Cover only what applies: problem and success; stakeholders and downstreams;
 goals and non-goals; bounded and adjacent contexts; domain terms and events;
@@ -80,7 +80,9 @@ validation; delivery intent; and parallel ownership.
 
 ## Artifacts
 
-`README.md` contains:
+Every cycle reviews README, BACKLOG, and CHANGELOG. `README.md` contains stable
+bounded-context truth and changes only when durable domain, behavior, interface,
+contract, profile, or validation truth changes. It contains:
 
 - overview, problem, goals, and non-goals
 - Engineering Profile defaults and current-cycle overrides
@@ -90,16 +92,22 @@ validation; delivery intent; and parallel ownership.
 - contracts, risks, Gate Ledger, and validation strategy
 - facts, assumptions, accepted risks, and unresolved decisions
 
-The Gate Ledger enumerates Development Kernel and completion gates. Each gate is
-`required`, `not_applicable` with reason, `deferred` with owner/follow-up, or
-`accepted_risk` with rationale, owner, and expiry/review condition.
+The Gate Ledger enumerates Development Kernel and completion gates. Each has
+separate Gate Applicability (`required` or reasoned `not_applicable`), Gate
+Result, and optional user-approved Gate Exception (`deferred` or
+`accepted_risk` with rationale, owner, and expiry/review condition).
 
-`BACKLOG.md` contains one table with `id`, `title`, `priority`, `status`,
+`BACKLOG.md` contains one active table with `id`, `title`, `priority`, `status`,
 `depends_on`, `owns`, `reads`, `parallel_safe`, `reason`, `effort`, and
 `validation`. Ownership and dependencies prevent concurrent collisions.
 
-`CHANGELOG.md` starts with the current date and records decisions and evidence.
-Keep facts, assumptions, non-goals, and open risks distinct.
+Completed work moves to a concise Completed section with date and commit.
+
+`CHANGELOG.md` records one compact entry per completed cycle with outcome,
+evidence, Gate Exceptions, commits, deployment, and intended Final Push target.
+The Cycle Record and final response record the actual push result. Keep facts,
+assumptions, non-goals, and open risks distinct. Active Cycle Records live under
+`.git/dbsctr/`; specifications and Git remain durable authority.
 
 ## OpenCode Execution
 
@@ -113,7 +121,7 @@ before persisting them.
 
 ## Handoff
 
-Report bounded context, confidence, Engineering Profile, applicable modules and
+Report bounded context, readiness, Engineering Profile, applicable modules and
 gates, remaining risks, next DBSCTR task, and parallel-safe ownership. End a
 read-only plan with a Build Handoff containing scope, constraints, affected
 artifacts, validation, risks, unresolved decisions, and recommended Build agent.

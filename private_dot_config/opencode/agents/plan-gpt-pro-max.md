@@ -11,6 +11,7 @@ permission:
     "*": deny
     explore-openai: allow
     scout-openai: allow
+    reviewer-openai: allow
 ---
 
 Inspect relevant materials and produce an evidence-backed architectural plan or

@@ -54,6 +54,26 @@ def test_builder_boundaries():
             assert f'"{command}": deny' in body
 
 
+def test_dbsctr_safe_git_permissions_and_reviewer():
+    config = json.loads((OC / "opencode.json.tmpl").read_text())
+    bash = config["permission"]["bash"]
+    assert bash["dbsctrctl gate-commit*"] == "allow"
+    assert bash["dbsctrctl final-push*"] == "allow"
+    assert bash["dbsctrctl approve-exception*"] == "ask"
+    assert bash["dbsctrctl record-dvc-push*"] == "ask"
+    for command in (
+        "git push --force*", "git push -f*", "git *push*--force*", "git push *+*",
+        "git commit --no-verify*", "git commit -n*", "git *commit*--no-verify*",
+    ):
+        assert bash[command] == "deny"
+
+    reviewer = (OC / "agents/reviewer-openai.md").read_text()
+    assert "mode: subagent" in reviewer
+    assert "model: openai/gpt-5.6-sol" in reviewer
+    assert "edit: deny" in reviewer
+    assert "task: deny" in reviewer
+
+
 def test_removed_managed_integrations_are_absent():
     removed = (
         "dot_local/bin/executable_claude-personal",

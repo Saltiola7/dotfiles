@@ -75,3 +75,34 @@
   suite passed 186 tests.
 - Deployed the updated skill/routing and verified a live `/dbsctr` probe reports
   Gate Commit, Final Push, and stop conditions from the loaded skill.
+
+## 2026-07-12 — V3.1 Discovery
+
+- Approved a compatible V3.1 evolution under existing public commands and paths.
+- Separated Gate Applicability, Gate Result, and user-approved Gate Exception.
+- Selected `.git/dbsctr/` for active, non-portable Cycle Records; specifications,
+  tests, commits, and CI remain durable authority.
+- Required every cycle to review README, maintain a live BACKLOG item, and append
+  one compact CHANGELOG entry at completion without forcing meaningless README edits.
+- Selected a dependency-free `dbsctrctl` for deterministic state, artifact,
+  Gate Commit, and Final Push checks. Raw Git writes remain permission-gated.
+- Deferred an OpenCode plugin until measured helper bypass or compaction loss
+  justifies ambient enforcement.
+- Approved a read-only OpenAI reviewer route and fresh-process runtime validation.
+
+## 2026-07-12 — V3.1 Implementation
+
+- Separated Gate Applicability, Gate Result, and user-approved Gate Exception in
+  lifecycle artifacts, skills, templates, QA output, and deterministic state.
+- Added `dbsctrctl` with clean-cycle start, artifact identity checks, gate
+  evaluation, permission-gated exceptions, safe Gate Commits, destination-bound
+  Final Push, idempotent finalization, and separately approved DVC evidence.
+- Replaced percentage readiness with a material-question criterion and allowed
+  risk-scaled artifact compression without silently skipping kernel concerns.
+- Added a read-only OpenAI reviewer and narrow OpenCode permission rules that deny
+  force-push and hook bypass while allowing validated helper Git actions.
+- Validation: 206 configured tests passed before artifact closure; JSON rendering,
+  `git diff --check`, chezmoi dry-run/apply/status, fresh skill probes, helper
+  smoke, and reviewer delegation passed.
+- Exceptions: none. Deployment: local chezmoi targets applied. Final Push target:
+  recorded `origin/main`; actual result is reported after push.
