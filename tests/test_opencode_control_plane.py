@@ -1,4 +1,6 @@
 import json
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -61,6 +63,8 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert bash["dbsctrctl final-push*"] == "allow"
     assert bash["dbsctrctl approve-exception*"] == "ask"
     assert bash["dbsctrctl record-dvc-push*"] == "ask"
+    assert config["permission"]["dbsctr_status"] == "allow"
+    assert config["permission"]["dbsctr_begin"] == "allow"
     for command in (
         "git push --force*", "git push -f*", "git *push*--force*", "git push *+*",
         "git commit --no-verify*", "git commit -n*", "git *commit*--no-verify*",
@@ -72,6 +76,85 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert "model: openai/gpt-5.6-sol" in reviewer
     assert "edit: deny" in reviewer
     assert "task: deny" in reviewer
+
+
+def test_dbsctr_tools_and_herdr_config_are_managed():
+    tools = (OC / "tools/dbsctr.ts").read_text()
+    assert 'export const status = tool({' in tools
+    assert 'export const begin = tool({' in tools
+    assert "default(false)" in tools
+    runtime = (OC / "lib/dbsctr-runtime.ts").read_text()
+    assert '["dbsctrctl", "status", "--json"]' in runtime
+    assert '"herdr", "agent", "start", "opencode"' in runtime
+    herdr = text("private_dot_config/herdr/config.toml")
+    assert "pane_history = false" in herdr
+    assert 'name = "catppuccin"' in herdr
+
+
+def test_dbsctr_tool_runtime_preserves_argv_and_opts_in_to_herdr(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    dbsctr_log = tmp_path / "dbsctr.log"
+    herdr_log = tmp_path / "herdr.log"
+    dbsctr = bin_dir / "dbsctrctl"
+    dbsctr.write_text(
+        "#!/bin/sh\npwd > \"$DBSCTR_CWD\"\nprintf '<%s>\\n' \"$@\" > \"$DBSCTR_LOG\"\n"
+        "[ \"$DBSCTR_MODE\" = fail ] && { printf 'boom\\n' >&2; exit 7; }\n"
+        "[ \"$DBSCTR_MODE\" = malformed ] && { printf 'not-json\\n'; exit 0; }\n"
+        "printf '{\"cycle_id\":\"x\",\"worktree\":\"/tmp/cycle\"}\\n'\n"
+    )
+    herdr = bin_dir / "herdr"
+    herdr.write_text(
+        "#!/bin/sh\nprintf 'CALL\\nCWD:%s\\n' \"$(pwd)\" >> \"$HERDR_LOG\"\n"
+        "printf '<%s>\\n' \"$@\" >> \"$HERDR_LOG\"\n"
+        "[ \"$HERDR_FAIL\" = 1 ] && { printf 'herdr-boom\\n' >&2; exit 9; }\n"
+        "exit 0\n"
+    )
+    dbsctr.chmod(0o755)
+    herdr.chmod(0o755)
+    runtime = OC / "lib/dbsctr-runtime.ts"
+    script = (
+        f'import {{ beginCycle }} from {json.dumps(str(runtime))};'
+        'console.log(JSON.stringify(await beginCycle({cycleId:"x;touch nope",context:"ctx",risk:"routine",'
+        'deliveryIntent:"local",planPath:"/tmp/plan with spaces"},process.cwd(),'
+        'process.argv[1] === "launch",process.env)));'
+    )
+    env = {
+        **os.environ,
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "DBSCTR_LOG": str(dbsctr_log),
+        "DBSCTR_CWD": str(tmp_path / "dbsctr.cwd"),
+        "HERDR_LOG": str(herdr_log),
+        "HERDR_ENV": "1",
+    }
+    no_launch = subprocess.run(["bun", "-e", script], cwd=ROOT, env=env, text=True,
+                               capture_output=True, check=True)
+    assert json.loads(no_launch.stdout)["herdr"] == "not_launched"
+    assert not herdr_log.exists()
+    assert (tmp_path / "dbsctr.cwd").read_text().strip() == str(ROOT)
+    assert dbsctr_log.read_text().splitlines() == [
+        "<begin>", "<--cycle-id>", "<x;touch nope>", "<--context>", "<ctx>",
+        "<--risk>", "<routine>", "<--delivery-intent>", "<local>",
+        "<--plan>", "</tmp/plan with spaces>",
+    ]
+    launched = subprocess.run(["bun", "-e", script, "launch"], cwd=ROOT, env=env, text=True,
+                              capture_output=True, check=True)
+    assert json.loads(launched.stdout)["herdr"] == "launched"
+    assert herdr_log.read_text().splitlines() == [
+        "CALL", f"CWD:{ROOT}", "<agent>", "<start>", "<opencode>", "<--cwd>",
+        "</tmp/cycle>", "<--focus>", "<-->", "<opencode>", "</tmp/cycle>",
+    ]
+
+    failed = subprocess.run(["bun", "-e", script], cwd=ROOT,
+                            env={**env, "DBSCTR_MODE": "fail"}, text=True, capture_output=True)
+    assert failed.returncode != 0 and "boom" in failed.stderr
+    malformed = subprocess.run(["bun", "-e", script], cwd=ROOT,
+                               env={**env, "DBSCTR_MODE": "malformed"}, text=True, capture_output=True)
+    assert malformed.returncode != 0
+    herdr_failed = subprocess.run(["bun", "-e", script, "launch"], cwd=ROOT,
+                                  env={**env, "HERDR_FAIL": "1"}, text=True,
+                                  capture_output=True, check=True)
+    assert json.loads(herdr_failed.stdout)["herdr"].startswith("launch_failed:")
 
 
 def test_removed_managed_integrations_are_absent():

@@ -204,7 +204,7 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.4`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.5`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
@@ -231,3 +231,11 @@ def test_v34_automates_isolation_and_safe_cleanup():
     assert "commands.add_parser(\"begin\")" in helper
     assert "commands.add_parser(\"cleanup\")" in helper
     assert "dbsctrctl begin --plan" in dbsctr
+
+
+def test_v35_keeps_opencode_and_herdr_as_adapters():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    for term in ("dbsctr_status", "dbsctr_begin", "execution/visibility plane", "pane history disabled"):
+        assert term in spec
+    assert "Typed OpenCode tools are argument-safe adapters" in dbsctr

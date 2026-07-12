@@ -28,10 +28,12 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.4`. Use `dbsctrctl status` to resume the active Cycle
+5. Report Method Revision `3.5`. Use the typed `dbsctr_status` tool when available,
+   otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
-   bound to the committed Engineering Profile, then use `dbsctrctl begin --plan
-   PATH` to create an upstream-based branch/worktree and return its handoff. Use
+   bound to the committed Engineering Profile, then use typed `dbsctr_begin` or
+   `dbsctrctl begin --plan PATH` to create an upstream-based branch/worktree and
+   return its handoff. Use
    low-level `start` only in an already prepared clean cycle worktree. Create only
    actionable todos; adjacent kernel concerns may share one item when evidence is
    compact.
@@ -152,6 +154,9 @@ Delivery to the same upstream is serialized by the helper's target lock.
 After completion, `cleanup` removes only a clean DBSCTR-owned worktree whose
 commits reached target; retain successful worktrees for 24 hours by default and
 never auto-remove failed or dirty work.
+Typed OpenCode tools are argument-safe adapters over `dbsctrctl`, not another
+state machine. In a Herdr pane, `dbsctr_begin` may launch OpenCode in the new
+worktree. Herdr state is presentation only and never gate evidence.
 
 ## Completion Gates
 
