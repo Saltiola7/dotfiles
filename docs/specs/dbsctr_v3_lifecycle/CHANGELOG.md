@@ -1,5 +1,15 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.6.1 Integrated Review Corrections
+
+- Added target refresh and explicit stale-base rejection under the delivery lock
+  before Final Push changes state.
+- Made cycle worktree roots stable when `begin` is invoked from another linked
+  worktree.
+- Corrected Cycle Record schema/command documentation and narrowed roadmap claims
+  to implemented deterministic inventory, explicit reconciliation, optional
+  Herdr launch, and agent-driven semantic tracing.
+
 ## 2026-07-12 — V3.6 Lifecycle Reconciliation Audit
 
 - Began report-only lifecycle audits at a fixed Git commit, excluding dirty

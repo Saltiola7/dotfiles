@@ -42,21 +42,23 @@
 ### V3.4 — Isolation Automation (complete)
 
 - Add `dbsctrctl begin` to create cycle branch/worktree and start state.
-- Add deterministic handoff, reconciliation, retention, and cleanup commands.
-- Revalidate after target advancement; never resolve conflicts automatically.
+- Add deterministic handoff, retention, and cleanup commands.
+- Detect target advancement before push and require explicit reconciliation and
+  renewed validation; never resolve conflicts automatically.
 
 ### V3.5 — OpenCode And Herdr (complete)
 
 - Add typed OpenCode wrappers over stable `dbsctrctl` JSON interfaces.
-- Launch or resume isolated OpenCode workspaces through Herdr when available.
-- Surface cycle identity and status as non-authoritative UI metadata.
+- Optionally launch isolated OpenCode workspaces through Herdr when requested.
+- Use Herdr's native integration for non-authoritative session identity/status.
 - Add a compaction/plugin adapter only after measured context-loss failures.
 
 ### V3.6 — Lifecycle Reconciliation Audit (complete)
 
-- Inventory lifecycle artifacts and trace claims to source at a fixed commit.
-- Classify confirmed drift, stale evidence, missing artifacts, authority conflicts,
-  historical content, and unverified claims.
+- Deterministically inventory lifecycle triplets and graph identity at a fixed
+  commit, then direct the read-only DBSCTR agent to trace claims to source.
+- Define agent classifications for confirmed drift, stale evidence, missing
+  artifacts, authority conflicts, historical content, and unverified claims.
 - Keep report-only audit distinct from repository-wide QA.
 - Reconcile only mechanically proven drift by default; route semantic ambiguity
   through Discovery and context-specific DBSCTR cycles.

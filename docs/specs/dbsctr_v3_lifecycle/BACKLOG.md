@@ -6,6 +6,7 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
+| V3.6.1-1 | Correct integrated roadmap and stale-base delivery | high | in_progress | V3.6-3 | helper, tests, lifecycle artifacts | final review findings | no | Close cross-version contract gaps | M | Full QA and final review |
 Future milestones V3.3–V3.6 are specified in `ROADMAP.md` and become active only
 after their preceding milestone completes.
 

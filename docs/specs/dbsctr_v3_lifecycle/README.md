@@ -711,11 +711,11 @@ tool and provider examples and load only when useful.
 `dbsctrctl` stores JSON beneath `.git/dbsctr/` with `method_revision`, independent
 `schema_version`, `cycle_id`, `context`, `risk`, `delivery_intent`, committed
 Engineering Profile identity, applicability plan, Git baseline, current state,
-gates, Artifact Reviews, and created commits. Commands are `start`, `status`,
-`review-artifact`, `set-applicability`, `set-gate`, user-confirmed
-`approve-exception`, `raise-risk`, `check artifacts`, `gate-commit`, and
-`final-push`; `update-plan` rebinds a committed profile using an equal or stricter
-plan.
+gates, Artifact Reviews, and created commits. Commands are `begin`, `start`,
+`status`, `audit`, `review-artifact`, `set-applicability`, `set-gate`,
+user-confirmed `approve-exception`, `record-dvc-push`, `raise-risk`,
+`update-plan`, `check artifacts`, `gate-commit`, `final-push`, and `cleanup`.
+`update-plan` rebinds a committed profile using an equal or stricter plan.
 `gate-commit --gates ...` binds each commit to completed gates.
 
 New cycles require `start --plan PATH`, where `-` reads JSON from stdin. The plan
@@ -733,7 +733,7 @@ continue under legacy transitions and are never migrated implicitly.
 Gate Commit and Final Push verify that the current profile blob still matches the
 record; a committed profile change requires `update-plan` or `raise-risk` first.
 
-Schema version `2` / Method Revision `3.3` stores new records beneath
+Schema version `2`, shared by Method Revisions `3.3` through `3.6`, stores records beneath
 `<git-common-dir>/dbsctr/cycles/`. Each worktree owns one pointer beneath
 `worktrees/<worktree-id>/active`, so linked worktrees can run independent cycles
 while cycle IDs remain globally unique. Records include worktree path, Git
@@ -745,6 +745,9 @@ Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
 Contention fails without waiting or mutating cycle state. Completion removes only
 the current worktree pointer and retains the completed common record.
+Under that lock, Final Push refreshes the recorded remote branch and rejects target
+advancement before changing cycle state or pushing. Reconciliation and renewed
+validation remain explicit; conflicts are never resolved automatically.
 
 Method Revision `3.4` adds `dbsctrctl begin` as the normal write-cycle entry.
 It accepts the same context, risk, delivery intent, and plan as `start`, refreshes
