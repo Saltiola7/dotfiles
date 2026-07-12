@@ -13,6 +13,10 @@ export async function cycleStatus(cwd: string) {
   return await run(["dbsctrctl", "status", "--json"], cwd)
 }
 
+export async function lifecycleAudit(cwd: string, commit = "HEAD") {
+  return await run(["dbsctrctl", "audit", "--commit", commit, "--json"], cwd)
+}
+
 export async function beginCycle(args: {
   cycleId: string
   context: string

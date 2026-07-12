@@ -14,6 +14,12 @@ contracts, tests, backlogs, and changelogs current in the same cycle.
 Use `qa` for DBSCTR touched-scope gates. Run repository-wide QA only when the
 user explicitly requests it; Dependabot alerts are QA inputs.
 
+Treat "DBSCTR audit" as a report-only lifecycle reconciliation audit at a fixed
+commit unless the user explicitly requests updates. It inventories and traces
+specs, profiles, backlogs, changelogs, decisions, tests, and source claims;
+`/qa full` remains the separate configured-tool quality audit. Verified remediation
+runs as context-scoped isolated DBSCTR cycles.
+
 DBSCTR cycles create coherent Gate Commits after passing gate increments.
 They perform one Final Push after every required gate passes. This standing
 policy authorizes only a normal push to the cycle-start upstream. Stop and ask when the push lacks an

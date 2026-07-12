@@ -204,7 +204,7 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.5`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.6`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
@@ -239,3 +239,14 @@ def test_v35_keeps_opencode_and_herdr_as_adapters():
     for term in ("dbsctr_status", "dbsctr_begin", "execution/visibility plane", "pane history disabled"):
         assert term in spec
     assert "Typed OpenCode tools are argument-safe adapters" in dbsctr
+
+
+def test_v36_audit_is_fixed_commit_report_only_and_distinct_from_qa():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    agents = text("private_dot_config/opencode/AGENTS.md")
+    for term in ("report-only", "one Git commit", "dbsctr_audit", "does not duplicate `/qa`"):
+        assert term in spec
+    assert "Lifecycle Reconciliation Audit" in dbsctr
+    assert "Never infer" in dbsctr
+    assert 'Treat "DBSCTR audit" as a report-only' in agents

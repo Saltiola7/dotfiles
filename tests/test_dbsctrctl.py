@@ -425,6 +425,57 @@ class DbsctrctlTest(unittest.TestCase):
         result = run(other, "cleanup", "--cycle-id", "cycle-1", "--now", ok=False)
         self.assertIn("cycle worktree branch changed", result.stderr)
 
+    def test_audit_reads_fixed_commit_and_excludes_dirty_overlay(self):
+        built_from = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, check=True,
+                                    text=True, capture_output=True).stdout.strip()
+        incomplete = self.repo / "docs/specs/incomplete"
+        incomplete.mkdir(parents=True)
+        (incomplete / "README.md").write_text("# Incomplete\n")
+        graph = self.repo / "graphify-out"
+        graph.mkdir()
+        (graph / "GRAPH_REPORT.md").write_text(f"Built from commit: `{built_from}`\n")
+        old_name = self.repo / "old name.txt"
+        old_name.write_text("rename fixture\n")
+        subprocess.run(["git", "add", "docs/specs/incomplete", "graphify-out", "old name.txt"], cwd=self.repo,
+                       check=True)
+        subprocess.run(["git", "commit", "-m", "audit fixture"], cwd=self.repo, check=True,
+                       capture_output=True)
+        audited = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, check=True,
+                                 text=True, capture_output=True).stdout.strip()
+        (incomplete / "BACKLOG.md").write_text("dirty overlay\n")
+        subprocess.run(["git", "mv", "old name.txt", "new name.txt"], cwd=self.repo, check=True)
+        index_mtime = (self.repo / ".git/index").stat().st_mtime_ns
+        result = json.loads(run(self.repo, "audit", "--commit", audited, "--json").stdout)
+        self.assertEqual(result["commit"], audited)
+        self.assertIn("docs/specs/incomplete/BACKLOG.md", result["dirty_overlay_excluded"])
+        self.assertIn("old name.txt", result["dirty_overlay_excluded"])
+        self.assertIn("new name.txt", result["dirty_overlay_excluded"])
+        self.assertEqual((self.repo / ".git/index").stat().st_mtime_ns, index_mtime)
+        findings = {(item["code"], item["path"]) for item in result["findings"]}
+        self.assertIn(("missing_lifecycle_artifact", "docs/specs/incomplete/BACKLOG.md"), findings)
+        self.assertIn(("missing_lifecycle_artifact", "docs/specs/incomplete/CHANGELOG.md"), findings)
+        self.assertIn(("stale_graph", "graphify-out/GRAPH_REPORT.md"), findings)
+
+    def test_audit_flags_unverifiable_graph_metadata(self):
+        graph = self.repo / "graphify-out"
+        graph.mkdir()
+        (graph / "GRAPH_REPORT.md").write_text("Built from commit: `abc`\n")
+        subprocess.run(["git", "add", "graphify-out"], cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-m", "bad graph marker"], cwd=self.repo, check=True,
+                       capture_output=True)
+        result = json.loads(run(self.repo, "audit", "--json").stdout)
+        self.assertIn("unverified_graph_freshness", {item["code"] for item in result["findings"]})
+
+    def test_audit_reports_non_utf8_dirty_filename(self):
+        raw = os.fsencode(self.repo) + b"/bad-\xff"
+        try:
+            descriptor = os.open(raw, os.O_WRONLY | os.O_CREAT, 0o600)
+        except OSError as error:
+            self.skipTest(f"filesystem rejects non-UTF-8 names: {error}")
+        os.close(descriptor)
+        result = json.loads(run(self.repo, "audit", "--json").stdout)
+        self.assertIn(b"bad-\xff", [os.fsencode(path) for path in result["dirty_overlay_excluded"]])
+
     def test_profile_change_requires_plan_update_before_commit(self):
         remote = Path(self.temp.name) / "remote.git"
         subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)

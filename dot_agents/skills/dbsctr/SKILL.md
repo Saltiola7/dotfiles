@@ -28,7 +28,7 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.5`. Use the typed `dbsctr_status` tool when available,
+5. Report Method Revision `3.6`. Use the typed `dbsctr_status` tool when available,
    otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
    bound to the committed Engineering Profile, then use typed `dbsctr_begin` or
@@ -157,6 +157,22 @@ never auto-remove failed or dirty work.
 Typed OpenCode tools are argument-safe adapters over `dbsctrctl`, not another
 state machine. In a Herdr pane, `dbsctr_begin` may launch OpenCode in the new
 worktree. Herdr state is presentation only and never gate evidence.
+
+## Lifecycle Reconciliation Audit
+
+When the user asks for a DBSCTR project/codebase audit, default to report-only.
+Use typed `dbsctr_audit` or `dbsctrctl audit --commit HEAD --json` to pin committed
+scope, inventory lifecycle triplets, expose excluded dirty overlay, and check
+Graphify freshness. Then verify material claims against authoritative source and
+classify confirmed drift, stale evidence, missing artifacts, authority conflicts,
+historical content, and unverified claims. Do not treat graph inference as source.
+
+Keep this distinct from `/qa full`: lifecycle audit reconciles artifacts and
+traceability; QA runs configured quality authorities. Do not write, archive,
+execute external systems, or change statuses during report-only audit. When the
+user explicitly requests updates or reconciliation, turn verified findings into
+collision-safe context batches and run normal isolated DBSCTR cycles. Never infer
+product/domain truth merely to make documents agree.
 
 ## Completion Gates
 

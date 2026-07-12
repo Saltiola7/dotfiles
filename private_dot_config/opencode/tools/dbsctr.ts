@@ -1,11 +1,19 @@
 import { tool } from "@opencode-ai/plugin"
-import { beginCycle, cycleStatus } from "../lib/dbsctr-runtime"
+import { beginCycle, cycleStatus, lifecycleAudit } from "../lib/dbsctr-runtime"
 
 export const status = tool({
   description: "Read authoritative DBSCTR cycle status for the current worktree.",
   args: {},
   async execute(_args, context) {
     return await cycleStatus(context.worktree)
+  },
+})
+
+export const audit = tool({
+  description: "Inventory DBSCTR lifecycle artifacts at a fixed Git commit without changing files.",
+  args: { commit: tool.schema.string().optional().default("HEAD") },
+  async execute(args, context) {
+    return await lifecycleAudit(context.worktree, args.commit)
   },
 })
 

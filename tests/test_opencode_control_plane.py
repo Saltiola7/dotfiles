@@ -65,6 +65,7 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert bash["dbsctrctl record-dvc-push*"] == "ask"
     assert config["permission"]["dbsctr_status"] == "allow"
     assert config["permission"]["dbsctr_begin"] == "allow"
+    assert config["permission"]["dbsctr_audit"] == "allow"
     for command in (
         "git push --force*", "git push -f*", "git *push*--force*", "git push *+*",
         "git commit --no-verify*", "git commit -n*", "git *commit*--no-verify*",
@@ -82,9 +83,11 @@ def test_dbsctr_tools_and_herdr_config_are_managed():
     tools = (OC / "tools/dbsctr.ts").read_text()
     assert 'export const status = tool({' in tools
     assert 'export const begin = tool({' in tools
+    assert 'export const audit = tool({' in tools
     assert "default(false)" in tools
     runtime = (OC / "lib/dbsctr-runtime.ts").read_text()
     assert '["dbsctrctl", "status", "--json"]' in runtime
+    assert '["dbsctrctl", "audit", "--commit", commit, "--json"]' in runtime
     assert '"herdr", "agent", "start", "opencode"' in runtime
     herdr = text("private_dot_config/herdr/config.toml")
     assert "pane_history = false" in herdr
