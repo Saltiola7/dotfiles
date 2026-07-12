@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.4 implemented
+**Status:** V3.4 implemented; V3.5 in progress
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -759,6 +759,19 @@ default. Cleanup must run from another worktree and requires a completed record,
 a clean cycle worktree, and proof that every cycle commit is contained in the
 delivery target. `--now` waives only the retention delay. Failed, active, dirty,
 missing-target, or current worktrees are never removed.
+
+Method Revision `3.5` exposes typed OpenCode tools `dbsctr_status` and
+`dbsctr_begin`. They invoke the dependency-free helper with an argument vector in
+the active worktree; they do not implement lifecycle transitions independently.
+`dbsctr_begin` returns the authoritative handoff and, when explicitly enabled in
+a Herdr pane, asks Herdr to start OpenCode in the new cycle worktree. Cycle
+creation remains successful and visible when optional Herdr launch fails.
+
+Herdr is an execution/visibility plane only. It never approves gates, interprets
+agent status as evidence, commits, pushes, or removes worktrees. Chezmoi manages
+stable `~/.config/herdr/config.toml` preferences with pane history disabled.
+Herdr owns its generated OpenCode integration, sockets, sessions, logs, plugin
+registry, and worktrees; those runtime files are not templated by chezmoi.
 
 ### Git Lifecycle Contract
 

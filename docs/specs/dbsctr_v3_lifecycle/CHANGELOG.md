@@ -1,5 +1,16 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.5 OpenCode And Herdr Integration
+
+- Began typed OpenCode status/begin wrappers over authoritative `dbsctrctl` JSON
+  and optional Herdr launch of the newly isolated OpenCode workspace.
+- Kept DBSCTR authoritative for cycle state, gates, commits, and delivery; Herdr
+  owns panes/session visibility only, and launch failure does not falsify cycle
+  creation.
+- Selected chezmoi management for stable Herdr preferences only, disabled pane
+  history to avoid prompt/secret retention, and left generated integration and
+  runtime state Herdr-owned.
+
 ## 2026-07-12 — V3.4 Isolation Automation
 
 - Began automatic creation of upstream-based cycle branches and linked worktrees

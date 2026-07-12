@@ -6,6 +6,10 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
+| V3.5-1 | Specify OpenCode/Herdr execution boundaries | high | in_progress | V3.4-3 | lifecycle spec, roadmap | native extension docs | no | Preserve one lifecycle authority | M | Contract review |
+| V3.5-2 | Add typed DBSCTR status/begin tools | high | in_progress | V3.5-1 | OpenCode tools/config/tests | `dbsctrctl` JSON | no | Expose safe native calls | M | Config and build smoke |
+| V3.5-3 | Manage Herdr preferences and refresh integration | medium | pending | V3.5-1 | Herdr config and generated integration deployment | Herdr docs/runtime | yes | Add safe execution UI | S | Integration status |
+| V3.5-4 | Deploy and verify fresh OpenCode/Herdr behavior | high | pending | V3.5-2, V3.5-3 | lifecycle artifacts | all V3.5 work | no | Complete cycle coherently | M | Full QA and fresh process |
 Future milestones V3.3–V3.6 are specified in `ROADMAP.md` and become active only
 after their preceding milestone completes.
 

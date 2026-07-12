@@ -45,7 +45,7 @@
 - Add deterministic handoff, reconciliation, retention, and cleanup commands.
 - Revalidate after target advancement; never resolve conflicts automatically.
 
-### V3.5 — OpenCode And Herdr
+### V3.5 — OpenCode And Herdr (in progress)
 
 - Add typed OpenCode wrappers over stable `dbsctrctl` JSON interfaces.
 - Launch or resume isolated OpenCode workspaces through Herdr when available.
