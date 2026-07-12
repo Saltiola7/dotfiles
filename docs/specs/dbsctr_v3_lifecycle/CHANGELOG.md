@@ -1,5 +1,16 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.2 Discovery And Roadmap
+
+- Approved V3.2 protocol correctness: schema-versioned new records, explicit
+  applicability plans, ordered gate passing, monotonic risk, and legacy V3.1
+  completion without implicit migration.
+- Approved always-isolated DBSCTR write cycles as the V3.3 direction, followed by
+  worktree automation, OpenCode/Herdr integration, and report-only lifecycle
+  reconciliation audit in separate milestones.
+- Retained direct-upstream delivery and deferred PR delivery, automatic semantic
+  rewriting, permanent worktree retention, and unproven plugin enforcement.
+
 ## 2026-07-11 — Discovery
 
 - Reached 97% confidence after reviewing DBSCTR V1/V2, Discovery2, QA, domain

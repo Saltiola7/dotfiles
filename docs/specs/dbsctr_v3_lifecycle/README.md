@@ -1,7 +1,7 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** Implemented; V3.1 evolution approved  
-**Discovery confidence:** 97%  
+**Status:** V3.1 implemented; V3.2 in progress
+**Discovery readiness:** Complete
 **Created:** 2026-07-11
 
 ## Overview
@@ -16,6 +16,7 @@ The public OpenCode entry points are `/discovery`, `/dbsctr`, and `/qa`.
 OpenCode is the first harness because its skills, commands, todos, agents,
 permissions, and Plan/Build separation should shape the workflow directly.
 Future harnesses may implement adapters to the same artifacts and contracts.
+The approved staged evolution through V3.6 is recorded in [`ROADMAP.md`](ROADMAP.md).
 
 ## Problem
 
@@ -104,6 +105,8 @@ Adjacent contexts:
 | Gate Result | `pending`, `passed`, `failed`, `unavailable`, or `not_run`; separate from applicability. |
 | Gate Exception | A user-approved `deferred` or `accepted_risk` disposition with owner and review condition. |
 | Method Revision | The lifecycle contract revision loaded by the active process. |
+| Applicability Plan | Explicit JSON input declaring the Engineering Profile and applicability of every gate for a new cycle. |
+| Cycle Record Schema | Integer version for the serialized Cycle Record shape, independent of Method Revision. |
 
 ## Domain Model
 
@@ -146,6 +149,8 @@ Adjacent contexts:
 - `ArtifactReviewed`
 - `GateEvaluated`
 - `GateExceptionApproved`
+- `RiskRaised`
+- `GateApplicabilityTightened`
 
 ### Sources And Sinks
 
@@ -324,6 +329,32 @@ records, and retirement decisions. External writes remain approval-gated.
 - And adjacent concerns may be compressed when existing artifacts and focused
   evidence already cover the change
 
+### Feature: V3.2 Protocol Correctness
+
+**Scenario: Start from an explicit applicability plan**
+- Given a committed Engineering Profile and a plan defining every gate
+- When a new Lifecycle Cycle starts
+- Then the Cycle Record stores Method Revision `3.2`, schema version `1`, and the
+  profile Git blob identity
+- And mandatory or delivery-required gates cannot be ruled out
+
+**Scenario: Preserve a legacy active cycle**
+- Given an active schema-less V3.1 Cycle Record
+- When its gates, commits, or Final Push continue
+- Then V3.1 transition rules remain available without implicit migration
+
+**Scenario: Enforce dependency order without hiding failure**
+- Given an earlier required gate is not disposed
+- When a later gate attempts to pass
+- Then the transition is rejected
+- But a later failure or unavailable authority may be recorded immediately
+
+**Scenario: Tighten cycle rigor**
+- Given new evidence raises risk or makes a previously inapplicable gate required
+- When the primary records the stricter plan
+- Then risk and applicability tighten and dependent passed gates reopen
+- And neither risk nor applicability can loosen within the active cycle
+
 ## Engineering Profile
 
 ### Defaults
@@ -347,7 +378,16 @@ records, and retirement decisions. External writes remain approval-gated.
 | Scope | Lifecycle skills/modules, QA, commands, routing, archive, specs, tests, CI |
 | Overrides | Preserve public commands; add local cycle state, deterministic checks, artifact review, and safe Git actions without a plugin |
 
-## Gate Ledger
+### V3.2 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: changes serialized state and gate-transition contracts |
+| Delivery intent | Deploy managed helper and skills locally after validation |
+| Scope | Cycle schema, applicability plan, gate order, risk raising, compatibility, roadmap |
+| Overrides | Preserve schema-less V3.1 completion; defer worktree registry and automation to V3.3/V3.4 |
+
+## Gate Ledger — V3.1 Completion
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
 |---|---|---|---|---|---|---|
@@ -650,12 +690,27 @@ tool and provider examples and load only when useful.
 
 ### Cycle Record Interface
 
-`dbsctrctl` stores JSON beneath `.git/dbsctr/` with `method_revision`, `cycle_id`,
-`context`, `risk`, `delivery_intent`, Git baseline, current state, gates,
-Artifact Reviews, and created commits. Commands are `start`, `status`,
+`dbsctrctl` stores JSON beneath `.git/dbsctr/` with `method_revision`, independent
+`schema_version`, `cycle_id`, `context`, `risk`, `delivery_intent`, committed
+Engineering Profile identity, applicability plan, Git baseline, current state,
+gates, Artifact Reviews, and created commits. Commands are `start`, `status`,
 `review-artifact`, `set-applicability`, `set-gate`, user-confirmed
-`approve-exception`, `check artifacts`, `gate-commit`, and `final-push`.
+`approve-exception`, `raise-risk`, `check artifacts`, `gate-commit`, and
+`final-push`.
 `gate-commit --gates ...` binds each commit to completed gates.
+
+New cycles require `start --plan PATH`, where `-` reads JSON from stdin. The plan
+names `docs/specs/<context>/README.md` and defines every gate as `required` or
+reasoned `not_applicable`. The helper records the profile's committed Git blob.
+Kernel gates and Review/Integrate are always required; release and deploy intents
+require their matching completion gates.
+
+For schema version `1`, a gate passes only after every predecessor is disposed.
+Failures and unavailable authorities remain recordable out of order. Risk may
+only rise through `raise-risk --plan`; its plan may tighten
+`not_applicable` to `required` but cannot loosen applicability. Tightening or
+reopening an earlier gate invalidates later passed gates. Schema-less V3.1 records
+continue under legacy transitions and are never migrated implicitly.
 
 ### Git Lifecycle Contract
 
