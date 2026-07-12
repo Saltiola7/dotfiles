@@ -7,6 +7,15 @@
   records, and serialized delivery targets.
 - Kept worktree creation, handoff, reconciliation, retention, and cleanup in
   V3.4; V3.3 changes state ownership only.
+- Implemented schema version `2` common Cycle Records, per-worktree active
+  pointers, globally atomic cycle-ID reservation, worktree/delivery identity,
+  canonical target locks, retained completion records, and resumable pointer
+  cleanup.
+- Validation: 28 helper tests and 220 full tests passed; compilation, diff check,
+  chezmoi dry-run/apply, fresh-process skill smoke, and independent review passed.
+- Exceptions: none. Release: not applicable. Deployment: helper and DBSCTR skill
+  applied locally. Final Push target: `origin/main`.
+- Gate Commits: `d444950`, `7d80d21`.
 
 ## 2026-07-12 — V3.2 Discovery And Roadmap
 

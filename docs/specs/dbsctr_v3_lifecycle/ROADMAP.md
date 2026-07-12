@@ -32,7 +32,7 @@
 - Allow risk and applicability to tighten, never loosen silently.
 - Keep schema-less V3.1 records readable and completable under legacy rules.
 
-### V3.3 — Worktree Architecture (in progress)
+### V3.3 — Worktree Architecture (complete)
 
 - Move cycle registry to the Git common directory.
 - Support multiple active cycles with one active cycle per worktree.
