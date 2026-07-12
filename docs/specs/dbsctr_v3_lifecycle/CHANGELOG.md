@@ -9,6 +9,12 @@
 - Corrected Cycle Record schema/command documentation and narrowed roadmap claims
   to implemented deterministic inventory, explicit reconciliation, optional
   Herdr launch, and agent-driven semantic tracing.
+- Validation: 37 helper tests and 233 full tests passed with one expected macOS
+  filesystem skip; compilation, diff check, targeted chezmoi deployment, and a
+  fresh exact-path independent review passed.
+- Exceptions: none. Release: not applicable. Deployment: corrected helper applied
+  locally. Final Push target: `origin/main`.
+- Gate Commits: `02bcf34`, `1b75001`.
 
 ## 2026-07-12 — V3.6 Lifecycle Reconciliation Audit
 
