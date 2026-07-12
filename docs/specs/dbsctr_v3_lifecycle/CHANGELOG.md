@@ -11,6 +11,24 @@
 - Retained direct-upstream delivery and deferred PR delivery, automatic semantic
   rewriting, permanent worktree retention, and unproven plugin enforcement.
 
+## 2026-07-12 — V3.2 Implementation
+
+- Added schema version `1` Cycle Records with explicit JSON applicability plans,
+  committed Engineering Profile identity, mandatory/delivery gate validation,
+  and duplicate-key rejection.
+- Enforced predecessor disposal before passing later gates while preserving
+  immediate failure/unavailable evidence and legacy schema-less V3.1 transitions.
+- Added monotonic `raise-risk` and equal-or-stricter `update-plan` transitions;
+  stale profile identity blocks Gate Commit and Final Push.
+- Added the approved V3.2–V3.6 roadmap and aligned DBSCTR, Discovery, templates,
+  lifecycle contracts, and compatibility tests.
+- Validation: 214 tests passed; Python compilation, `git diff --check`, OpenCode
+  config resolution, chezmoi dry-run/apply, helper smoke, two fresh-process skill
+  probes, and independent review passed.
+- Exceptions: none. Release: not applicable. Deployment: managed helper and
+  skills applied locally. Final Push target: `origin/main`.
+- Gate Commits: `da65d0b`, `66df166`, `00c2950`.
+
 ## 2026-07-11 — Discovery
 
 - Reached 97% confidence after reviewing DBSCTR V1/V2, Discovery2, QA, domain

@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.1 implemented; V3.2 in progress
+**Status:** V3.2 implemented
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -402,6 +402,22 @@ records, and retirement decisions. External writes remain approval-gated.
 | Deploy | Apply managed skills and commands locally | required | passed | Chezmoi apply/status | - | Primary |
 | Operate | Verify new OpenCode processes load V3.1 | required | passed | Live command and reviewer probes | - | Primary |
 | Maintain/Retire | Keep V3.1 maintainable and compatible | required | passed | Compatibility and CI contracts | - | Primary |
+
+## Gate Ledger — V3.2 Completion
+
+| Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
+|---|---|---|---|---|---|---|
+| Domain | Planned lifecycle vocabulary and roadmap | required | passed | V3.2 specification and roadmap | - | Primary |
+| Behavior | Planned, ordered, monotonic transitions | required | passed | V3.2 scenarios | - | Primary |
+| Spec | Plan, CLI, schema, and compatibility interfaces | required | passed | README and BACKLOG | - | Primary |
+| Contract | Applicability, order, risk, profile, legacy invariants | required | passed | V3.2 contracts | - | Primary |
+| Test-driven implementation | Intended failures then passing transitions | required | passed | 23 helper tests; 214 total | - | Primary |
+| Refactor | Review findings resolved minimally | required | passed | Profile, JSON, and object-format fixes | - | Primary |
+| Review/Integrate | Integrated independent review | required | passed | reviewer-openai: No findings | - | Primary |
+| Release | Publish external artifact | not_applicable | not_run | No release requested | - | User |
+| Deploy | Apply managed helper and skills locally | required | passed | Chezmoi dry-run/apply | - | Primary |
+| Operate | Verify fresh OpenCode processes | required | passed | DBSCTR and Discovery probes | - | Primary |
+| Maintain/Retire | Preserve supported cycle compatibility | required | passed | V3.1 and unknown-schema tests | - | Primary |
 
 ## Architecture
 
