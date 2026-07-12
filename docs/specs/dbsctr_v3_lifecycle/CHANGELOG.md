@@ -8,6 +8,18 @@
   source reconciliation and from `/qa` quality-tool execution.
 - Kept all remediation explicit: structural or semantic updates start scoped
   DBSCTR cycles rather than mutating artifacts during audit.
+- Implemented fixed-commit lifecycle triplet inventory, exact object-format-aware
+  graph freshness, unverifiable metadata findings, byte-safe dirty-overlay
+  reporting, and optional-lock-free Git reads.
+- Added typed `dbsctr_audit`, routing and skill semantics, and explicit separation
+  from `/qa full` and write-capable reconciliation cycles.
+- Validation: 36 helper tests and 232 full tests passed with one expected macOS
+  filesystem skip; Python/Bun build, diff check, config resolution, chezmoi
+  dry-run/apply, real helper audit, typed-tool audit, and independent review
+  passed. Live audit: 10 contexts, zero findings, zero dirty overlay at HEAD.
+- Exceptions: none. Release: not applicable. Deployment: helper, skill, routing,
+  config, runtime, and typed tool applied locally. Final Push target: `origin/main`.
+- Gate Commits: `696971c`, `178bf26`.
 
 ## 2026-07-12 — V3.5 OpenCode And Herdr Integration
 

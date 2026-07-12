@@ -52,7 +52,7 @@
 - Surface cycle identity and status as non-authoritative UI metadata.
 - Add a compaction/plugin adapter only after measured context-loss failures.
 
-### V3.6 — Lifecycle Reconciliation Audit (in progress)
+### V3.6 — Lifecycle Reconciliation Audit (complete)
 
 - Inventory lifecycle artifacts and trace claims to source at a fixed commit.
 - Classify confirmed drift, stale evidence, missing artifacts, authority conflicts,

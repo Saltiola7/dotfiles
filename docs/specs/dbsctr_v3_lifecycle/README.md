@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.5 implemented; V3.6 in progress
+**Status:** V3.6 implemented; approved roadmap complete
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
