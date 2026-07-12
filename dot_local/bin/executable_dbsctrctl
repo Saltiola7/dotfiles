@@ -11,7 +11,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
 
@@ -122,11 +122,33 @@ def ahead(root, upstream_name):
 
 
 def remote_destination(root, upstream_name):
-    if not upstream_name or "/" not in upstream_name:
+    remote, _ = remote_for_upstream(root, upstream_name)
+    if not remote:
         return {"name": None, "push_url": None}
-    remote = upstream_name.partition("/")[0]
     url = git(root, "remote", "get-url", "--push", remote, check=False)
     return {"name": remote, "push_url": url.stdout.strip() or None}
+
+
+def remote_for_upstream(root, upstream_name):
+    if not upstream_name:
+        return None, None
+    remotes = git(root, "remote").stdout.splitlines()
+    matches = [name for name in remotes if upstream_name.startswith(name + "/")]
+    if not matches:
+        return None, None
+    remote = max(matches, key=len)
+    return remote, upstream_name[len(remote) + 1:]
+
+
+def configured_upstream(root):
+    current = branch(root)
+    if not current:
+        return None, None
+    remote = git(root, "config", "--get", f"branch.{current}.remote", check=False).stdout.strip()
+    merge = git(root, "config", "--get", f"branch.{current}.merge", check=False).stdout.strip()
+    if not remote or not merge.startswith("refs/heads/"):
+        return None, None
+    return remote, merge.removeprefix("refs/heads/")
 
 
 def load(root):
@@ -180,8 +202,9 @@ def target_lock(root, record):
         yield
 
 
-def delivery_lock_id(push_url, upstream_name):
-    remote_branch = upstream_name.partition("/")[2] if upstream_name else ""
+def delivery_lock_id(push_url, upstream_name=None, remote_branch=None):
+    if remote_branch is None:
+        remote_branch = upstream_name.partition("/")[2] if upstream_name else ""
     return hashlib.sha256(f"{push_url or 'no-remote'}\0{remote_branch}".encode()).hexdigest()[:24]
 
 
@@ -316,8 +339,7 @@ def completion_artifact_check(record):
         fail("changed CHANGELOG review needs its repository path")
 
 
-def command_start(args):
-    root = root_dir()
+def start_cycle(root, args, plan, created_by_dbsctr=False):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.cycle_id):
         fail("cycle ID must be a simple filename")
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.context):
@@ -333,12 +355,13 @@ def command_start(args):
     if dirty_paths:
         fail("cycle must start with a clean worktree: " + ", ".join(dirty_paths))
     profile_path, profile_blob, gates = validate_plan(
-        root, args.context, args.delivery_intent, read_plan(args.plan)
+        root, args.context, args.delivery_intent, plan
     )
     current_branch = branch(root)
     current_upstream = upstream(root)
+    delivery_remote, delivery_branch = configured_upstream(root)
     record = {
-        "method_revision": "3.3", "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
+        "method_revision": "3.4", "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
         "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
         "engineering_profile": {"path": profile_path, "blob": profile_blob},
         "applicability_plan": {"profile": profile_path, "gates": {
@@ -352,9 +375,10 @@ def command_start(args):
         "worktree": {"id": worktree_id(root), "path": str(root.resolve()),
                      "git_dir": str(git_dir(root).resolve()), "branch": current_branch,
                      "base_commit": git(root, "rev-parse", "HEAD").stdout.strip(),
-                     "created_by_dbsctr": False},
-        "delivery": {"upstream": current_upstream, "lock_id": delivery_lock_id(
-            remote_destination(root, current_upstream).get("push_url"), current_upstream
+                     "created_by_dbsctr": created_by_dbsctr},
+        "delivery": {"upstream": current_upstream, "remote": delivery_remote,
+                     "branch": delivery_branch, "lock_id": delivery_lock_id(
+            remote_destination(root, current_upstream).get("push_url"), remote_branch=delivery_branch
         )},
         "state": "active", "commits": [], "gates": gates,
         "artifact_reviews": {name: {"result": "pending", "reason": None, "reviewed_at": None}
@@ -369,7 +393,98 @@ def command_start(args):
     except Exception:
         record_path.unlink(missing_ok=True)
         raise
-    print(args.cycle_id)
+    return record
+
+
+def command_start(args):
+    root = root_dir()
+    record = start_cycle(root, args, read_plan(args.plan))
+    print(record["cycle_id"])
+
+
+def command_begin(args):
+    source = root_dir()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.cycle_id):
+        fail("cycle ID must be a simple filename")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]*", args.context):
+        fail("context must be a simple bounded-context name")
+    target = upstream(source)
+    remote, remote_branch = configured_upstream(source)
+    if not target or not remote or not remote_branch:
+        fail("begin requires a configured remote upstream")
+    git(source, "fetch", remote, remote_branch)
+    if ahead(source, target):
+        fail("unknown commits are ahead of upstream; reconcile them before begin")
+    branch_name = f"dbsctr/{args.context}/{args.cycle_id}"
+    if git(source, "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}", check=False).returncode == 0:
+        fail(f"cycle branch already exists: {branch_name}")
+    repo_id = f"{source.name}-{hashlib.sha256(str(common_git_dir(source).resolve()).encode()).hexdigest()[:12]}"
+    parent = Path(args.worktree_root).expanduser() if args.worktree_root else Path.home() / ".local/state/dbsctr/worktrees" / repo_id
+    worktree = parent / args.cycle_id
+    if worktree.exists():
+        fail(f"cycle worktree already exists: {worktree}")
+    parent.mkdir(parents=True, exist_ok=True)
+    plan = read_plan(args.plan)
+    git(source, "worktree", "add", "-b", branch_name, str(worktree), target)
+    worktree = worktree.resolve()
+    try:
+        git(worktree, "branch", "--set-upstream-to", target, branch_name)
+        record = start_cycle(worktree, args, plan, created_by_dbsctr=True)
+    except Exception:
+        git(source, "worktree", "remove", str(worktree), check=False)
+        git(source, "branch", "-D", branch_name, check=False)
+        raise
+    print(json.dumps({
+        "cycle_id": record["cycle_id"], "branch": branch_name,
+        "worktree": str(worktree), "upstream": target,
+        "open": ["opencode", str(worktree)],
+    }, sort_keys=True))
+
+
+def command_cleanup(args):
+    root = root_dir()
+    path = cycle_dir(root) / "cycles" / f"{args.cycle_id}.json"
+    if not path.is_file():
+        fail(f"cycle record is missing: {args.cycle_id}")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    if record.get("state") != "completed":
+        fail("only a completed cycle can be cleaned up")
+    if record.get("worktree", {}).get("created_by_dbsctr") is not True:
+        fail("cleanup only removes DBSCTR-created worktrees")
+    worktree = Path(record["worktree"]["path"])
+    if worktree.resolve() == root.resolve():
+        fail("run cleanup from another worktree")
+    if not worktree.is_dir():
+        print("already removed " + str(worktree))
+        return
+    completed = datetime.fromisoformat(record["completed_at"].replace("Z", "+00:00"))
+    if not args.now and datetime.now(timezone.utc) - completed < timedelta(hours=24):
+        fail("successful worktrees are retained for 24 hours; use --now to remove earlier")
+    if status_paths(worktree):
+        fail("refusing to remove a dirty cycle worktree")
+    if branch(worktree) != record["worktree"]["branch"]:
+        fail("cycle worktree branch changed")
+    recorded_commits = [entry["id"] for entry in record["commits"]]
+    if recorded_commits and git(worktree, "rev-parse", "HEAD").stdout.strip() != recorded_commits[-1]:
+        fail("cycle worktree HEAD changed")
+    delivery = record.get("delivery", {})
+    remote = delivery.get("remote")
+    remote_branch = delivery.get("branch")
+    if not remote or not remote_branch:
+        remote, remote_branch = remote_for_upstream(worktree, record["git"]["upstream"])
+    expected = record["git"]["remote"]
+    if expected != remote_destination(worktree, record["git"]["upstream"]):
+        fail("remote push destination changed")
+    git(worktree, "fetch", remote, remote_branch)
+    target = record["git"]["upstream"]
+    for entry in record["commits"]:
+        if git(worktree, "merge-base", "--is-ancestor", entry["id"], target, check=False).returncode:
+            fail("cycle commits are not all contained in the delivery target")
+    branch_name = record["worktree"].get("branch")
+    git(root, "worktree", "remove", str(worktree))
+    if branch_name:
+        git(root, "branch", "-d", branch_name, check=False)
+    print("removed " + str(worktree))
 
 
 def command_status(args):
@@ -605,8 +720,12 @@ def finish_push(root, path, record):
     changelog_path = record["artifact_reviews"]["CHANGELOG"]["path"]
     if changelog_path not in changed:
         fail("reviewed CHANGELOG path is not committed in this cycle")
-    remote, separator, remote_branch = current_upstream.partition("/")
-    if not separator or not remote or not remote_branch:
+    delivery = record.get("delivery", {})
+    remote = delivery.get("remote")
+    remote_branch = delivery.get("branch")
+    if not remote or not remote_branch:
+        remote, remote_branch = remote_for_upstream(root, current_upstream)
+    if not remote or not remote_branch:
         fail("upstream is not a remote branch")
     if baseline.get("remote") != remote_destination(root, current_upstream):
         fail("remote push destination changed")
@@ -649,6 +768,14 @@ def parser():
     start.add_argument("--delivery-intent", required=True, choices=("local", "merge", "release", "deploy"))
     start.add_argument("--plan", required=True, help="applicability-plan JSON path or - for stdin")
     start.set_defaults(func=command_start)
+    begin = commands.add_parser("begin")
+    begin.add_argument("--cycle-id", required=True)
+    begin.add_argument("--context", required=True)
+    begin.add_argument("--risk", required=True, choices=("routine", "elevated", "critical"))
+    begin.add_argument("--delivery-intent", required=True, choices=("local", "merge", "release", "deploy"))
+    begin.add_argument("--plan", required=True, help="applicability-plan JSON path or - for stdin")
+    begin.add_argument("--worktree-root")
+    begin.set_defaults(func=command_begin)
     status = commands.add_parser("status")
     status.add_argument("--json", action="store_true")
     status.set_defaults(func=command_status)
@@ -697,6 +824,10 @@ def parser():
     commit.set_defaults(func=command_gate_commit)
     final = commands.add_parser("final-push")
     final.set_defaults(func=command_final_push)
+    cleanup = commands.add_parser("cleanup")
+    cleanup.add_argument("--cycle-id", required=True)
+    cleanup.add_argument("--now", action="store_true")
+    cleanup.set_defaults(func=command_cleanup)
     return result
 
 

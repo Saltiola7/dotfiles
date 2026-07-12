@@ -55,7 +55,7 @@ class DbsctrctlTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def start(self, intent="local"):
+    def plan_path(self, intent="local"):
         gates = {
             gate: {"applicability": "required"}
             for gate in GATES
@@ -70,6 +70,10 @@ class DbsctrctlTest(unittest.TestCase):
             "profile": "docs/specs/test/README.md",
             "gates": gates,
         }))
+        return plan
+
+    def start(self, intent="local"):
+        plan = self.plan_path(intent)
         return run(self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
                    "--risk", "routine", "--delivery-intent", intent, "--plan", str(plan))
 
@@ -95,7 +99,7 @@ class DbsctrctlTest(unittest.TestCase):
     def test_start_records_schema_and_release_default(self):
         self.start()
         record = json.loads(self.record_path().read_text())
-        self.assertEqual(record["method_revision"], "3.3")
+        self.assertEqual(record["method_revision"], "3.4")
         self.assertEqual(record["schema_version"], 2)
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
         self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")
@@ -121,7 +125,7 @@ class DbsctrctlTest(unittest.TestCase):
         (self.repo / "tracked.txt").write_text("pre-cycle\n")
         result = run(
             self.repo, "start", "--cycle-id", "cycle-1", "--context", "test",
-            "--risk", "routine", "--delivery-intent", "local", "--plan", "missing.json", ok=False,
+            "--risk", "routine", "--delivery-intent", "local", "--plan", str(self.plan_path()), ok=False,
         )
         self.assertIn("clean worktree", result.stderr)
 
@@ -312,8 +316,8 @@ class DbsctrctlTest(unittest.TestCase):
     def test_final_push_refuses_contended_target_lock(self):
         remote = Path(self.temp.name) / "remote.git"
         subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
-        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
-        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+        subprocess.run(["git", "remote", "add", "team/origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "team/origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
         record = json.loads(self.record_path().read_text())
@@ -323,6 +327,103 @@ class DbsctrctlTest(unittest.TestCase):
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             result = run(self.repo, "final-push", ok=False)
         self.assertIn("locked by another DBSCTR cycle", result.stderr)
+
+    def test_begin_isolates_cycle_from_dirty_source_worktree(self):
+        remote = Path(self.temp.name) / "remote.git"
+        worktrees = Path(self.temp.name) / "isolated"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        (self.repo / "tracked.txt").write_text("unrelated dirty work\n")
+        result = run(
+            self.repo, "begin", "--cycle-id", "isolated-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", str(self.plan_path()),
+            "--worktree-root", str(worktrees),
+        )
+        handoff = json.loads(result.stdout)
+        isolated = Path(handoff["worktree"])
+        self.assertTrue(isolated.is_dir())
+        self.assertEqual((self.repo / "tracked.txt").read_text(), "unrelated dirty work\n")
+        record = json.loads((self.repo / ".git/dbsctr/cycles/isolated-1.json").read_text())
+        self.assertTrue(record["worktree"]["created_by_dbsctr"])
+        self.assertEqual(record["worktree"]["path"], str(isolated))
+        self.assertEqual(json.loads(run(isolated, "status", "--json").stdout)["cycle_id"], "isolated-1")
+        self.assertEqual(run(self.repo, "status", "--json").stdout.strip(), "null")
+
+    def test_begin_fetches_before_classifying_ahead_commits(self):
+        remote = Path(self.temp.name) / "remote.git"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        (self.repo / "tracked.txt").write_text("already remote\n")
+        subprocess.run(["git", "commit", "-am", "already remote"], cwd=self.repo, check=True,
+                       capture_output=True)
+        subprocess.run(["git", "push", str(remote), "HEAD:master"], cwd=self.repo, check=True,
+                       capture_output=True)
+        result = run(
+            self.repo, "begin", "--cycle-id", "isolated-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", str(self.plan_path()),
+            "--worktree-root", str(Path(self.temp.name) / "isolated"),
+        )
+        self.assertEqual(json.loads(result.stdout)["cycle_id"], "isolated-1")
+
+    def test_begin_rejects_unknown_ahead_commits(self):
+        remote = Path(self.temp.name) / "remote.git"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        (self.repo / "tracked.txt").write_text("ahead\n")
+        subprocess.run(["git", "commit", "-am", "ahead"], cwd=self.repo, check=True, capture_output=True)
+        result = run(
+            self.repo, "begin", "--cycle-id", "isolated-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", str(self.plan_path()),
+            "--worktree-root", str(Path(self.temp.name) / "isolated"), ok=False,
+        )
+        self.assertIn("unknown commits are ahead", result.stderr)
+
+    def test_cleanup_removes_only_clean_completed_dbsctr_worktree(self):
+        remote = Path(self.temp.name) / "remote.git"
+        worktrees = Path(self.temp.name) / "isolated"
+        subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
+        subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=self.repo, check=True)
+        subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        handoff = json.loads(run(
+            self.repo, "begin", "--cycle-id", "isolated-1", "--context", "test",
+            "--risk", "routine", "--delivery-intent", "local", "--plan", str(self.plan_path()),
+            "--worktree-root", str(worktrees),
+        ).stdout)
+        record_path = self.repo / ".git/dbsctr/cycles/isolated-1.json"
+        record = json.loads(record_path.read_text())
+        record.update({"state": "completed", "completed_at": "2026-01-01T00:00:00Z"})
+        record_path.write_text(json.dumps(record))
+        pointer = self.repo / ".git/dbsctr/worktrees" / record["worktree"]["id"] / "active"
+        pointer.unlink()
+        run(self.repo, "cleanup", "--cycle-id", "isolated-1", "--now")
+        self.assertFalse(Path(handoff["worktree"]).exists())
+        self.assertTrue(record_path.exists())
+
+    def test_cleanup_rejects_low_level_or_drifted_worktree(self):
+        self.start()
+        record_path = self.record_path()
+        record = json.loads(record_path.read_text())
+        record.update({"state": "completed", "completed_at": "2026-01-01T00:00:00Z"})
+        record_path.write_text(json.dumps(record))
+        result = run(self.repo, "cleanup", "--cycle-id", "cycle-1", "--now", ok=False)
+        self.assertIn("DBSCTR-created", result.stderr)
+
+        record["worktree"]["created_by_dbsctr"] = True
+        record_path.write_text(json.dumps(record))
+        other = Path(self.temp.name) / "other"
+        subprocess.run(["git", "worktree", "add", "-b", "other", str(other), "HEAD"],
+                       cwd=self.repo, check=True, capture_output=True)
+        subprocess.run(["git", "switch", "-c", "drift"], cwd=self.repo, check=True,
+                       capture_output=True)
+        result = run(other, "cleanup", "--cycle-id", "cycle-1", "--now", ok=False)
+        self.assertIn("cycle worktree branch changed", result.stderr)
 
     def test_profile_change_requires_plan_update_before_commit(self):
         remote = Path(self.temp.name) / "remote.git"

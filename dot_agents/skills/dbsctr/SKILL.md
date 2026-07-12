@@ -28,11 +28,13 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.3`. Use `dbsctrctl status` to resume the active Cycle
-   Record. For a new cycle, create an explicit JSON applicability plan bound to
-   the committed Engineering Profile, then use `dbsctrctl start --plan PATH` to
-   capture it with the Git baseline. Create only actionable todos; adjacent
-   kernel concerns may share one item when evidence is compact.
+5. Report Method Revision `3.4`. Use `dbsctrctl status` to resume the active Cycle
+   Record. For a new write cycle, create an explicit JSON applicability plan
+   bound to the committed Engineering Profile, then use `dbsctrctl begin --plan
+   PATH` to create an upstream-based branch/worktree and return its handoff. Use
+   low-level `start` only in an already prepared clean cycle worktree. Create only
+   actionable todos; adjacent kernel concerns may share one item when evidence is
+   compact.
 
 ## Progressive Modules
 
@@ -146,6 +148,10 @@ actual push result. Record each review with `dbsctrctl review-artifact`; validat
 completed records remain there while each worktree has one active pointer.
 Multiple sessions may resume one cycle, but one primary owns integration.
 Delivery to the same upstream is serialized by the helper's target lock.
+`begin` leaves a dirty source worktree untouched and blocks unknown ahead commits.
+After completion, `cleanup` removes only a clean DBSCTR-owned worktree whose
+commits reached target; retain successful worktrees for 24 hours by default and
+never auto-remove failed or dirty work.
 
 ## Completion Gates
 
@@ -211,11 +217,12 @@ reviewer is available, record a capability gap; do not silently waive review.
 
 ## Evidence And Git
 
-At cycle start, use `dbsctrctl start --plan PATH` to record schema version,
-committed Engineering Profile identity, explicit gate applicability, HEAD,
-branch, upstream, worktree status, pre-cycle ahead commits, Method Revision,
-gates, and Artifact Reviews in the Cycle Record. This baseline defines which
-commits the cycle owns and whether an automatic Final Push can be safe.
+At cycle start, use `dbsctrctl begin --plan PATH` to create isolation and record
+schema version, committed Engineering Profile identity, explicit gate
+applicability, HEAD, branch, upstream, worktree status, pre-cycle ahead commits,
+Method Revision, gates, and Artifact Reviews. Use low-level `start` only for an
+already prepared clean worktree. This baseline defines which commits the cycle
+owns and whether an automatic Final Push can be safe.
 
 Evidence checkpoints and coherent Gate Commits are mandatory when a gate changes
 files. After one gate or a small adjacent gate group passes:
