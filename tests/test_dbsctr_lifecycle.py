@@ -76,6 +76,7 @@ def test_v3_module_registry_is_extensible_and_normalized():
         "ml.md",
         "analytics.md",
         "python.md",
+        "semantic-audit.md",
     }
 
     for path in modules.glob("*.md"):
@@ -205,7 +206,7 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.8`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.9`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
@@ -258,7 +259,7 @@ def test_v362_requires_begin_authorization_and_method_revision_compatibility():
     dbsctr = text(SKILLS / "dbsctr/SKILL.md")
     helper = text("dot_local/bin/executable_dbsctrctl")
     tools = text("private_dot_config/opencode/tools/dbsctr.ts")
-    assert "CURRENT_METHOD_REVISION = \"3.8\"" in helper
+    assert "CURRENT_METHOD_REVISION = \"3.9\"" in helper
     assert '"method_revision": CURRENT_METHOD_REVISION' in helper
     assert "context.ask" in tools
     assert "before any `beginCycle`" in spec
@@ -288,3 +289,26 @@ def test_v38_retains_secret_safe_evidence_and_conditional_python_reference():
     for term in ("op://", "op run", "Pydantic Settings", "SecretStr", "fake environment"):
         assert term in python
     assert "record-evidence GATE" in dbsctr
+
+
+def test_v39_semantic_reconciliation_is_fixed_commit_report_only_and_authority_ordered():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    protocol = text(SKILLS / "dbsctr/references/semantic-audit.md")
+    classifications = ("consistent", "confirmed_drift", "stale_evidence", "missing_artifact",
+                       "authority_conflict", "historical_unlabelled", "unverified_claim", "out_of_scope")
+    for term in classifications:
+        assert term in protocol
+        assert protocol.count(f"- `{term}`:") == 1
+    for term in ("report-only", "resolved commit", "Absence of contradiction", "private machine paths",
+                 "inventory_findings", "public=false", "authoritative=false"):
+        assert term in spec
+    assert "references/semantic-audit.md" in dbsctr
+    assert "Graph paths never prove a claim" in protocol
+    assert "never project authority" in protocol and "publishable source" in protocol
+    assert "first matching rule" in protocol
+    assert "dbsctrctl inspect" in protocol and "never read its filesystem" in protocol
+    assert "never read withheld content" in protocol
+    assert "Keep `/qa full` separate" in protocol
+    for boundary in ("never changes files", "lifecycle state", "without explicit approval"):
+        assert boundary in protocol

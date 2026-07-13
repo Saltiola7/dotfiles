@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.8 Evidence Envelopes implemented; V3.9–V3.10 roadmap approved
+**Status:** V3.9 semantic reconciliation active; V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -470,6 +470,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Scope | Schema-3 Evidence Envelopes, conservative output retention, Gate Commit binding, and cleanup coupling |
 | Overrides | No typed write tool; no canonical URL retention without future committed allowlist policy; exclude V3.9 semantics |
 
+### V3.9 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: agent interpretation compares lifecycle claims with multiple authority levels |
+| Delivery intent | Merge and deploy the semantic audit protocol and skill locally |
+| Scope | Fixed-commit claim tracing, exact classifications, report schema, privacy, and remediation boundaries |
+| Overrides | Reuse V3.7 inspection and V3.8 metadata; no new write tool, automatic remediation, or `/qa full` execution |
+
 ## Gate Ledger — V3.1 Completion
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
@@ -830,7 +839,8 @@ directory, branch, base commit, creation authority, upstream, and lock identity.
 schema-less/schema-1/schema-2 records remain readable without implicit rewriting.
 Method Revision `3.8` creates schema version `3` records with an Evidence Envelope
 collection; old records retain their original transition and evidence semantics.
-New records use the helper's single `CURRENT_METHOD_REVISION = "3.8"` constant.
+Method Revision `3.9` retains schema version `3`; new records use the helper's
+single `CURRENT_METHOD_REVISION = "3.9"` constant.
 
 Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
@@ -967,15 +977,43 @@ MiB raw-output cap, and terminates the whole process group on timeout or overflo
 - Approved private local repositories may inform implementation research but are
   not public artifacts, distributable examples, or automatic project authority.
 
-### Approved V3.9 Semantic Reconciliation Contract
+Method Revision `3.9` adds the semantic reconciliation protocol loaded by the
+DBSCTR skill after deterministic `dbsctr_audit`. It uses `dbsctr_inspect` against
+the already resolved commit and changes no helper transition or serialized
+schema.
+
+### V3.9 Semantic Reconciliation Contract
 
 - Semantic reconciliation uses one V3.7-resolved commit and V3.8 metadata without
   exposing withheld content.
 - Findings are confirmed drift, stale evidence, missing artifact, authority
   conflict, historical-but-unlabelled content, unverified claim, consistent, or
   out of scope.
+- Every material claim receives one report-local ID, exact committed claim and
+  evidence locations, authority level, relation, severity, confidence,
+  rationale, uncertainty, and a separately approvable remediation-cycle scope.
+- Classification uses deterministic precedence: out of scope, missing artifact,
+  authority conflict, historical-but-unlabelled content, stale evidence,
+  confirmed drift, consistent, then unverified claim. The first matching rule
+  wins so classifications remain exclusive.
+- Absence of contradiction is not consistency; missing proof is an unverified
+  claim. Severity expresses impact independently from confidence.
 - Source and project policy outrank graph inference and approved private local
   references. Uncertainty stays explicit.
+- Authority order is explicit user intent and project policy/contracts/decisions;
+  authoritative implementation/tests/schemas/manifests/configured CI; valid
+  commit-bound Evidence Envelope metadata; lifecycle claims under review; then
+  graph/private-reference hints. Equal-level unresolved disagreement is an
+  authority conflict.
+- Private local references require explicit authorization and a pinned commit.
+  A separate helper inspection rooted in that repository uses bounded Git-object
+  actions and excludes its overlay. Reports omit private machine paths and mark
+  the reference `public=false` and `authoritative=false`; durable public artifacts
+  do not copy private content.
+- Reports identify mode, resolved commit, excluded overlay, contexts, counts by
+  classification/severity, unchanged `inventory_findings`, complete semantic
+  claim findings, and approved-reference metadata. Deterministic inventory
+  findings remain separate from semantic ones.
 - The audit remains report-only and distinct from `/qa full`. It never rewrites,
   changes status, commits, deploys, or cleans up; every remediation starts a
   separately approved context-scoped DBSCTR cycle.

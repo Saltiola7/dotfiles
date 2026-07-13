@@ -28,7 +28,7 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.8`. Use the typed `dbsctr_status` tool when available,
+5. Report Method Revision `3.9`. Use the typed `dbsctr_status` tool when available,
    otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
     bound to the committed Engineering Profile, then obtain authorization before `dbsctr_begin`;
@@ -173,12 +173,17 @@ historical content, and unverified claims. Do not treat graph inference as sourc
 Use typed `dbsctr_inspect` for bounded `read`, `tree`, `search`, and `object`
 access to that resolved commit; never substitute filesystem reads that include
 the dirty overlay.
+For semantic reconciliation, load `references/semantic-audit.md`, keep the audit
+on the resolved commit, apply its authority order and exact classifications, and
+return its report shape. Evidence Envelope metadata may support a trace, but
+withheld content remains unavailable. Private local references require explicit
+authorization, a pinned commit, and non-public/non-authoritative treatment.
 
 Keep this distinct from `/qa full`: lifecycle audit reconciles artifacts and
 traceability; QA runs configured quality authorities. Do not write, archive,
 execute external systems, or change statuses during report-only audit. When the
-user explicitly requests updates or reconciliation, turn verified findings into
-collision-safe context batches and run normal isolated DBSCTR cycles. Never infer
+user explicitly approves remediation, turn verified findings into collision-safe
+context batches and start each approved isolated DBSCTR cycle separately. Never infer
 product/domain truth merely to make documents agree.
 
 ## Completion Gates

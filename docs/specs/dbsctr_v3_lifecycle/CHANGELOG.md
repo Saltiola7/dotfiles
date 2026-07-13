@@ -1,5 +1,25 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.9 Semantic Reconciliation
+
+- Added a report-only semantic audit protocol after deterministic fixed-commit
+  inventory, using bounded `dbsctr_inspect` claim traces and V3.8 metadata without
+  reading withheld content.
+- Defined exclusive precedence for consistent, confirmed drift, stale evidence,
+  missing artifact, authority conflict, historical-but-unlabelled content,
+  unverified claim, and out-of-scope classifications.
+- Added explicit authority ordering, confidence/severity separation, deterministic
+  inventory separation, complete report fields, and separately approved
+  remediation-cycle proposals.
+- Constrained private local references to explicitly authorized, commit-pinned,
+  Git-object-only inspection; reports omit machine paths and mark references
+  non-public and non-authoritative.
+- Validation: 257 tests passed and 1 skipped; Python compile and `git diff --check`
+  passed. Independent review findings were remediated and final review reported
+  no findings.
+- Deployment: targeted local chezmoi apply pending. Gate Exceptions: none.
+  Intended Final Push: `origin/main`.
+
 ## 2026-07-12 — V3.8 Evidence Envelopes
 
 - Added schema-3 Cycle Records and permission-gated `record-evidence` execution

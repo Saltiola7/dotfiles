@@ -6,9 +6,9 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.9-1 | Specify semantic audit classifications | high | pending | V3.8-3,V3.8-4 | lifecycle specs | V3.7/V3.8 | no | fixes report semantics | medium | scenario/contract review |
-| V3.9-2 | Implement semantic audit orchestration | high | pending | V3.9-1 | audit skill/tool | fixed-commit inspection | no | traces claims without mutation | medium | audit smoke/tests |
-| V3.9-3 | Test report-only authority boundaries | high | pending | V3.9-2 | tests | audit surfaces | no | prevents automatic rewriting | medium | affected test suite |
+| V3.9-1 | Specify semantic audit classifications | high | implemented | V3.8-3,V3.8-4 | lifecycle specs | V3.7/V3.8 | no | fixes report semantics | medium | scenario/contract review |
+| V3.9-2 | Implement semantic audit orchestration | high | implemented | V3.9-1 | audit skill/reference | fixed-commit inspection | no | traces claims without mutation | medium | audit smoke/tests |
+| V3.9-3 | Test report-only authority boundaries | high | implemented | V3.9-2 | tests | audit surfaces | no | prevents automatic rewriting | medium | affected test suite |
 | V3.10-1 | Specify conditional Product Intent | medium | pending | V3.9-3 | Discovery/lifecycle specs | Engineering Profile | no | avoids synthetic product artifacts | medium | static contracts |
 | V3.10-2 | Add generic Web/UI module | medium | pending | V3.10-1 | DBSCTR module | product/accessibility policy | no | adds UI lifecycle outcomes | medium | module tests |
 | V3.10-3 | Add tool references and local MCP rule | medium | pending | V3.10-2 | Web/UI references | project authorities | yes | keeps examples non-normative | small | static contracts |
