@@ -13,6 +13,9 @@
 - **REQUIRED:** Name the authoritative dependency metadata and, when used, the authoritative lock artifact.
 - **CONDITIONAL:** For libraries, record compatible runtime dependency ranges; for deployed applications, record whether exact deployment locks are required.
 - **PROJECT POLICY:** The project selects its package manager, environment manager, build backend, and lock strategy.
+- **CONDITIONAL:** When project policy selects 1Password-backed process settings,
+  load `references/python.md`; do not make 1Password, Pydantic Settings, or a task
+  runner universal Python requirements.
 - **EXAMPLE:** Separate development, test, documentation, and runtime dependency groups can make intent reviewable.
 
 ## Required Outcomes

@@ -8,9 +8,13 @@ import hashlib
 import json
 import os
 import re
+import selectors
+import signal
+import shutil
 import subprocess
 import sys
 import tempfile
+import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
@@ -23,9 +27,15 @@ ARTIFACTS = ("README", "BACKLOG", "CHANGELOG")
 SECRET_NAMES = ("credentials", "credentials.json", "id_rsa", "private_key", "password")
 MANDATORY_GATES = set(GATES[:6]) | {"review_integrate"}
 RISK_RANK = {"routine": 0, "elevated": 1, "critical": 2}
-CURRENT_METHOD_REVISION = "3.7"
+CURRENT_METHOD_REVISION = "3.8"
 INSPECT_RESPONSE_HARD = 128 * 1024
 INSPECT_ENV = {**os.environ, "GIT_OPTIONAL_LOCKS": "0", "GIT_NO_REPLACE_OBJECTS": "1"}
+EVIDENCE_RAW_CAP = 1024 * 1024
+EVIDENCE_SIDECAR_CAP = 256 * 1024
+SECRET_OPTION = re.compile(r"(?:pass(?:word)?|secret|token|key|credential|auth(?:orization)?|cookie)", re.I)
+SECRET_VALUE = re.compile(r"(?:op://|-----BEGIN [A-Z ]*PRIVATE KEY-----|\b(?:gh[pousr]_|AKIA)[A-Za-z0-9_=-]{16,}|\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}|\bBearer\s+\S+|\b(?:authorization|password|secret|token|api[_-]?key)\s*[:=]\s*\S+|\w+://[^\s/@:]+:[^\s/@]+@)", re.I)
+HIGH_ENTROPY = re.compile(r"(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{32,}(?![A-Za-z0-9_-])")
+SAFE_EVIDENCE_LINE = re.compile(r"(?:ok|pass(?:ed)?|success|succeeded|\d+ (?:passed|failed)(?:, \d+ skipped)?)", re.I)
 
 
 def fail(message):
@@ -203,7 +213,7 @@ def load(root):
     if not cycle_id or not path.is_file():
         fail("active DBSCTR record is missing")
     record = json.loads(path.read_text(encoding="utf-8"))
-    if "schema_version" in record and record["schema_version"] not in (1, 2):
+    if "schema_version" in record and record["schema_version"] not in (1, 2, 3):
         fail(f"unsupported Cycle Record schema: {record['schema_version']}")
     return path, record
 
@@ -223,7 +233,7 @@ def require_pushable(record):
 
 
 def is_v32(record):
-    return record.get("schema_version") in (1, 2)
+    return record.get("schema_version") in (1, 2, 3)
 
 
 @contextlib.contextmanager
@@ -238,6 +248,15 @@ def target_lock(root, record):
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             fail("delivery target is locked by another DBSCTR cycle")
+        yield
+
+
+@contextlib.contextmanager
+def evidence_lock(root, cycle_id):
+    path = cycle_dir(root) / "locks" / f"evidence-{cycle_id}.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
         yield
 
 
@@ -400,7 +419,7 @@ def start_cycle(root, args, plan, created_by_dbsctr=False):
     current_upstream = upstream(root)
     delivery_remote, delivery_branch = configured_upstream(root)
     record = {
-        "method_revision": CURRENT_METHOD_REVISION, "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
+        "method_revision": CURRENT_METHOD_REVISION, "schema_version": 3, "created_at": now(), "cycle_id": args.cycle_id,
         "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
         "engineering_profile": {"path": profile_path, "blob": profile_blob},
         "applicability_plan": {"profile": profile_path, "gates": {
@@ -419,7 +438,7 @@ def start_cycle(root, args, plan, created_by_dbsctr=False):
                      "branch": delivery_branch, "lock_id": delivery_lock_id(
             remote_destination(root, current_upstream).get("push_url"), remote_branch=delivery_branch
         )},
-        "state": "active", "commits": [], "gates": gates,
+        "state": "active", "commits": [], "gates": gates, "evidence": {"version": 1, "items": {}},
         "artifact_reviews": {name: {"result": "pending", "reason": None, "reviewed_at": None}
                              for name in ARTIFACTS},
     }
@@ -494,36 +513,58 @@ def command_cleanup(args):
     worktree = Path(record["worktree"]["path"])
     if worktree.resolve() == root.resolve():
         fail("run cleanup from another worktree")
-    if not worktree.is_dir():
+    schema3 = record.get("schema_version") == 3
+    if not worktree.is_dir() and not schema3:
         print("already removed " + str(worktree))
         return
     completed = datetime.fromisoformat(record["completed_at"].replace("Z", "+00:00"))
     if not args.now and datetime.now(timezone.utc) - completed < timedelta(hours=24):
         fail("successful worktrees are retained for 24 hours; use --now to remove earlier")
-    if status_paths(worktree):
+    if worktree.is_dir() and status_paths(worktree):
         fail("refusing to remove a dirty cycle worktree")
-    if branch(worktree) != record["worktree"]["branch"]:
+    if worktree.is_dir() and branch(worktree) != record["worktree"]["branch"]:
         fail("cycle worktree branch changed")
     recorded_commits = [entry["id"] for entry in record["commits"]]
-    if recorded_commits and git(worktree, "rev-parse", "HEAD").stdout.strip() != recorded_commits[-1]:
+    if worktree.is_dir() and recorded_commits and git(worktree, "rev-parse", "HEAD").stdout.strip() != recorded_commits[-1]:
         fail("cycle worktree HEAD changed")
     delivery = record.get("delivery", {})
     remote = delivery.get("remote")
     remote_branch = delivery.get("branch")
-    if not remote or not remote_branch:
+    if worktree.is_dir() and (not remote or not remote_branch):
         remote, remote_branch = remote_for_upstream(worktree, record["git"]["upstream"])
     expected = record["git"]["remote"]
-    if expected != remote_destination(worktree, record["git"]["upstream"]):
+    if worktree.is_dir() and expected != remote_destination(worktree, record["git"]["upstream"]):
         fail("remote push destination changed")
-    git(worktree, "fetch", remote, remote_branch)
+    if worktree.is_dir():
+        git(worktree, "fetch", remote, remote_branch)
     target = record["git"]["upstream"]
     for entry in record["commits"]:
-        if git(worktree, "merge-base", "--is-ancestor", entry["id"], target, check=False).returncode:
+        if worktree.is_dir() and git(worktree, "merge-base", "--is-ancestor", entry["id"], target, check=False).returncode:
             fail("cycle commits are not all contained in the delivery target")
     branch_name = record["worktree"].get("branch")
-    git(root, "worktree", "remove", str(worktree))
+    if worktree.is_dir():
+        git(root, "worktree", "remove", str(worktree))
     if branch_name:
         git(root, "branch", "-d", branch_name, check=False)
+    if schema3:
+        evidence = cycle_dir(root) / "evidence" / args.cycle_id
+        parked = evidence.with_name(evidence.name + ".cleanup")
+        cleanup = record.get("cleanup")
+        if cleanup:
+            if cleanup.get("state") != "evidence_parked" or evidence.exists():
+                fail("invalid evidence cleanup state")
+        elif parked.exists():
+            fail("untracked parked evidence directory")
+        elif evidence.exists():
+            os.replace(evidence, parked)
+            record["cleanup"] = {"state": "evidence_parked", "parked_at": now()}
+            save(path, record)
+        else:
+            record["cleanup"] = {"state": "evidence_parked", "parked_at": now()}
+            save(path, record)
+        if parked.exists():
+            shutil.rmtree(parked)
+        path.unlink()
     print("removed " + str(worktree))
 
 
@@ -918,11 +959,236 @@ def command_review(args):
     save(path, record)
 
 
+def evidence_text(value, limit, name):
+    try:
+        raw = value.encode("utf-8")
+    except UnicodeEncodeError:
+        fail(f"{name} must be UTF-8")
+    if not value or len(raw) > limit or any(ord(char) < 32 or ord(char) == 127 for char in value):
+        fail(f"invalid {name}")
+    if SECRET_VALUE.search(value) or HIGH_ENTROPY.search(value):
+        fail(f"unsafe {name}")
+    return value
+
+
+def redact_argument(value):
+    if SECRET_VALUE.search(value) or HIGH_ENTROPY.search(value) or value.startswith("op://"):
+        return "[REDACTED]"
+    if "://" in value and re.search(r"://[^/@:]+:[^/@]+@", value):
+        return "[REDACTED]"
+    return value
+
+
+def sanitized_argv(argv):
+    if not argv or len(argv) > 64:
+        fail("argv must contain 1 through 64 entries")
+    output = []
+    for index, value in enumerate(argv):
+        if not isinstance(value, str) or "\0" in value:
+            fail("invalid argv")
+        if index == 0:
+            name = Path(value).name
+            output.append(name if name and not SECRET_VALUE.search(name) and not HIGH_ENTROPY.search(name) else "[REDACTED]")
+        elif value.startswith("--"):
+            output.append(value.partition("=")[0] + ("=[REDACTED]" if "=" in value else ""))
+        elif value in ("-q", "-v", "-s", "-x", "-n"):
+            output.append(value)
+        else:
+            output.append("[REDACTED]")
+    if len(json.dumps(output, ensure_ascii=True, separators=(",", ":")).encode()) > 4096:
+        fail("serialized argv exceeds 4096 bytes")
+    return output
+
+
+def safe_output(raw):
+    if not raw:
+        return {"status": "no_content"}, None
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return {"status": "withheld", "reason": "non_utf8"}, None
+    if (SECRET_VALUE.search(text) or HIGH_ENTROPY.search(text) or "://" in text
+            or re.search(r"(?:^|\s)(?:/|~)[^\s]+", text) or any(ord(char) < 32 and char not in "\n\r\t" for char in text)):
+        return {"status": "withheld", "reason": "unclassified"}, None
+    lines = [line for line in text.splitlines() if line]
+    if not lines or not all(SAFE_EVIDENCE_LINE.fullmatch(line) for line in lines):
+        return {"status": "withheld", "reason": "unclassified"}, None
+    return None, text.encode("utf-8")
+
+
+def write_sidecar(root, cycle_id, data):
+    digest = hashlib.sha256(data).hexdigest()
+    parent = common_git_dir(root) / "dbsctr" / "evidence"
+    directory = parent / cycle_id
+    for candidate in (parent, directory):
+        if candidate.is_symlink():
+            fail("unsafe evidence directory")
+        candidate.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(candidate, 0o700)
+        candidate_stat = candidate.stat()
+        if candidate_stat.st_uid != os.getuid() or candidate_stat.st_mode & 0o777 != 0o700:
+            fail("unsafe evidence directory")
+    target = directory / digest
+    if target.exists() or target.is_symlink():
+        stat = target.lstat()
+        if (not target.is_file() or target.is_symlink() or stat.st_uid != os.getuid()
+                or stat.st_mode & 0o777 != 0o600 or stat.st_size != len(data)
+                or hashlib.sha256(target.read_bytes()).hexdigest() != digest):
+            fail("unsafe evidence sidecar")
+        return digest
+    descriptor, temporary = tempfile.mkstemp(dir=directory)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary, target)
+        except FileExistsError:
+            pass
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+    return digest
+
+
+def verify_envelope(root, record, gate_name, require_bound=False, require_head=True):
+    gate = record["gates"][gate_name]
+    evidence_id = gate.get("evidence")
+    item = record.get("evidence", {}).get("items", {}).get(evidence_id)
+    if not item or item.get("gate") != gate_name or item.get("result") != gate.get("result"):
+        fail(f"invalid evidence for gate: {gate_name}")
+    if require_head and item.get("head") != git(root, "rev-parse", "HEAD").stdout.strip():
+        fail(f"evidence HEAD is stale: {gate_name}")
+    if require_bound and not item.get("commit"):
+        fail(f"evidence is not bound to a commit: {gate_name}")
+    content = item.get("content", {})
+    if content.get("status") == "sidecar":
+        if content.get("path") != f"evidence/{record['cycle_id']}/{content.get('sha256')}":
+            fail("invalid evidence sidecar path")
+        target = common_git_dir(root) / "dbsctr" / content["path"]
+        if (not target.exists() or target.is_symlink() or not target.is_file() or target.stat().st_uid != os.getuid()
+                or target.stat().st_mode & 0o777 != 0o600 or target.stat().st_size != content.get("byte_count")
+                or hashlib.sha256(target.read_bytes()).hexdigest() != content.get("sha256")):
+            fail("invalid evidence sidecar")
+    elif content.get("status") not in ("withheld", "no_content"):
+        fail("invalid evidence content")
+    return item
+
+
+def evidence_path_blobs(root, paths, index=False, commit=None):
+    if not paths:
+        return {}
+    result = {}
+    for name in paths if index or commit else safe_paths(root, paths):
+        if commit:
+            value = git(root, "rev-parse", "--verify", f"{commit}:{name}", check=False)
+        elif index:
+            value = git(root, "rev-parse", "--verify", f":{name}", check=False)
+        elif os.path.lexists(root / name):
+            value = git(root, "hash-object", "--path", name, "--", name, check=False)
+        else:
+            value = None
+        result[name] = value.stdout.strip() if value and value.returncode == 0 else None
+    return result
+
+
+def command_record_evidence(args):
+    root = root_dir()
+    authority = evidence_text(args.authority, 128, "authority")
+    argv, sanitized = list(args.program), sanitized_argv(args.program)
+    path_blobs = evidence_path_blobs(root, args.path or [])
+    with evidence_lock(root, active_path(root).read_text(encoding="utf-8").strip()):
+        path, record = load(root)
+        require_active(record)
+        if record.get("schema_version") != 3:
+            fail("record-evidence requires a schema 3 Cycle Record")
+        gate = record["gates"][args.gate]
+        if gate["applicability"] != "required":
+            fail("evidence gate is not required")
+        started, observed, cutoff, start_error = now(), 0, None, False
+        raw = bytearray()
+        try:
+            process = subprocess.Popen(argv, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                       stderr=subprocess.STDOUT, shell=False, start_new_session=True)
+            selector = selectors.DefaultSelector()
+            selector.register(process.stdout, selectors.EVENT_READ)
+            deadline = datetime.now(timezone.utc).timestamp() + args.timeout
+            while selector.get_map() and not cutoff:
+                remaining = deadline - datetime.now(timezone.utc).timestamp()
+                if remaining <= 0:
+                    cutoff = "timeout"
+                    break
+                for key, _ in selector.select(remaining):
+                    block = os.read(key.fd, 65536)
+                    if not block:
+                        selector.unregister(key.fileobj)
+                        continue
+                    observed += len(block)
+                    raw.extend(block[:max(0, EVIDENCE_RAW_CAP - len(raw))])
+                    if observed > EVIDENCE_RAW_CAP:
+                        cutoff = "overflow"
+                        break
+            if cutoff:
+                os.killpg(process.pid, signal.SIGTERM)
+                try:
+                    process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    pass
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            process.wait(timeout=2)
+            selector.close()
+        except subprocess.TimeoutExpired:
+            cutoff = "timeout"
+            if process:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+        except OSError:
+            start_error, process = True, None
+        finished = now()
+        result = "unavailable" if start_error or cutoff else "passed" if process.returncode == 0 else "failed"
+        if result == "passed":
+            incomplete = [name for name in GATES[:GATES.index(args.gate)] if not disposed(record["gates"][name])]
+            if incomplete:
+                fail("gate predecessors are incomplete: " + ", ".join(incomplete))
+        content, retained = ({"status": "withheld", "reason": cutoff or "start_failed"}, None) if (cutoff or start_error) else safe_output(bytes(raw))
+        envelope = {"id": "ev-" + uuid.uuid4().hex, "gate": args.gate, "authority": authority,
+                    "argv": sanitized, "paths": path_blobs,
+                    "head": git(root, "rev-parse", "HEAD").stdout.strip(),
+                    "started_at": started, "finished_at": finished, "result": result,
+                    "raw": {"byte_count": observed, "lower_bound": bool(cutoff), "truncated": bool(cutoff)},
+                    "summary": "passed" if result == "passed" else "failed" if result == "failed" else "unavailable", "urls": []}
+        if retained is not None:
+            retained, truncated = retained[:EVIDENCE_SIDECAR_CAP], len(retained) > EVIDENCE_SIDECAR_CAP
+            digest = write_sidecar(root, record["cycle_id"], retained)
+            content = {"status": "sidecar", "path": f"evidence/{record['cycle_id']}/{digest}", "sha256": digest,
+                       "byte_count": len(retained), "truncated": truncated}
+        envelope["content"] = content
+        evidence_id = envelope["id"]
+        record["evidence"]["items"][evidence_id] = envelope
+        gate.pop("exception", None)
+        gate.update({"result": result, "evidence": evidence_id})
+        save(path, record)
+        print(evidence_id)
+
+
 def command_set_gate(args):
     root = root_dir()
     path, record = load(root)
     require_active(record)
     gate = record["gates"][args.gate]
+    if record.get("schema_version") == 3 and args.evidence is not None:
+        item = record["evidence"]["items"].get(args.evidence)
+        if not item or item["gate"] != args.gate or item["result"] != args.result:
+            fail("schema 3 evidence must be a matching stored evidence ID")
+        if item["head"] != git(root, "rev-parse", "HEAD").stdout.strip():
+            fail("schema 3 evidence HEAD is stale")
     if is_v32(record) and args.result == "passed":
         incomplete = [name for name in GATES[:GATES.index(args.gate)] if not disposed(record["gates"][name])]
         if incomplete:
@@ -1051,11 +1317,19 @@ def command_gate_commit(args):
     path, record = load(root)
     require_active(record)
     require_current_profile(root, record)
+    schema3_items = []
     for name in args.gates:
         gate = record["gates"][name]
         complete = gate["applicability"] == "not_applicable" or gate["result"] == "passed" or "exception" in gate
         if not complete:
             fail(f"gate is not complete: {name}")
+        if record.get("schema_version") == 3 and gate["result"] in ("passed", "failed", "unavailable"):
+            item = verify_envelope(root, record, name)
+            if set(item.get("paths", {})) != set(args.paths):
+                fail(f"evidence paths differ from commit paths: {name}")
+            if evidence_path_blobs(root, args.paths) != item["paths"]:
+                fail(f"evidence paths changed after validation: {name}")
+            schema3_items.append((name, item))
     paths = safe_paths(root, args.paths)
     staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
     if staged and set(staged) != set(paths):
@@ -1063,6 +1337,9 @@ def command_gate_commit(args):
     if git(root, "diff", "--check", check=False).returncode:
         fail("git diff --check failed")
     git(root, "add", "--", *paths)
+    for name, item in schema3_items:
+        if evidence_path_blobs(root, args.paths, index=True) != item["paths"]:
+            fail(f"staged paths differ from evidence: {name}")
     if git(root, "diff", "--cached", "--check", check=False).returncode:
         fail("staged git diff --check failed")
     staged = git(root, "diff", "--cached", "--name-only").stdout.splitlines()
@@ -1072,6 +1349,14 @@ def command_gate_commit(args):
         fail("staged diff is empty")
     git(root, "commit", "-m", args.message)
     commit = git(root, "rev-parse", "HEAD").stdout.strip()
+    if record.get("schema_version") == 3:
+        for name, item in schema3_items:
+            if evidence_path_blobs(root, args.paths, commit=commit) != item["paths"]:
+                fail(f"committed paths differ from evidence: {name}")
+        for name in args.gates:
+            gate = record["gates"][name]
+            if gate.get("evidence"):
+                record["evidence"]["items"][gate["evidence"]]["commit"] = commit
     record["commits"].append({"id": commit, "gates": args.gates})
     save(path, record)
     print(commit)
@@ -1094,6 +1379,16 @@ def finish_push(root, path, record):
         return
     require_pushable(record)
     require_current_profile(root, record)
+    if record.get("schema_version") == 3:
+        final_head = git(root, "rev-parse", "HEAD").stdout.strip()
+        for name, gate in record["gates"].items():
+            if gate["applicability"] == "required" and gate["result"] in ("passed", "failed", "unavailable"):
+                item = verify_envelope(root, record, name, require_head=False)
+                gate_commits = {entry["id"] for entry in record["commits"] if name in entry["gates"]}
+                if item.get("commit") and item["commit"] not in gate_commits:
+                    fail(f"evidence commit is not bound to its gate: {name}")
+                if not item.get("commit") and item.get("head") != final_head:
+                    fail(f"uncommitted gate evidence HEAD is stale: {name}")
     if any(gate["applicability"] == "required" and gate["result"] != "passed" and "exception" not in gate
            for gate in record["gates"].values()):
         fail("required gates have not all passed")
@@ -1215,6 +1510,13 @@ def parser():
     dvc.add_argument("--head", required=True)
     dvc.add_argument("--evidence", required=True)
     dvc.set_defaults(func=command_record_dvc_push)
+    evidence = commands.add_parser("record-evidence")
+    evidence.add_argument("gate", choices=GATES)
+    evidence.add_argument("--authority", required=True)
+    evidence.add_argument("--timeout", type=int, default=120, choices=range(1, 601))
+    evidence.add_argument("--path", action="append")
+    evidence.add_argument("program", nargs="+")
+    evidence.set_defaults(func=command_record_evidence)
     check = commands.add_parser("check")
     check.add_argument("subject", choices=("artifacts",))
     check.set_defaults(func=command_check)

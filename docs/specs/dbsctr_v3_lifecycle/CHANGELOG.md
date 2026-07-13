@@ -1,5 +1,27 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.8 Evidence Envelopes
+
+- Added schema-3 Cycle Records and permission-gated `record-evidence` execution
+  with no shell, closed stdin, bounded process-group timeout/output, conservative
+  argv metadata, and no environment serialization.
+- Added explicit sidecar/withheld/no-content dispositions. Only strict allowlisted
+  summaries reach private hash-addressed sidecars; arbitrary text, URLs, binary,
+  suspected secrets, and unclassified output are withheld without raw digests.
+- Bound envelopes to pre-commit HEAD and explicit path/blob identities; rechecked
+  worktree, staged index, and committed tree before Gate Commit binding; rechecked
+  envelope and sidecar integrity before Final Push.
+- Coupled schema-3 evidence and record deletion through retryable permission-gated
+  cleanup while preserving historical schema behavior.
+- Added conditional Python guidance for project-owned `op://`/`op run` wrappers,
+  lazy grouped Pydantic Settings, `SecretStr`, fake-value tests, and constrained
+  credential files. Private local references remain non-public and non-authoritative.
+- Validation: 256 tests passed and 1 skipped; Python compile and `git diff --check`
+  passed. Builder output received primary integration review; independent security
+  review findings were remediated and final review reported no findings.
+- Deployment: targeted local chezmoi apply pending. Gate Exceptions: none.
+  Intended Final Push: `origin/main`.
+
 ## 2026-07-12 — V3.7 Fixed-Commit Inspection
 
 - Added dependency-free `dbsctrctl inspect` actions for bounded committed-file

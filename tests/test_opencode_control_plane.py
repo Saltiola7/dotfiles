@@ -63,6 +63,7 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert bash["dbsctrctl final-push*"] == "allow"
     assert bash["dbsctrctl approve-exception*"] == "ask"
     assert bash["dbsctrctl record-dvc-push*"] == "ask"
+    assert bash["dbsctrctl record-evidence*"] == "ask"
     assert bash["dbsctrctl cleanup*"] == "ask"
     for command in (
         "herdr server stop*", "herdr config reset-keys*", "herdr worktree remove*",

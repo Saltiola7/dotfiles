@@ -71,7 +71,7 @@
 - Reconcile only mechanically proven drift by default; route semantic ambiguity
   through Discovery and context-specific DBSCTR cycles.
 
-### V3.7 — Fixed-Commit Inspection
+### V3.7 — Fixed-Commit Inspection (complete)
 
 - Add one read-only helper and typed adapter with `read`, `tree`, `search`, and
   `object` actions over a once-resolved immutable Git object ID.
@@ -81,7 +81,7 @@
   continuation explicit.
 - Perform no checkout, fetch, index/worktree mutation, or shell interpolation.
 
-### V3.8 — Evidence Envelopes
+### V3.8 — Evidence Envelopes (active)
 
 - Store evidence metadata in retained Cycle Records and sanitized large output
   in hash-addressed sidecars beneath `.git/dbsctr/evidence/<cycle-id>/`.

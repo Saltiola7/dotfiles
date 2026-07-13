@@ -28,7 +28,7 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.7`. Use the typed `dbsctr_status` tool when available,
+5. Report Method Revision `3.8`. Use the typed `dbsctr_status` tool when available,
    otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
     bound to the committed Engineering Profile, then obtain authorization before `dbsctr_begin`;
@@ -264,6 +264,16 @@ files. After one gate or a small adjacent gate group passes:
    adjacent gates when separate commits would add noise; skip gates with no file
    changes.
 5. Verify the commit and remaining worktree state before continuing.
+
+For schema-3 cycles, execute a project-selected authority through
+`dbsctrctl record-evidence GATE --authority NAME [--path FILE ...] -- PROGRAM ...`.
+This nested authority execution is permission-gated. The helper runs
+an argument vector without a shell, stores only conservative metadata and safe
+allowlisted output, withholds everything unclassified, and binds passing evidence
+to the exact validated path/blob set and its Gate Commit. Do not place secrets in command arguments merely because the
+record sanitizes them; use the project-owned secret wrapper and inherited process
+environment. Gates with no file changes retain evidence only when its HEAD still
+matches Final Push HEAD.
 
 The primary alone stages, commits, and pushes. If hooks reject a commit, fix the
 issue and create a new commit; never bypass hooks or rewrite published history.

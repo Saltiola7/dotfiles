@@ -2,6 +2,7 @@
 
 import json
 import fcntl
+import hashlib
 import importlib.machinery
 import importlib.util
 import os
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 from pathlib import Path
 
@@ -91,16 +93,23 @@ class DbsctrctlTest(unittest.TestCase):
     def pass_gates(self):
         for gate in GATES:
             if gate != "release":
-                run(self.repo, "set-gate", gate, "--result", "passed", "--evidence", "test evidence")
+                self.record_gate(gate)
 
     def pass_gate(self, gate="domain"):
-        run(self.repo, "set-gate", gate, "--result", "passed", "--evidence", "test evidence")
+        self.record_gate(gate)
+
+    def record_gate(self, gate, code=0, paths=()):
+        command = ["record-evidence", gate, "--authority", "test"]
+        for path in paths:
+            command += ["--path", path]
+        return run(self.repo, *command, "--", sys.executable, "-c", f"raise SystemExit({code})")
 
     def test_start_records_current_method_revision_and_release_default(self):
         self.start()
         record = json.loads(self.record_path().read_text())
-        self.assertEqual(record["method_revision"], "3.7")
-        self.assertEqual(record["schema_version"], 2)
+        self.assertEqual(record["method_revision"], "3.8")
+        self.assertEqual(record["schema_version"], 3)
+        self.assertEqual(record["evidence"], {"version": 1, "items": {}})
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
         self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")
         self.assertEqual(record["state"], "active")
@@ -181,20 +190,171 @@ class DbsctrctlTest(unittest.TestCase):
     def test_gate_pass_requires_predecessors_but_failure_does_not(self):
         self.start()
         result = run(
-            self.repo, "set-gate", "behavior", "--result", "passed",
-            "--evidence", "too early", ok=False,
+            self.repo, "record-evidence", "behavior", "--authority", "test", "--",
+            sys.executable, "-c", "raise SystemExit(0)", ok=False,
         )
         self.assertIn("predecessor", result.stderr)
-        run(self.repo, "set-gate", "behavior", "--result", "failed", "--evidence", "early failure")
-        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
+        self.record_gate("behavior", 1)
+        self.record_gate("domain")
         run(
             self.repo, "approve-exception", "behavior", "--kind", "deferred",
             "--rationale", "approved", "--owner", "owner", "--review-condition", "next cycle",
         )
-        run(self.repo, "set-gate", "spec", "--result", "passed", "--evidence", "spec")
+        self.record_gate("spec")
         run(self.repo, "set-gate", "domain", "--result", "pending")
         record = json.loads(self.record_path().read_text())
         self.assertEqual(record["gates"]["spec"]["result"], "pending")
+
+    def test_record_evidence_runs_literal_command_and_binds_gate(self):
+        self.start()
+        marker = self.repo / "shell-expanded"
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--",
+            sys.executable, "-c", "import sys; assert sys.stdin.read() == ''; print('ok')", f"$(touch {marker})")
+        record = json.loads(self.record_path().read_text())
+        evidence_id = record["gates"]["domain"]["evidence"]
+        envelope = record["evidence"]["items"][evidence_id]
+        self.assertEqual(envelope["result"], "passed")
+        self.assertEqual(envelope["argv"][-1], "[REDACTED]")
+        self.assertFalse(marker.exists())
+        self.assertEqual(envelope["urls"], [])
+        self.assertNotIn("environment", json.dumps(record))
+
+    def test_record_evidence_redacts_or_withholds_secrets(self):
+        self.start()
+        secret = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--",
+            sys.executable, "-c", f"print('{secret}')", "--token", secret)
+        record = json.loads(self.record_path().read_text())
+        envelope = next(iter(record["evidence"]["items"].values()))
+        serialized = json.dumps(envelope)
+        self.assertNotIn(secret, serialized)
+        self.assertEqual(envelope["argv"][-1], "[REDACTED]")
+        self.assertEqual(envelope["content"], {"status": "withheld", "reason": "unclassified"})
+
+    def test_record_evidence_retains_only_allowlisted_output_and_sanitizes_argv(self):
+        self.start()
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--",
+            sys.executable, "-c", "print('ok')", "--file=private.txt", "short-secret", "-psecret")
+        envelope = next(iter(json.loads(self.record_path().read_text())["evidence"]["items"].values()))
+        self.assertEqual(envelope["argv"], [Path(sys.executable).name, "[REDACTED]", "[REDACTED]",
+                                             "--file=[REDACTED]", "[REDACTED]", "[REDACTED]"])
+        self.assertEqual(envelope["content"]["status"], "sidecar")
+        self.assertIn("path", envelope["content"])
+
+    def test_record_evidence_failure_and_set_gate_rejects_arbitrary_schema3_evidence(self):
+        self.start()
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--",
+            sys.executable, "-c", "raise SystemExit(2)")
+        record = json.loads(self.record_path().read_text())
+        self.assertEqual(record["gates"]["domain"]["result"], "failed")
+        result = run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "arbitrary", ok=False)
+        self.assertIn("evidence ID", result.stderr)
+
+    def test_record_evidence_withholds_binary_and_overflow_output(self):
+        self.start()
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--",
+            sys.executable, "-c", "import os; os.write(1, b'\\xff')")
+        record = json.loads(self.record_path().read_text())
+        binary = next(iter(record["evidence"]["items"].values()))
+        self.assertEqual(binary["content"]["status"], "withheld")
+        self.assertEqual(binary["result"], "passed")
+
+        run(self.repo, "record-evidence", "behavior", "--authority", "unit", "--", sys.executable, "-c",
+            "import os; os.write(1, b'x' * (1024 * 1024 + 1))")
+        overflow = next(item for item in json.loads(self.record_path().read_text())["evidence"]["items"].values()
+                        if item["gate"] == "behavior")
+        self.assertEqual(overflow["result"], "unavailable")
+        self.assertTrue(overflow["raw"]["truncated"])
+        self.assertEqual(overflow["content"], {"status": "withheld", "reason": "overflow"})
+
+    def test_record_evidence_sidecar_is_hashed_private_and_deduplicated(self):
+        self.start()
+        command = [sys.executable, "-c", "print('ok')"]
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--", *command)
+        run(self.repo, "record-evidence", "behavior", "--authority", "unit", "--", *command)
+        items = list(json.loads(self.record_path().read_text())["evidence"]["items"].values())
+        digest = items[0]["content"]["sha256"]
+        sidecar = self.repo / ".git/dbsctr/evidence/cycle-1" / digest
+        self.assertEqual(hashlib.sha256(sidecar.read_bytes()).hexdigest(), digest)
+        self.assertEqual(sidecar.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(items[1]["content"]["sha256"], digest)
+
+    def test_gate_commit_binds_current_evidence_and_rejects_tampered_sidecar(self):
+        self.start()
+        (self.repo / "tracked.txt").write_text("domain\n")
+        run(self.repo, "record-evidence", "domain", "--authority", "unit", "--path", "tracked.txt",
+            "--", sys.executable, "-c", "print('ok')")
+        run(self.repo, "gate-commit", "--message", "domain", "--gates", "domain", "--paths", "tracked.txt")
+        record = json.loads(self.record_path().read_text())
+        domain = record["evidence"]["items"][record["gates"]["domain"]["evidence"]]
+        self.assertEqual(domain["commit"], subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo,
+                         text=True, capture_output=True, check=True).stdout.strip())
+        (self.repo / "tracked.txt").write_text("behavior\n")
+        run(self.repo, "record-evidence", "behavior", "--authority", "unit", "--path", "tracked.txt",
+            "--", sys.executable, "-c", "print('ok')")
+        behavior = next(item for item in json.loads(self.record_path().read_text())["evidence"]["items"].values()
+                        if item["gate"] == "behavior")
+        (self.repo / ".git/dbsctr" / behavior["content"]["path"]).unlink()
+        result = run(self.repo, "gate-commit", "--message", "behavior", "--gates", "behavior",
+                     "--paths", "tracked.txt", ok=False)
+        self.assertIn("sidecar", result.stderr)
+
+    def test_schema3_rejects_stale_cross_gate_and_precreated_sidecar_evidence(self):
+        self.start()
+        evidence_id = self.record_gate("domain", paths=("tracked.txt",)).stdout.strip()
+        cross_gate = run(self.repo, "set-gate", "behavior", "--result", "passed",
+                         "--evidence", evidence_id, ok=False)
+        self.assertIn("matching stored evidence ID", cross_gate.stderr)
+        (self.repo / "tracked.txt").write_text("new head\n")
+        subprocess.run(["git", "commit", "-am", "advance"], cwd=self.repo, check=True,
+                       capture_output=True)
+        stale = run(self.repo, "gate-commit", "--message", "stale", "--gates", "domain",
+                    "--paths", "tracked.txt", ok=False)
+        self.assertIn("evidence HEAD is stale", stale.stderr)
+
+    def test_schema3_rejects_precreated_sidecar_symlink(self):
+        self.start()
+        directory = self.repo / ".git/dbsctr/evidence/cycle-1"
+        directory.mkdir(parents=True, mode=0o700)
+        digest = hashlib.sha256(b"ok\n").hexdigest()
+        (directory / digest).symlink_to(self.repo / "tracked.txt")
+        unsafe = run(self.repo, "record-evidence", "domain", "--authority", "test", "--",
+                     sys.executable, "-c", "print('ok')", ok=False)
+        self.assertIn("unsafe evidence sidecar", unsafe.stderr)
+
+    def test_schema3_rejects_paths_changed_after_evidence(self):
+        self.start()
+        (self.repo / "tracked.txt").write_text("validated\n")
+        self.record_gate("domain", paths=("tracked.txt",))
+        (self.repo / "tracked.txt").write_text("changed later\n")
+        result = run(self.repo, "gate-commit", "--message", "unsafe", "--gates", "domain",
+                     "--paths", "tracked.txt", ok=False)
+        self.assertIn("changed after validation", result.stderr)
+
+    def test_schema3_rejects_commit_hook_path_changes(self):
+        self.start()
+        (self.repo / "tracked.txt").write_text("validated\n")
+        self.record_gate("domain", paths=("tracked.txt",))
+        hook = self.repo / ".git/hooks/pre-commit"
+        hook.write_text("#!/bin/sh\nprintf 'hook changed\\n' > tracked.txt\ngit add tracked.txt\n")
+        hook.chmod(0o755)
+        result = run(self.repo, "gate-commit", "--message", "hook", "--gates", "domain",
+                     "--paths", "tracked.txt", ok=False)
+        self.assertIn("committed paths differ from evidence", result.stderr)
+
+    def test_record_evidence_kills_resistant_process_group_without_leaking_argv(self):
+        self.start()
+        script = (
+            "import os,signal,time; child=os.fork(); "
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(10)"
+        )
+        result = run(self.repo, "record-evidence", "domain", "--authority", "unit", "--timeout", "1",
+                     "--", sys.executable, "-c", script)
+        evidence_id = result.stdout.strip()
+        envelope = json.loads(self.record_path().read_text())["evidence"]["items"][evidence_id]
+        self.assertEqual(envelope["result"], "unavailable")
+        self.assertEqual(envelope["content"], {"status": "withheld", "reason": "timeout"})
+        self.assertNotIn(script, json.dumps(envelope))
 
     def test_risk_and_applicability_only_tighten(self):
         self.start()
@@ -400,11 +560,26 @@ class DbsctrctlTest(unittest.TestCase):
         record = json.loads(record_path.read_text())
         record.update({"state": "completed", "completed_at": "2026-01-01T00:00:00Z"})
         record_path.write_text(json.dumps(record))
+        evidence = self.repo / ".git/dbsctr/evidence/isolated-1"
+        evidence.mkdir(parents=True)
+        (evidence / "retained-sidecar").write_bytes(b"safe")
         pointer = self.repo / ".git/dbsctr/worktrees" / record["worktree"]["id"] / "active"
         pointer.unlink()
+        loader = importlib.machinery.SourceFileLoader("dbsctrctl_cleanup_module", str(SCRIPT))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+        with mock.patch.object(module, "root_dir", return_value=self.repo), \
+             mock.patch.object(module.shutil, "rmtree", side_effect=OSError("interrupted cleanup")):
+            with self.assertRaises(OSError):
+                module.command_cleanup(SimpleNamespace(cycle_id="isolated-1", now=True))
+        parked_record = json.loads(record_path.read_text())
+        self.assertEqual(parked_record["cleanup"]["state"], "evidence_parked")
+        self.assertTrue((evidence.parent / "isolated-1.cleanup").exists())
         run(self.repo, "cleanup", "--cycle-id", "isolated-1", "--now")
         self.assertFalse(Path(handoff["worktree"]).exists())
-        self.assertTrue(record_path.exists())
+        self.assertFalse(record_path.exists())
+        self.assertFalse(evidence.exists())
 
     def test_cleanup_rejects_low_level_or_drifted_worktree(self):
         self.start()
@@ -646,9 +821,9 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
         profile = self.repo / "docs/specs/test/README.md"
         profile.write_text("new profile\n")
+        self.record_gate("domain", paths=("docs/specs/test/README.md",))
         run(
             self.repo, "gate-commit", "--message", "profile", "--gates", "domain",
             "--paths", "docs/specs/test/README.md",
@@ -659,6 +834,7 @@ class DbsctrctlTest(unittest.TestCase):
             for name, gate in record["gates"].items()
         }}
         (self.repo / "tracked.txt").write_text("change\n")
+        self.record_gate("domain", paths=("tracked.txt",))
         result = run(
             self.repo, "gate-commit", "--message", "change", "--gates", "domain",
             "--paths", "tracked.txt", ok=False,
@@ -671,6 +847,7 @@ class DbsctrctlTest(unittest.TestCase):
         )
         changelog = self.repo / "docs/specs/test/CHANGELOG.md"
         changelog.write_text("completed\n")
+        self.record_gate("domain", paths=("docs/specs/test/CHANGELOG.md",))
         run(
             self.repo, "gate-commit", "--message", "changelog", "--gates", "domain",
             "--paths", "docs/specs/test/CHANGELOG.md",
@@ -707,13 +884,13 @@ class DbsctrctlTest(unittest.TestCase):
             "--reason", "no runtime", ok=False,
         )
         run(self.repo, "set-gate", "operate", "--result", "passed", "--evidence", "x", ok=False)
-        run(self.repo, "set-gate", "domain", "--result", "failed", "--evidence", "failed check")
+        self.record_gate("domain", 1)
         run(
             self.repo, "approve-exception", "domain", "--kind", "deferred",
             "--rationale", "approved later", "--owner", "owner",
             "--review-condition", "next cycle",
         )
-        run(self.repo, "set-gate", "domain", "--result", "failed", "--evidence", "new failure")
+        self.record_gate("domain", 1)
         record = json.loads(self.record_path().read_text())
         self.assertNotIn("exception", record["gates"]["domain"])
 
@@ -745,16 +922,16 @@ class DbsctrctlTest(unittest.TestCase):
 
     def test_gate_commit_refuses_unrelated_staged_paths(self):
         self.start()
-        self.pass_gate()
         (self.repo / "tracked.txt").write_text("wanted\n")
+        self.record_gate("domain", paths=("tracked.txt",))
         (self.repo / "other.txt").write_text("base\n")
         subprocess.run(["git", "add", "other.txt"], cwd=self.repo, check=True)
         run(self.repo, "gate-commit", "--message", "wanted", "--gates", "domain", "--paths", "tracked.txt", ok=False)
 
     def test_gate_commit_accepts_explicit_new_file(self):
         self.start()
-        self.pass_gate()
         (self.repo / "new.txt").write_text("new\n")
+        self.record_gate("domain", paths=("new.txt",))
         result = run(self.repo, "gate-commit", "--message", "new file", "--gates", "domain", "--paths", "new.txt")
         self.assertEqual(len(result.stdout.strip()), 40)
         tracked = subprocess.run(
@@ -767,9 +944,9 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "add", "test_secret_loader.py"], cwd=self.repo, check=True)
         subprocess.run(["git", "commit", "-m", "fixture"], cwd=self.repo, check=True, capture_output=True)
         self.start()
-        self.pass_gate()
         (self.repo / "tracked.txt").unlink()
         (self.repo / "test_secret_loader.py").write_text("changed safe source\n")
+        self.record_gate("domain", paths=("tracked.txt", "test_secret_loader.py"))
         run(
             self.repo, "gate-commit", "--message", "delete and edit", "--gates", "domain", "--paths",
             "tracked.txt", "test_secret_loader.py",
@@ -797,9 +974,9 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        run(self.repo, "set-gate", "domain", "--result", "passed", "--evidence", "domain")
         changelog = self.repo / "docs/specs/test/CHANGELOG.md"
         changelog.write_text("completed\n")
+        self.record_gate("domain", paths=("docs/specs/test/CHANGELOG.md",))
         run(self.repo, "gate-commit", "--message", "cycle", "--gates", "domain", "--paths",
             "docs/specs/test/CHANGELOG.md")
         run(self.repo, "review-artifact", "README", "--result", "unchanged", "--reason", "accurate")
@@ -828,8 +1005,8 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        self.pass_gate()
         (self.repo / "docs/specs/test/CHANGELOG.md").write_text("completed\n")
+        self.record_gate("domain", paths=("docs/specs/test/CHANGELOG.md",))
         run(
             self.repo, "gate-commit", "--message", "cycle change", "--gates", "domain", "--paths",
             "docs/specs/test/CHANGELOG.md",
@@ -851,10 +1028,12 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        self.pass_gate()
         (self.repo / "tracked.txt").write_text("cycle\n")
         (self.repo / "docs/specs/test/BACKLOG.md").write_text("done\n")
         (self.repo / "docs/specs/test/CHANGELOG.md").write_text("completed\n")
+        self.record_gate("domain", paths=(
+            "tracked.txt", "docs/specs/test/BACKLOG.md", "docs/specs/test/CHANGELOG.md",
+        ))
         run(
             self.repo, "gate-commit", "--message", "cycle change", "--gates", "domain", "--paths",
             "tracked.txt", "docs/specs/test/BACKLOG.md", "docs/specs/test/CHANGELOG.md",
@@ -889,9 +1068,9 @@ class DbsctrctlTest(unittest.TestCase):
             capture_output=True,
         )
         self.start()
-        self.pass_gate()
         (self.repo / "tracked.txt").write_text("cycle\n")
         (self.repo / "docs/specs/test/CHANGELOG.md").write_text("completed\n")
+        self.record_gate("domain", paths=("tracked.txt", "docs/specs/test/CHANGELOG.md"))
         run(
             self.repo, "gate-commit", "--message", "cycle change", "--gates", "domain", "--paths",
             "tracked.txt", "docs/specs/test/CHANGELOG.md",
@@ -917,8 +1096,8 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        self.pass_gate()
         (self.repo / "tracked.txt").write_text("cycle\n")
+        self.record_gate("domain", paths=("tracked.txt",))
         run(self.repo, "gate-commit", "--message", "cycle change", "--gates", "domain", "--paths", "tracked.txt")
         self.review_artifacts()
         self.pass_gates()
@@ -937,12 +1116,12 @@ class DbsctrctlTest(unittest.TestCase):
         subprocess.run(["git", "push", "-u", "origin", "HEAD"], cwd=self.repo, check=True,
                        capture_output=True)
         self.start()
-        self.pass_gate()
         run(
             self.repo, "record-dvc-push", "--head", "0" * 40,
             "--evidence", "wrong", ok=False,
         )
         (self.repo / "docs/specs/test/CHANGELOG.md").write_text("completed\n")
+        self.record_gate("domain", paths=("docs/specs/test/CHANGELOG.md",))
         run(
             self.repo, "gate-commit", "--message", "cycle change", "--gates", "domain", "--paths",
             "docs/specs/test/CHANGELOG.md",

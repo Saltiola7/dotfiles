@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.7 fixed-commit inspection implemented; V3.8–V3.10 roadmap approved
+**Status:** V3.8 Evidence Envelopes active; V3.9–V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -461,6 +461,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Scope | Fixed-commit `read`, `tree`, `search`, and `object`; limits, compatibility, and runtime evidence |
 | Overrides | Keep schema version 2 and public commands; exclude V3.8 evidence envelopes and runtime hygiene |
 
+### V3.8 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: executes project authorities and retains local evidence near Cycle Records |
+| Delivery intent | Merge and deploy helper, skill, permission, and conditional Python reference locally |
+| Scope | Schema-3 Evidence Envelopes, conservative output retention, Gate Commit binding, and cleanup coupling |
+| Overrides | No typed write tool; no canonical URL retention without future committed allowlist policy; exclude V3.9 semantics |
+
 ## Gate Ledger — V3.1 Completion
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
@@ -791,9 +800,9 @@ tool and provider examples and load only when useful.
 `dbsctrctl` stores JSON beneath `.git/dbsctr/` with `method_revision`, independent
 `schema_version`, `cycle_id`, `context`, `risk`, `delivery_intent`, committed
 Engineering Profile identity, applicability plan, Git baseline, current state,
-gates, Artifact Reviews, and created commits. Commands are `begin`, `start`,
+gates, Evidence Envelopes, Artifact Reviews, and created commits. Commands are `begin`, `start`,
 `status`, `audit`, `review-artifact`, `set-applicability`, `set-gate`,
-user-confirmed `approve-exception`, `record-dvc-push`, `raise-risk`,
+user-confirmed `approve-exception`, `record-dvc-push`, `record-evidence`, `raise-risk`,
 `update-plan`, `check artifacts`, `gate-commit`, `final-push`, and `cleanup`.
 `update-plan` rebinds a committed profile using an equal or stricter plan.
 `gate-commit --gates ...` binds each commit to completed gates.
@@ -818,8 +827,10 @@ Schema version `2`, shared by Method Revisions `3.3` through `3.7`, stores recor
 `worktrees/<worktree-id>/active`, so linked worktrees can run independent cycles
 while cycle IDs remain globally unique. Records include worktree path, Git
 directory, branch, base commit, creation authority, upstream, and lock identity.
-schema-less/schema-1/schema-2 records remain readable without implicit rewriting;
-new records use the helper's single `CURRENT_METHOD_REVISION = "3.7"` constant.
+schema-less/schema-1/schema-2 records remain readable without implicit rewriting.
+Method Revision `3.8` creates schema version `3` records with an Evidence Envelope
+collection; old records retain their original transition and evidence semantics.
+New records use the helper's single `CURRENT_METHOD_REVISION = "3.8"` constant.
 
 Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
@@ -842,6 +853,9 @@ default. Cleanup must run from another worktree and requires a completed record,
 a clean cycle worktree, and proof that every cycle commit is contained in the
 delivery target. `--now` waives only the retention delay. Failed, active, dirty,
 missing-target, or current worktrees are never removed.
+For schema-3 cycles, cleanup parks evidence with retryable state, removes it, and
+then removes the retained Cycle Record. Schema-less/schema-1/schema-2 cleanup
+continues retaining records.
 
 Method Revision `3.5` exposes typed OpenCode tools `dbsctr_status` and
 `dbsctr_begin`. They invoke the dependency-free helper with an argument vector in
@@ -903,15 +917,23 @@ silently emits binary, oversized, traversal-selected, or unbounded content.
   offsets inside a multibyte character are rejected. Git stdout is streamed and
   stderr is drained independently so bounded reads cannot deadlock on diagnostics.
 
-### Approved V3.8 Evidence Envelope Contract
+Method Revision `3.8` adds
+`dbsctrctl record-evidence GATE --authority NAME [--path FILE ...] -- PROGRAM ...`.
+The command asks before nested authority execution. It executes an
+argument vector without a shell, closes stdin, inherits but never serializes the
+process environment, applies a 120-second default/600-second hard timeout and 1
+MiB raw-output cap, and terminates the whole process group on timeout or overflow.
+
+### V3.8 Evidence Envelope Contract
 
 - Cycle Records retain evidence metadata; sanitized large output resides in
   hash-addressed sidecars beneath
   `<git-common-dir>/dbsctr/evidence/<cycle-id>/<sha256>`.
 - Metadata records evidence ID, cycle, gate, authority, sanitized argument
-  vector, resolved HEAD, timestamps, result, digest when safe, byte count,
-  truncation, classified summary, canonical non-sensitive URLs, and sidecar or
-  `content_withheld` status.
+  vector, resolved HEAD, timestamps, result, digest when safe, observed byte
+  count/lower-bound status, truncation, generated summary, an empty URL list, and
+  explicit `sidecar`, `withheld`, or `no_content` disposition. URL retention waits
+  for a future committed canonical allowlist policy.
 - Evidence never records inherited environment, environment values, stdin, shell
   expansion results, resolved `op://` values, or secret-bearing URLs.
 - Known secret forms are redacted before persistence. Summaries and URLs pass the
@@ -920,6 +942,20 @@ silently emits binary, oversized, traversal-selected, or unbounded content.
   Policy explicitly marks a canonical value non-sensitive. Output that cannot be
   classified safely is withheld; only byte count, result, and withheld status
   remain because a raw digest can disclose low-entropy secrets by verification.
+- Arbitrary UTF-8 is unclassified by default. Sidecars retain at most 256 KiB and
+  only strict allowlisted evidence summaries such as `ok` or numeric test-result
+  lines; everything else is withheld without a digest.
+- Persisted invocation keeps a safe executable basename and option names while
+  redacting positional values, scripts, paths, combined option values, short
+  option payloads, URLs, and suspected credentials. Application secrets belong
+  in the inherited environment supplied by the project-owned wrapper, never argv.
+- Evidence is recorded under a per-cycle lock and binds explicit intended paths
+  to their Git blob identities plus pre-commit HEAD. Gate Commit revalidates both
+  worktree and staged-index identities before binding the evidence to its commit.
+  Gates with no changed files require evidence at Final Push HEAD. Sidecar
+  identity, owner, mode, size, and digest are revalidated before commit and push.
+- New schema-3 gates reference stored Evidence IDs rather than arbitrary evidence
+  text. Schema-less/schema-1/schema-2 records remain readable and completable.
 - Evidence and completed Cycle Records share retention. Only explicit,
   permission-gated cleanup removes both; there is no automatic expiry.
 - DBSCTR never retrieves project secrets. A project authority may use a

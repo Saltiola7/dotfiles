@@ -6,10 +6,10 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.8-1 | Specify evidence schema and retention | high | pending | V3.7-4 | lifecycle specs | inspection contract | no | establishes evidence boundary | medium | scenario/contract review |
-| V3.8-2 | Implement sanitized evidence sidecars | high | pending | V3.8-1 | `dbsctrctl` | Cycle Records | no | retains bounded evidence | large | helper tests |
-| V3.8-3 | Test redaction and withheld content | high | pending | V3.8-2 | tests | helper output | no | prevents secret retention | medium | secret-canary tests |
-| V3.8-4 | Add Python 1Password settings reference | medium | pending | V3.8-1 | Python reference | approved local pattern | yes | documents conditional project pattern | small | static contracts |
+| V3.8-1 | Specify evidence schema and retention | high | implemented | V3.7-4 | lifecycle specs | inspection contract | no | establishes evidence boundary | medium | scenario/contract review |
+| V3.8-2 | Implement sanitized evidence sidecars | high | implemented | V3.8-1 | `dbsctrctl` | Cycle Records | no | retains bounded evidence | large | helper tests |
+| V3.8-3 | Test redaction and withheld content | high | implemented | V3.8-2 | tests | helper output | no | prevents secret retention | medium | secret-canary tests |
+| V3.8-4 | Add Python 1Password settings reference | medium | implemented | V3.8-1 | Python reference | approved local pattern | yes | documents conditional project pattern | small | static contracts |
 | V3.9-1 | Specify semantic audit classifications | high | pending | V3.8-3,V3.8-4 | lifecycle specs | V3.7/V3.8 | no | fixes report semantics | medium | scenario/contract review |
 | V3.9-2 | Implement semantic audit orchestration | high | pending | V3.9-1 | audit skill/tool | fixed-commit inspection | no | traces claims without mutation | medium | audit smoke/tests |
 | V3.9-3 | Test report-only authority boundaries | high | pending | V3.9-2 | tests | audit surfaces | no | prevents automatic rewriting | medium | affected test suite |
