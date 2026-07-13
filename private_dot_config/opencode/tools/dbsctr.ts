@@ -1,5 +1,5 @@
 import { tool } from "@opencode-ai/plugin"
-import { beginCycle, cycleStatus, lifecycleAudit } from "../lib/dbsctr-runtime"
+import { beginCycle, cycleStatus, fixedCommitInspect, lifecycleAudit } from "../lib/dbsctr-runtime"
 
 export const status = tool({
   description: "Read authoritative DBSCTR cycle status for the current worktree.",
@@ -14,6 +14,23 @@ export const audit = tool({
   args: { commit: tool.schema.string().optional().default("HEAD") },
   async execute(args, context) {
     return await lifecycleAudit(context.worktree, args.commit)
+  },
+})
+
+export const inspect = tool({
+  description: "Read, list, search, or inspect metadata from one fixed Git commit without using the worktree overlay.",
+  args: {
+    action: tool.schema.enum(["read", "tree", "search", "object"]),
+    commit: tool.schema.string().optional().default("HEAD"),
+    path: tool.schema.string().optional(),
+    query: tool.schema.string().optional(),
+    limit: tool.schema.number().int().optional(),
+    offset: tool.schema.number().int().optional(),
+    cursor: tool.schema.number().int().optional(),
+    excerpt: tool.schema.number().int().optional(),
+  },
+  async execute(args, context) {
+    return await fixedCommitInspect(args, context.worktree)
   },
 })
 

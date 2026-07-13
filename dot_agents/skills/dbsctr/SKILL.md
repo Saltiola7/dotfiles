@@ -28,7 +28,7 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
    safety, delivery, or validation.
 4. Record current affected scope, risk, delivery intent, applicable modules, and
    required capabilities.
-5. Report Method Revision `3.6`. Use the typed `dbsctr_status` tool when available,
+5. Report Method Revision `3.7`. Use the typed `dbsctr_status` tool when available,
    otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
     bound to the committed Engineering Profile, then obtain authorization before `dbsctr_begin`;
@@ -170,6 +170,9 @@ scope, inventory lifecycle triplets, expose excluded dirty overlay, and check
 Graphify freshness. Then verify material claims against authoritative source and
 classify confirmed drift, stale evidence, missing artifacts, authority conflicts,
 historical content, and unverified claims. Do not treat graph inference as source.
+Use typed `dbsctr_inspect` for bounded `read`, `tree`, `search`, and `object`
+access to that resolved commit; never substitute filesystem reads that include
+the dirty overlay.
 
 Keep this distinct from `/qa full`: lifecycle audit reconciles artifacts and
 traceability; QA runs configured quality authorities. Do not write, archive,

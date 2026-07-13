@@ -204,7 +204,7 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.6`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.7`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
@@ -257,9 +257,20 @@ def test_v362_requires_begin_authorization_and_method_revision_compatibility():
     dbsctr = text(SKILLS / "dbsctr/SKILL.md")
     helper = text("dot_local/bin/executable_dbsctrctl")
     tools = text("private_dot_config/opencode/tools/dbsctr.ts")
-    assert "CURRENT_METHOD_REVISION = \"3.6\"" in helper
+    assert "CURRENT_METHOD_REVISION = \"3.7\"" in helper
     assert '"method_revision": CURRENT_METHOD_REVISION' in helper
     assert "context.ask" in tools
     assert "before any `beginCycle`" in spec
     assert "schema-less/schema-1/schema-2" in spec
     assert "authorization before `dbsctr_begin`" in dbsctr
+
+
+def test_v37_inspection_is_fixed_commit_bounded_and_read_only():
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+    helper = text("dot_local/bin/executable_dbsctrctl")
+    tools = text("private_dot_config/opencode/tools/dbsctr.ts")
+    for term in ("Fixed-Commit Inspection Contract", "`read`, `tree`", "`search`, and", "`object` actions", "dirty overlay"):
+        assert term in spec
+    assert 'commands.add_parser("inspect")' in helper
+    assert "INSPECT_RESPONSE_HARD" in helper
+    assert "export const inspect = tool({" in tools

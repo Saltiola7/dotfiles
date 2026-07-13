@@ -17,6 +17,24 @@ export async function lifecycleAudit(cwd: string, commit = "HEAD") {
   return await run(["dbsctrctl", "audit", "--commit", commit, "--json"], cwd)
 }
 
+export async function fixedCommitInspect(args: {
+  action: "read" | "tree" | "search" | "object"
+  commit?: string
+  path?: string
+  query?: string
+  limit?: number
+  offset?: number
+  cursor?: number
+  excerpt?: number
+}, cwd: string) {
+  const argv = ["dbsctrctl", "inspect", "--commit", args.commit ?? "HEAD", "--action", args.action]
+  for (const [name, value] of Object.entries(args)) {
+    if (name !== "action" && name !== "commit" && value !== undefined) argv.push(`--${name}`, String(value))
+  }
+  argv.push("--json")
+  return await run(argv, cwd)
+}
+
 export async function beginCycle(args: {
   cycleId: string
   context: string

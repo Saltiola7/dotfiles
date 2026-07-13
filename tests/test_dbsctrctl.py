@@ -99,7 +99,7 @@ class DbsctrctlTest(unittest.TestCase):
     def test_start_records_current_method_revision_and_release_default(self):
         self.start()
         record = json.loads(self.record_path().read_text())
-        self.assertEqual(record["method_revision"], "3.6")
+        self.assertEqual(record["method_revision"], "3.7")
         self.assertEqual(record["schema_version"], 2)
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
         self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")
@@ -475,6 +475,169 @@ class DbsctrctlTest(unittest.TestCase):
         os.close(descriptor)
         result = json.loads(run(self.repo, "audit", "--json").stdout)
         self.assertIn(b"bad-\xff", [os.fsencode(path) for path in result["dirty_overlay_excluded"]])
+
+    def test_inspect_reads_only_the_resolved_commit_and_reports_overlay(self):
+        (self.repo / "tracked.txt").write_text("committed needle\n")
+        (self.repo / "nested").mkdir()
+        (self.repo / "nested" / "match.txt").write_text("needle twice: needle\n")
+        (self.repo / "binary.bin").write_bytes(b"\0binary")
+        subprocess.run(["git", "add", "tracked.txt", "nested", "binary.bin"], cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-m", "inspect fixture"], cwd=self.repo, check=True,
+                       capture_output=True)
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=self.repo, check=True, text=True,
+                                capture_output=True).stdout.strip()
+        (self.repo / "tracked.txt").write_text("dirty overlay\n")
+
+        read = json.loads(run(
+            self.repo, "inspect", "--commit", "HEAD", "--action", "read", "--path", "tracked.txt", "--json"
+        ).stdout)
+        self.assertEqual(read["commit"], commit)
+        self.assertEqual(read["content"], "committed needle\n")
+        self.assertIn("tracked.txt", read["dirty_overlay_excluded"])
+        self.assertFalse(read["truncated"])
+
+        binary = json.loads(run(
+            self.repo, "inspect", "--commit", commit, "--action", "read", "--path", "binary.bin", "--json"
+        ).stdout)
+        self.assertTrue(binary["binary"])
+        self.assertNotIn("content", binary)
+
+        metadata = json.loads(run(
+            self.repo, "inspect", "--commit", commit, "--action", "object", "--path", "tracked.txt", "--json"
+        ).stdout)
+        self.assertEqual(metadata["type"], "blob")
+        self.assertEqual(metadata["size"], len("committed needle\n"))
+
+        search = json.loads(run(
+            self.repo, "inspect", "--commit", commit, "--action", "search", "--query", "needle", "--json"
+        ).stdout)
+        self.assertEqual([item["path"] for item in search["matches"]], ["nested/match.txt", "tracked.txt"])
+
+    def test_inspect_rejects_unsafe_paths_and_has_deterministic_continuations(self):
+        (self.repo / "many").mkdir()
+        for index in range(3):
+            (self.repo / "many" / f"{index}.txt").write_text(f"line {index}\n")
+        subprocess.run(["git", "add", "many"], cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-m", "tree fixture"], cwd=self.repo, check=True,
+                       capture_output=True)
+        first = json.loads(run(
+            self.repo, "inspect", "--action", "tree", "--path", "many", "--limit", "2", "--json"
+        ).stdout)
+        self.assertEqual([item["path"] for item in first["entries"]], ["many/0.txt", "many/1.txt"])
+        self.assertEqual(first["continuation"], {"cursor": 2})
+        second = json.loads(run(
+            self.repo, "inspect", "--action", "tree", "--path", "many", "--limit", "2", "--cursor", "2", "--json"
+        ).stdout)
+        self.assertEqual([item["path"] for item in second["entries"]], ["many/2.txt"])
+        self.assertIsNone(second["continuation"])
+        for path in ("/etc/passwd", "../tracked.txt", "many/../0.txt", "bad\npath"):
+            result = run(
+                self.repo, "inspect", "--action", "read", "--path", path, "--json", ok=False
+            )
+            self.assertIn("unsafe path", result.stderr)
+
+    def test_inspect_bounds_scopes_and_validates_action_arguments(self):
+        (self.repo / "scope").mkdir()
+        (self.repo / "scope" / "literal.txt").write_text("a.b\nneedle\n")
+        (self.repo / "outside.txt").write_text("needle\n")
+        (self.repo / "large.txt").write_bytes(b"needle\n" + b"x" * (4 * 1024 * 1024))
+        subprocess.run(["git", "add", "scope", "outside.txt", "large.txt"], cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-m", "inspect bounds fixture"], cwd=self.repo, check=True,
+                       capture_output=True)
+
+        root = json.loads(run(self.repo, "inspect", "--action", "tree", "--json").stdout)
+        self.assertIn("scope", [item["path"] for item in root["entries"]])
+        scoped = json.loads(run(
+            self.repo, "inspect", "--action", "search", "--path", "scope", "--query", "needle", "--json"
+        ).stdout)
+        self.assertEqual([item["path"] for item in scoped["matches"]], ["scope/literal.txt"])
+        literal = json.loads(run(
+            self.repo, "inspect", "--action", "search", "--query", "a.b", "--json"
+        ).stdout)
+        self.assertEqual([item["path"] for item in literal["matches"]], ["scope/literal.txt"])
+        self.assertEqual(json.loads(run(
+            self.repo, "inspect", "--action", "search", "--query", "a.b*", "--json"
+        ).stdout)["matches"], [])
+
+        for args, message in (
+            (("--action", "read", "--path", "large.txt"), "4194304"),
+            (("--action", "tree", "--limit", "101"), "tree limit"),
+            (("--action", "search", "--query", "needle", "--excerpt", "2049"), "excerpt limit"),
+            (("--action", "object", "--query", "needle"), "not valid"),
+            (("--action", "read", "--path", "tracked.txt", "--cursor", "1"), "not valid"),
+            (("--action", "tree", "--cursor", "999"), "cursor is outside"),
+        ):
+            result = run(self.repo, "inspect", *args, "--json", ok=False)
+            self.assertIn(message, result.stderr)
+
+    def test_inspect_disables_replacements_and_preserves_utf8_byte_boundaries(self):
+        (self.repo / "original.txt").write_text("original\n")
+        (self.repo / "replacement.txt").write_text("replacement\n")
+        (self.repo / "unicode.txt").write_text("a" * 32767 + "é" + "z\n")
+        (self.repo / "excerpt.txt").write_text("ééé needle\n")
+        subprocess.run(["git", "add", "original.txt", "replacement.txt", "unicode.txt", "excerpt.txt"],
+                       cwd=self.repo, check=True)
+        subprocess.run(["git", "commit", "-m", "replacement fixture"], cwd=self.repo, check=True,
+                       capture_output=True)
+        original = subprocess.run(["git", "rev-parse", "HEAD:original.txt"], cwd=self.repo, check=True,
+                                  text=True, capture_output=True).stdout.strip()
+        replacement = subprocess.run(["git", "rev-parse", "HEAD:replacement.txt"], cwd=self.repo, check=True,
+                                     text=True, capture_output=True).stdout.strip()
+        subprocess.run(["git", "replace", original, replacement], cwd=self.repo, check=True)
+
+        read = json.loads(run(
+            self.repo, "inspect", "--action", "read", "--path", "original.txt", "--json"
+        ).stdout)
+        self.assertEqual(read["content"], "original\n")
+        first = json.loads(run(
+            self.repo, "inspect", "--action", "read", "--path", "unicode.txt", "--json"
+        ).stdout)
+        self.assertEqual(first["continuation"], {"offset": 32767})
+        second = json.loads(run(
+            self.repo, "inspect", "--action", "read", "--path", "unicode.txt",
+            "--offset", "32767", "--limit", "3", "--json"
+        ).stdout)
+        self.assertEqual(second["content"], "éz")
+        invalid = run(
+            self.repo, "inspect", "--action", "read", "--path", "unicode.txt",
+            "--offset", "32768", "--json", ok=False,
+        )
+        self.assertIn("UTF-8 boundary", invalid.stderr)
+
+        excerpt = json.loads(run(
+            self.repo, "inspect", "--action", "search", "--path", "excerpt.txt",
+            "--query", "needle", "--excerpt", "5", "--json",
+        ).stdout)["matches"][0]
+        self.assertEqual(excerpt["excerpt"], "éé")
+        self.assertTrue(excerpt["excerpt_truncated"])
+
+    def test_inspect_bounds_dirty_overlay_reporting(self):
+        for index in range(101):
+            (self.repo / f"dirty-{index:03}.txt").write_text("dirty\n")
+        result = json.loads(run(self.repo, "inspect", "--action", "tree", "--json").stdout)
+        self.assertEqual(len(result["dirty_overlay_excluded"]), 100)
+        self.assertEqual(result["dirty_overlay_total"], 101)
+        self.assertTrue(result["dirty_overlay_truncated"])
+
+    def test_inspect_bounds_overlay_bytes_and_reports_both_rename_paths(self):
+        (self.repo / "tracked.txt").rename(self.repo / "renamed.txt")
+        subprocess.run(["git", "add", "-A"], cwd=self.repo, check=True)
+        renamed = json.loads(run(self.repo, "inspect", "--action", "tree", "--json").stdout)
+        self.assertIn("tracked.txt", renamed["dirty_overlay_excluded"])
+        self.assertIn("renamed.txt", renamed["dirty_overlay_excluded"])
+
+        subprocess.run(["git", "reset", "--hard", "HEAD"], cwd=self.repo, check=True,
+                       capture_output=True)
+        nested = self.repo
+        for character in "abcd":
+            nested /= character * 150
+            nested.mkdir()
+        for index in range(100):
+            (nested / f"{index:03}-{'x' * 180}").write_text("dirty\n")
+        bounded = json.loads(run(self.repo, "inspect", "--action", "tree", "--json").stdout)
+        self.assertEqual(bounded["dirty_overlay_total"], 100)
+        self.assertLess(len(bounded["dirty_overlay_excluded"]), 100)
+        self.assertTrue(bounded["dirty_overlay_truncated"])
 
     def test_profile_change_requires_plan_update_before_commit(self):
         remote = Path(self.temp.name) / "remote.git"

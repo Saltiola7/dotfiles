@@ -1,5 +1,24 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.7 Fixed-Commit Inspection
+
+- Added dependency-free `dbsctrctl inspect` actions for bounded committed-file
+  reads, tree pages, literal searches, and object metadata after resolving one
+  immutable commit identity.
+- Excluded dirty overlay from content while reporting bounded path metadata;
+  rejected traversal and action mismatches; disabled Git replacement objects;
+  bounded blobs, pages, excerpts, responses, and overlay reporting; and preserved
+  UTF-8 boundaries.
+- Added the read-only typed `dbsctr_inspect` OpenCode adapter and global allow
+  permission, updated DBSCTR audit routing, and advanced new Cycle Records to
+  Method Revision `3.7` without rewriting historical records.
+- Validation: 243 tests passed and 1 skipped; Python compile, Bun tool build,
+  `git diff --check`, real fixed-commit action smoke, and independent security
+  review passed. Builder patch was reviewed and its initial bounds gaps were
+  corrected before integration.
+- Deployment: targeted local chezmoi apply pending. Gate Exceptions: none.
+  Intended Final Push: `origin/main`.
+
 ## 2026-07-12 — V3.7–V3.10 Roadmap Approval
 
 - Approved separate milestones for fixed-commit inspection, sanitized retained

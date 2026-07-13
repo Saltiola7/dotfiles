@@ -73,6 +73,7 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert config["permission"]["dbsctr_status"] == "allow"
     assert config["permission"]["dbsctr_begin"] == "ask"
     assert config["permission"]["dbsctr_audit"] == "allow"
+    assert config["permission"]["dbsctr_inspect"] == "allow"
     assert config["agent"]["plan"]["permission"]["dbsctr_begin"] == "deny"
     for command in (
         "git push --force*", "git push -f*", "git *push*--force*", "git push *+*",
@@ -100,10 +101,12 @@ def test_dbsctr_tools_and_herdr_config_are_managed():
     assert 'export const status = tool({' in tools
     assert 'export const begin = tool({' in tools
     assert 'export const audit = tool({' in tools
+    assert 'export const inspect = tool({' in tools
     assert "default(false)" in tools
     runtime = (OC / "lib/dbsctr-runtime.ts").read_text()
     assert '["dbsctrctl", "status", "--json"]' in runtime
     assert '["dbsctrctl", "audit", "--commit", commit, "--json"]' in runtime
+    assert '"dbsctrctl", "inspect", "--commit"' in runtime
     assert '"herdr", "agent", "start", "opencode"' in runtime
     herdr = text("private_dot_config/herdr/config.toml")
     assert "pane_history = false" in herdr
@@ -174,6 +177,29 @@ def test_dbsctr_tool_runtime_preserves_argv_and_opts_in_to_herdr(tmp_path):
                                   env={**env, "HERDR_FAIL": "1"}, text=True,
                                   capture_output=True, check=True)
     assert json.loads(herdr_failed.stdout)["herdr"].startswith("launch_failed:")
+
+
+def test_dbsctr_inspect_runtime_preserves_argv(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log = tmp_path / "inspect.log"
+    helper = bin_dir / "dbsctrctl"
+    helper.write_text('#!/bin/sh\nprintf "<%s>\\n" "$@" > "$INSPECT_LOG"\nprintf "{}\\n"\n')
+    helper.chmod(0o755)
+    runtime = OC / "lib/dbsctr-runtime.ts"
+    script = (
+        f'import {{ fixedCommitInspect }} from {json.dumps(str(runtime))};'
+        'console.log(await fixedCommitInspect({action:"search",commit:"ref;touch nope",'
+        'path:"docs/specs",query:"literal.* value",limit:7,cursor:2,excerpt:80},process.cwd()));'
+    )
+    subprocess.run(["bun", "-e", script], cwd=ROOT,
+                   env={**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "INSPECT_LOG": str(log)},
+                   text=True, capture_output=True, check=True)
+    assert log.read_text().splitlines() == [
+        "<inspect>", "<--commit>", "<ref;touch nope>", "<--action>", "<search>",
+        "<--path>", "<docs/specs>", "<--query>", "<literal.* value>",
+        "<--limit>", "<7>", "<--cursor>", "<2>", "<--excerpt>", "<80>", "<--json>",
+    ]
 
 
 def test_dbsctr_begin_asks_before_running_helper(tmp_path):

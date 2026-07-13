@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.6.2 implemented; V3.7–V3.10 roadmap approved
+**Status:** V3.7 fixed-commit inspection active; V3.8–V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -452,6 +452,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Scope | Fixed-commit inspection, evidence envelopes, semantic reconciliation, conditional Product Intent and Web/UI guidance |
 | Overrides | Preserve public commands and compatibility; keep Graphify and Herdr runtime hygiene in separate cycles |
 
+### V3.7 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: adds a bounded repository-read trust boundary exposed to agents |
+| Delivery intent | Merge and deploy the helper, skill, typed tool, and permission locally |
+| Scope | Fixed-commit `read`, `tree`, `search`, and `object`; limits, compatibility, and runtime evidence |
+| Overrides | Keep schema version 2 and public commands; exclude V3.8 evidence envelopes and runtime hygiene |
+
 ## Gate Ledger — V3.1 Completion
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
@@ -804,13 +813,13 @@ continue under legacy transitions and are never migrated implicitly.
 Gate Commit and Final Push verify that the current profile blob still matches the
 record; a committed profile change requires `update-plan` or `raise-risk` first.
 
-Schema version `2`, shared by Method Revisions `3.3` through `3.6`, stores records beneath
+Schema version `2`, shared by Method Revisions `3.3` through `3.7`, stores records beneath
 `<git-common-dir>/dbsctr/cycles/`. Each worktree owns one pointer beneath
 `worktrees/<worktree-id>/active`, so linked worktrees can run independent cycles
 while cycle IDs remain globally unique. Records include worktree path, Git
 directory, branch, base commit, creation authority, upstream, and lock identity.
 schema-less/schema-1/schema-2 records remain readable without implicit rewriting;
-new records use the helper's single `CURRENT_METHOD_REVISION = "3.6"` constant.
+new records use the helper's single `CURRENT_METHOD_REVISION = "3.7"` constant.
 
 Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
@@ -862,18 +871,37 @@ decisions, tests, and implementation claims. A request to update or reconcile
 findings starts explicit context-scoped DBSCTR cycles; audit alone never rewrites
 semantic truth, archives files, executes external systems, commits, or pushes.
 
-### Approved V3.7 Fixed-Commit Inspection Contract
+Method Revision `3.7` adds `dbsctrctl inspect` and typed `dbsctr_inspect` as
+read-only, argument-vector adapters over one resolved Git commit. Inspection
+never reads worktree content, mutates Git state, follows filesystem symlinks, or
+silently emits binary, oversized, traversal-selected, or unbounded content.
 
-- One helper interface and typed read-only adapter expose `read`, `tree`,
-  `search`, and `object` actions. Concrete output caps are selected and tested as
-  Project Policy during V3.7 implementation.
+### V3.7 Fixed-Commit Inspection Contract
+
+- `dbsctrctl inspect --commit REF --action ACTION --json` and typed
+  `dbsctr_inspect` expose `read`, `tree`, `search`, and `object` actions.
 - A supplied ref resolves once to one immutable object ID; every result reports
-  that identity and reads Git objects rather than the filesystem overlay.
+  that identity and reads Git objects rather than the filesystem overlay. Git
+  replacement objects are disabled so mutable replacement refs cannot alter the
+  content represented by the reported identity.
 - Absolute paths, `..`, traversal, repository escape, invalid object types,
   shell interpolation, checkout, fetch, and index/worktree mutation are rejected.
 - Search and output have caller limits and hard caps. Truncation is explicit and
   continuable; binary content is identified rather than emitted as unbounded text.
 - Dirty overlay remains visible as excluded context and cannot affect a result.
+  Both sides of a rename are counted; retained paths are capped at 100 and 64
+  KiB with total and truncation metadata.
+- Project Policy limits are: paths 4,096 bytes; queries 256 bytes; blobs 4 MiB;
+  read pages 32 KiB by default and 64 KiB maximum; tree pages 50 entries by
+  default and 100 maximum; search pages 25 matches by default and 100 maximum;
+  excerpts 1 KiB by default and 2 KiB maximum; serialized responses 128 KiB.
+- Continuations are byte offsets for reads and deterministic numeric cursors for
+  tree/search pages. Binary reads return metadata without content; oversized
+  reads are rejected before content retrieval; search treats its query literally
+  and skips binary/oversized blobs.
+- Text pages and excerpts preserve UTF-8 boundaries while enforcing byte limits;
+  offsets inside a multibyte character are rejected. Git stdout is streamed and
+  stderr is drained independently so bounded reads cannot deadlock on diagnostics.
 
 ### Approved V3.8 Evidence Envelope Contract
 
