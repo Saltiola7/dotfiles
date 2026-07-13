@@ -63,9 +63,17 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert bash["dbsctrctl final-push*"] == "allow"
     assert bash["dbsctrctl approve-exception*"] == "ask"
     assert bash["dbsctrctl record-dvc-push*"] == "ask"
+    assert bash["dbsctrctl cleanup*"] == "ask"
+    for command in (
+        "herdr server stop*", "herdr config reset-keys*", "herdr worktree remove*",
+        "herdr workspace close*", "herdr pane close*", "herdr tab close*",
+        "herdr session stop*", "herdr session delete*",
+    ):
+        assert bash[command] == "ask"
     assert config["permission"]["dbsctr_status"] == "allow"
-    assert config["permission"]["dbsctr_begin"] == "allow"
+    assert config["permission"]["dbsctr_begin"] == "ask"
     assert config["permission"]["dbsctr_audit"] == "allow"
+    assert config["agent"]["plan"]["permission"]["dbsctr_begin"] == "deny"
     for command in (
         "git push --force*", "git push -f*", "git *push*--force*", "git push *+*",
         "git commit --no-verify*", "git commit -n*", "git *commit*--no-verify*",
@@ -77,6 +85,14 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert "model: openai/gpt-5.6-sol" in reviewer
     assert "edit: deny" in reviewer
     assert "task: deny" in reviewer
+    assert "dbsctr_begin: deny" in reviewer
+
+    for name in ("plan-gpt-pro.md", "plan-gpt-pro-max.md"):
+        assert "dbsctr_begin: deny" in (OC / "agents" / name).read_text()
+    for name in ("build-gpt.md", "build-gpt-pro.md", "build-claude.md"):
+        assert "dbsctr_begin: allow" in (OC / "agents" / name).read_text()
+    for name in ("builder-openai.md", "builder-bedrock.md"):
+        assert "dbsctr_begin: deny" in (OC / "agents" / name).read_text()
 
 
 def test_dbsctr_tools_and_herdr_config_are_managed():
@@ -158,6 +174,37 @@ def test_dbsctr_tool_runtime_preserves_argv_and_opts_in_to_herdr(tmp_path):
                                   env={**env, "HERDR_FAIL": "1"}, text=True,
                                   capture_output=True, check=True)
     assert json.loads(herdr_failed.stdout)["herdr"].startswith("launch_failed:")
+
+
+def test_dbsctr_begin_asks_before_running_helper(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    helper_log = tmp_path / "helper.log"
+    helper = bin_dir / "dbsctrctl"
+    helper.write_text("#!/bin/sh\nprintf helper > \"$HELPER_LOG\"\nprintf '{\"worktree\":\"/tmp/cycle\"}\\n'\n")
+    helper.chmod(0o755)
+    tools = OC / "tools/dbsctr.ts"
+    script = f'''import {{ begin }} from {json.dumps(str(tools))};
+const context = {{ worktree: process.cwd(), ask: async (input) => {{
+  if (process.argv[1] !== "allow") throw new Error(process.argv[1]);
+  console.log(JSON.stringify(input));
+}} }};
+try {{ console.log(await begin.execute({{cycleId:"x",context:"ctx",risk:"routine",deliveryIntent:"local",planPath:"/tmp/plan"}}, context)); }}
+catch (error) {{ console.error(error.message); process.exit(1); }}'''
+    env = {**os.environ, "PATH": f"{bin_dir}:{os.environ['PATH']}", "HELPER_LOG": str(helper_log)}
+    for outcome in ("denied", "cancelled"):
+        result = subprocess.run(["bun", "-e", script, outcome], cwd=ROOT, env=env, text=True,
+                                capture_output=True)
+        assert result.returncode != 0
+        assert outcome in result.stderr
+        assert not helper_log.exists()
+
+    result = subprocess.run(["bun", "-e", script, "allow"], cwd=ROOT, env=env, text=True,
+                            capture_output=True, check=True)
+    ask = json.loads(result.stdout.splitlines()[0])
+    assert ask["permission"] == "dbsctr_begin"
+    assert ask["patterns"] == ["*"]
+    assert helper_log.read_text() == "helper"
 
 
 def test_removed_managed_integrations_are_absent():

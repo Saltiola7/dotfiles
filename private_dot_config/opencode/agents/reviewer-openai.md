@@ -6,6 +6,7 @@ variant: medium
 permission:
   edit: deny
   bash: deny
+  dbsctr_begin: deny
   task: deny
   webfetch: deny
 ---

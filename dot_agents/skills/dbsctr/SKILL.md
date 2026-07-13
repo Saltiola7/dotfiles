@@ -31,7 +31,8 @@ git-only, dependency-only, or non-behavioral configuration work unless invoked.
 5. Report Method Revision `3.6`. Use the typed `dbsctr_status` tool when available,
    otherwise `dbsctrctl status`, to resume the active Cycle
    Record. For a new write cycle, create an explicit JSON applicability plan
-   bound to the committed Engineering Profile, then use typed `dbsctr_begin` or
+    bound to the committed Engineering Profile, then obtain authorization before `dbsctr_begin`;
+    use typed `dbsctr_begin` or
    `dbsctrctl begin --plan PATH` to create an upstream-based branch/worktree and
    return its handoff. Use
    low-level `start` only in an already prepared clean cycle worktree. Create only
@@ -155,8 +156,11 @@ After completion, `cleanup` removes only a clean DBSCTR-owned worktree whose
 commits reached target; retain successful worktrees for 24 hours by default and
 never auto-remove failed or dirty work.
 Typed OpenCode tools are argument-safe adapters over `dbsctrctl`, not another
-state machine. In a Herdr pane, `dbsctr_begin` may launch OpenCode in the new
-worktree. Herdr state is presentation only and never gate evidence.
+state machine. `dbsctr_begin` asks once before helper execution; denial or
+cancellation creates no branch, worktree, Cycle Record, fetch, or Herdr launch.
+The `launch` argument defaults to `false`; when explicitly true in a Herdr pane,
+the same authorization covers launching OpenCode in the new worktree. Herdr state
+is presentation only and never gate evidence.
 
 ## Lifecycle Reconciliation Audit
 

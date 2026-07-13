@@ -4,6 +4,7 @@ mode: subagent
 model: amazon-bedrock/global.anthropic.claude-sonnet-5
 variant: medium
 permission:
+  dbsctr_begin: deny
   task: deny
   external_directory: deny
   bash:

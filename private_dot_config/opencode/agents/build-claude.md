@@ -5,6 +5,7 @@ mode: primary
 model: amazon-bedrock/global.anthropic.claude-opus-4-8
 variant: medium
 permission:
+  dbsctr_begin: allow
   task:
     "*": deny
     explore-bedrock: allow

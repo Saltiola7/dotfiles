@@ -4,6 +4,7 @@ mode: subagent
 model: openai/gpt-5.6-terra
 variant: medium
 permission:
+  dbsctr_begin: deny
   task: deny
   external_directory: deny
   bash:

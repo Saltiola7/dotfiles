@@ -6,8 +6,7 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-Future milestones V3.3–V3.6 are specified in `ROADMAP.md` and become active only
-after their preceding milestone completes.
+| V3.6.2-1 | Authorize isolated cycle begin and correct Method Revision | high | active | V3.6.1 | helper, OpenCode tool/config/agent permission frontmatter, DBSCTR skill/spec/tests | lifecycle artifacts and current OpenCode tool contract | no | Begin creates Git and optional Herdr state; permission and record revision must be correct | small | focused helper, control-plane, and lifecycle tests; no deployment |
 
 ## Completed
 
@@ -23,5 +22,6 @@ after their preceding milestone completes.
 | V3.6-1–V3.6-3 | Add fixed-commit lifecycle reconciliation audit | 2026-07-12 | `696971c`, `178bf26` |
 | V3.6.1-1 | Correct integrated roadmap and stale-base delivery | 2026-07-12 | `02bcf34`, `1b75001` |
 
-The approved V3.2–V3.6 roadmap is complete. Future work begins from measured
-audit findings or separately approved delivery-route expansion.
+V3.6.2-1 owner: selected Build agent for implementation; orchestrator owns review,
+validation, artifact closure, managed-config deployment, and delivery. No roadmap
+expansion is approved.

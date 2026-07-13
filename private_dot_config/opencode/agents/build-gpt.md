@@ -5,6 +5,7 @@ mode: primary
 model: openai/gpt-5.6-sol
 variant: medium
 permission:
+  dbsctr_begin: allow
   task:
     "*": deny
     explore-openai: allow

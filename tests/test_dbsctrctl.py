@@ -96,10 +96,10 @@ class DbsctrctlTest(unittest.TestCase):
     def pass_gate(self, gate="domain"):
         run(self.repo, "set-gate", gate, "--result", "passed", "--evidence", "test evidence")
 
-    def test_start_records_schema_and_release_default(self):
+    def test_start_records_current_method_revision_and_release_default(self):
         self.start()
         record = json.loads(self.record_path().read_text())
-        self.assertEqual(record["method_revision"], "3.4")
+        self.assertEqual(record["method_revision"], "3.6")
         self.assertEqual(record["schema_version"], 2)
         self.assertEqual(record["engineering_profile"]["path"], "docs/specs/test/README.md")
         self.assertRegex(record["engineering_profile"]["blob"], r"^[0-9a-f]+$")

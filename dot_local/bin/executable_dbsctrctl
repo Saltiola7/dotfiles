@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic local DBSCTR V3.1 cycle record helper."""
+"""Deterministic local DBSCTR V3.6 cycle record helper."""
 
 import argparse
 import contextlib
@@ -23,6 +23,7 @@ ARTIFACTS = ("README", "BACKLOG", "CHANGELOG")
 SECRET_NAMES = ("credentials", "credentials.json", "id_rsa", "private_key", "password")
 MANDATORY_GATES = set(GATES[:6]) | {"review_integrate"}
 RISK_RANK = {"routine": 0, "elevated": 1, "critical": 2}
+CURRENT_METHOD_REVISION = "3.6"
 
 
 def fail(message):
@@ -390,7 +391,7 @@ def start_cycle(root, args, plan, created_by_dbsctr=False):
     current_upstream = upstream(root)
     delivery_remote, delivery_branch = configured_upstream(root)
     record = {
-        "method_revision": "3.4", "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
+        "method_revision": CURRENT_METHOD_REVISION, "schema_version": 2, "created_at": now(), "cycle_id": args.cycle_id,
         "context": args.context, "risk": args.risk, "delivery_intent": args.delivery_intent,
         "engineering_profile": {"path": profile_path, "blob": profile_blob},
         "applicability_plan": {"profile": profile_path, "gates": {

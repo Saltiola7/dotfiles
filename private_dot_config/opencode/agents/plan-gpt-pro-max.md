@@ -7,6 +7,7 @@ variant: max
 permission:
   edit: deny
   bash: ask
+  dbsctr_begin: deny
   task:
     "*": deny
     explore-openai: allow

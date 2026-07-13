@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.6 implemented; approved roadmap complete
+**Status:** V3.6.2 permission and Method Revision correction active
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -389,6 +389,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Scope | Cycle schema, applicability plan, gate order, risk raising, compatibility, roadmap |
 | Overrides | Preserve schema-less V3.1 completion; defer worktree registry and automation to V3.3/V3.4 |
 
+### V3.6.2 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: authorization boundary controls Git fetch/branch/worktree creation and optional Herdr launch |
+| Delivery intent | Merge; local managed-config deployment remains orchestrator-owned after validation |
+| Scope | `dbsctr_begin` authorization, narrow destructive-command prompts, Cycle Record Method Revision, compatibility evidence |
+| Overrides | Keep public commands and schema unchanged; no helper runs when OpenCode denies or cancels begin authorization |
+
 ## Gate Ledger — V3.1 Completion
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
@@ -705,6 +714,14 @@ tool and provider examples and load only when useful.
 - The loaded Method Revision and active cycle are reported at DBSCTR entry.
 - Raw Git writes remain permission-gated; narrowly allowed `dbsctrctl` actions
   perform deterministic checks before commit or push.
+- Global `dbsctr_begin` permission is `ask`; Plan and reviewer agents deny it and
+  selected Build agents allow it. `dbsctr_status` and `dbsctr_audit` remain allowed
+  read-only tools.
+- `dbsctr_begin` calls OpenCode `context.ask` once before any `beginCycle` helper
+  execution. Denial or cancellation performs no fetch, branch, worktree, Cycle
+  Record, or Herdr launch. `launch` defaults to `false`.
+- `dbsctrctl cleanup*` and destructive Herdr commands ask explicitly; normal
+  `herdr agent start` remains unchanged.
 
 ### Cycle Record Interface
 
@@ -738,8 +755,8 @@ Schema version `2`, shared by Method Revisions `3.3` through `3.6`, stores recor
 `worktrees/<worktree-id>/active`, so linked worktrees can run independent cycles
 while cycle IDs remain globally unique. Records include worktree path, Git
 directory, branch, base commit, creation authority, upstream, and lock identity.
-Schema version `1` and schema-less records remain readable from their original
-worktree-private paths.
+schema-less/schema-1/schema-2 records remain readable without implicit rewriting;
+new records use the helper's single `CURRENT_METHOD_REVISION = "3.6"` constant.
 
 Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.

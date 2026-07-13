@@ -103,6 +103,7 @@
       "permission": {
         "edit": "deny",
         "bash": "ask",
+        "dbsctr_begin": "deny",
         "task": {
           "*": "deny",
           "explore-openai": "allow",
@@ -118,7 +119,7 @@
   "plugin": ["@dietrichgebert/ponytail@4.8.4"],
   "permission": {
     "dbsctr_status": "allow",
-    "dbsctr_begin": "allow",
+    "dbsctr_begin": "ask",
     "dbsctr_audit": "allow",
     "bash": {
       "*": "allow",
@@ -136,6 +137,15 @@
       "dbsctrctl final-push*": "allow",
       "dbsctrctl approve-exception*": "ask",
       "dbsctrctl record-dvc-push*": "ask",
+      "dbsctrctl cleanup*": "ask",
+      "herdr server stop*": "ask",
+      "herdr config reset-keys*": "ask",
+      "herdr worktree remove*": "ask",
+      "herdr workspace close*": "ask",
+      "herdr pane close*": "ask",
+      "herdr tab close*": "ask",
+      "herdr session stop*": "ask",
+      "herdr session delete*": "ask",
       "git reset --hard*": "ask",
       "git clean *": "ask",
       "gh *": "ask",
