@@ -19,8 +19,10 @@
 - Validation: 256 tests passed and 1 skipped; Python compile and `git diff --check`
   passed. Builder output received primary integration review; independent security
   review findings were remediated and final review reported no findings.
-- Deployment: targeted local chezmoi apply pending. Gate Exceptions: none.
-  Intended Final Push: `origin/main`.
+- Gate Commit: `9fd353d`. Deployment: targeted local chezmoi apply completed;
+  source/deployed identity, idempotent dry-run, fresh config resolution, and a
+  deployed schema-3 sidecar smoke passed. Gate Exceptions: none. Intended Final
+  Push: `origin/main`.
 
 ## 2026-07-12 — V3.7 Fixed-Commit Inspection
 

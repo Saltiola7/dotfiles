@@ -81,7 +81,7 @@
   continuation explicit.
 - Perform no checkout, fetch, index/worktree mutation, or shell interpolation.
 
-### V3.8 — Evidence Envelopes (active)
+### V3.8 — Evidence Envelopes (complete)
 
 - Store evidence metadata in retained Cycle Records and sanitized large output
   in hash-addressed sidecars beneath `.git/dbsctr/evidence/<cycle-id>/`.

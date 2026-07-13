@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.8 Evidence Envelopes active; V3.9–V3.10 roadmap approved
+**Status:** V3.8 Evidence Envelopes implemented; V3.9–V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
