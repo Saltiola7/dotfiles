@@ -110,7 +110,7 @@
 - Treat source and project policy as authoritative over graph inference or
   approved private local reference repositories.
 
-### V3.10 — Product Intent And Web/UI
+### V3.10 — Product Intent And Web/UI (active)
 
 - Add conditional `docs/specs/<context>/PRODUCT.md` for product-facing contexts;
   do not create synthetic product artifacts for libraries or infrastructure.

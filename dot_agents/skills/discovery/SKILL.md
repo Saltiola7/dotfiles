@@ -99,6 +99,21 @@ contract, profile, or validation truth changes. It contains:
 - contracts, risks, Gate Ledger, and validation strategy
 - facts, assumptions, accepted risks, and unresolved decisions
 
+### Conditional Product Intent
+
+When the Engineering Profile establishes product-facing behavior, first select
+and reference the existing authoritative Product Intent artifact. Only create or
+update `docs/specs/<context>/PRODUCT.md` when no existing artifact satisfies the
+contract. Product Intent contains durable users/stakeholders, problem and desired
+outcomes, non-goals, core journeys, success evidence, product constraints,
+accessibility expectations, privacy/trust boundaries, compatibility, and
+retirement obligations.
+
+Do not create synthetic Product Intent for libraries, infrastructure, or internal
+tools unless their profile establishes intentional user journeys. Product Intent
+holds durable outcomes, not current cycle status, implementation design, or a
+feature wish list. Never duplicate an existing authoritative product artifact.
+
 The Gate Ledger enumerates Development Kernel and completion gates. Each has
 separate Gate Applicability (`required` or reasoned `not_applicable`), Gate
 Result, and optional user-approved Gate Exception (`deferred` or

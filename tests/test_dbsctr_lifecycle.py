@@ -68,7 +68,7 @@ def test_v2_is_archived_and_not_deployable():
 def test_v3_module_registry_is_extensible_and_normalized():
     modules = SKILLS / "dbsctr/modules"
     references = SKILLS / "dbsctr/references"
-    expected = {"python.md", "security.md", "data.md", "cloud.md", "ml.md", "analytics.md"}
+    expected = {"python.md", "security.md", "data.md", "cloud.md", "ml.md", "analytics.md", "web.md"}
     assert {path.name for path in modules.glob("*.md")} == expected
     assert {path.name for path in references.glob("*.md")} == {
         "data.md",
@@ -77,6 +77,7 @@ def test_v3_module_registry_is_extensible_and_normalized():
         "analytics.md",
         "python.md",
         "semantic-audit.md",
+        "web.md",
     }
 
     for path in modules.glob("*.md"):
@@ -206,7 +207,7 @@ def test_v32_requires_planned_ordered_monotonic_cycles():
     helper = text("dot_local/bin/executable_dbsctrctl")
     roadmap = text("docs/specs/dbsctr_v3_lifecycle/ROADMAP.md")
 
-    for term in ("Method Revision `3.9`", "applicability plan", "predecessor", "V3.1"):
+    for term in ("Method Revision `3.10`", "applicability plan", "predecessor", "V3.1"):
         assert term in dbsctr
     assert "schema version `1`" in spec
     assert "dbsctrctl start --plan PATH" in discovery
@@ -259,12 +260,38 @@ def test_v362_requires_begin_authorization_and_method_revision_compatibility():
     dbsctr = text(SKILLS / "dbsctr/SKILL.md")
     helper = text("dot_local/bin/executable_dbsctrctl")
     tools = text("private_dot_config/opencode/tools/dbsctr.ts")
-    assert "CURRENT_METHOD_REVISION = \"3.9\"" in helper
+    assert "CURRENT_METHOD_REVISION = \"3.10\"" in helper
     assert '"method_revision": CURRENT_METHOD_REVISION' in helper
     assert "context.ask" in tools
     assert "before any `beginCycle`" in spec
     assert "schema-less/schema-1/schema-2" in spec
     assert "authorization before `dbsctr_begin`" in dbsctr
+
+
+def test_v310_product_intent_and_web_ui_are_conditional_and_accessible():
+    discovery = text(SKILLS / "discovery/SKILL.md")
+    dbsctr = text(SKILLS / "dbsctr/SKILL.md")
+    web = text(SKILLS / "dbsctr/modules/web.md")
+    references = text(SKILLS / "dbsctr/references/web.md")
+    spec = text("docs/specs/dbsctr_v3_lifecycle/README.md")
+
+    assert "docs/specs/<context>/PRODUCT.md" in discovery
+    assert "Do not create synthetic Product Intent" in discovery
+    assert "Only create or" in discovery and "when no existing artifact satisfies" in discovery
+    assert "Never duplicate an existing authoritative product artifact" in discovery
+    assert "selected authoritative artifact records" in spec
+    assert "creates `PRODUCT.md` only when no existing artifact satisfies it" in spec
+    assert "modules/web.md" in dbsctr
+    assert "WCAG 2.2 AA" in web
+    for outcome in ("keyboard", "focus", "semantics", "contrast", "zoom", "reflow", "target size", "reduced-motion"):
+        assert outcome in web
+    assert "standard-defined exception" in web
+    assert "Automated checks and screenshots are supporting evidence only" in web
+    assert "Playwright" in references and "Flowbite Pro" in references
+    assert "Playwright" not in web and "Flowbite Pro" not in web
+    assert "Configure an MCP server only" in references and "within that project" in references
+    assert "Never create or modify user-global" in references
+    assert "MCP output is a tool hint, not source authority or gate evidence" in references
 
 
 def test_v37_inspection_is_fixed_commit_bounded_and_read_only():

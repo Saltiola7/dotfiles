@@ -6,10 +6,10 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.10-1 | Specify conditional Product Intent | medium | pending | V3.9-3 | Discovery/lifecycle specs | Engineering Profile | no | avoids synthetic product artifacts | medium | static contracts |
-| V3.10-2 | Add generic Web/UI module | medium | pending | V3.10-1 | DBSCTR module | product/accessibility policy | no | adds UI lifecycle outcomes | medium | module tests |
-| V3.10-3 | Add tool references and local MCP rule | medium | pending | V3.10-2 | Web/UI references | project authorities | yes | keeps examples non-normative | small | static contracts |
-| V3.10-4 | Test conditional loading/accessibility | medium | pending | V3.10-2,V3.10-3 | tests | module/reference | no | gates applicability and defaults | medium | affected test suite |
+| V3.10-1 | Specify conditional Product Intent | medium | implemented | V3.9-3 | Discovery/lifecycle specs | Engineering Profile | no | avoids synthetic product artifacts | medium | static contracts |
+| V3.10-2 | Add generic Web/UI module | medium | implemented | V3.10-1 | DBSCTR module | product/accessibility policy | no | adds UI lifecycle outcomes | medium | module tests |
+| V3.10-3 | Add tool references and local MCP rule | medium | implemented | V3.10-2 | Web/UI references | project authorities | yes | keeps examples non-normative | small | static contracts |
+| V3.10-4 | Test conditional loading/accessibility | medium | implemented | V3.10-2,V3.10-3 | tests | module/reference | no | gates applicability and defaults | medium | affected test suite |
 
 ## Completed
 

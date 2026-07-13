@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.9 semantic reconciliation implemented; V3.10 roadmap approved
+**Status:** V3.10 Product Intent and Web/UI active
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -393,7 +393,8 @@ records, and retirement decisions. External writes remain approval-gated.
 **Scenario: Load Product Intent conditionally**
 - Given an Engineering Profile identifies product-facing behavior
 - When Discovery selects durable product artifacts
-- Then `PRODUCT.md` records the applicable Product Intent
+- Then the selected authoritative artifact records the applicable Product Intent
+- And Discovery creates `PRODUCT.md` only when no existing artifact satisfies it
 - And non-product work receives no synthetic Product Intent
 
 **Scenario: Load Web/UI guidance conditionally**
@@ -410,7 +411,7 @@ records, and retirement decisions. External writes remain approval-gated.
 |---|---|
 | Deliverable | OpenCode lifecycle skills, commands, routing, modules, and tests |
 | Languages/frameworks | Language-neutral Markdown prompts; Python contract tests |
-| Modules | Python, Security, Data, Cloud, ML/AI, Analytics |
+| Modules | Python, Security, Data, Cloud, ML/AI, Analytics, Web/UI |
 | Runtime/platform support | OpenCode on the managed dotfiles environment; Python `>=3.12` test harness |
 | Public compatibility | Unversioned `/discovery`, `/dbsctr`, and `/qa`; V1 removed; V2 source archived |
 | Trust/data classification | Local configuration and public methodology; no sensitive application data |
@@ -478,6 +479,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Delivery intent | Merge and deploy the semantic audit protocol and skill locally |
 | Scope | Fixed-commit claim tracing, exact classifications, report schema, privacy, and remediation boundaries |
 | Overrides | Reuse V3.7 inspection and V3.8 metadata; no new write tool, automatic remediation, or `/qa full` execution |
+
+### V3.10 Cycle Overrides
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: changes Discovery artifacts and global Web/UI accessibility guidance |
+| Delivery intent | Merge and deploy Discovery/DBSCTR skills, Web/UI module, and references locally |
+| Scope | Conditional Product Intent, WCAG 2.2 AA outcomes, non-normative tool examples, and project-local MCP boundary |
+| Overrides | Preserve project authorities; no synthetic Product Intent, mandatory frontend dependency, or global MCP configuration |
 
 ## Gate Ledger — V3.1 Completion
 
@@ -578,11 +588,15 @@ dot_agents/skills/dbsctr/
     cloud.md
     ml.md
     analytics.md
+    web.md
   references/
     data.md
     cloud.md
     ml.md
     analytics.md
+    python.md
+    semantic-audit.md
+    web.md
 ```
 
 Each module contains applicability, Engineering Profile extensions, vocabulary,
@@ -598,6 +612,7 @@ tool and provider examples and load only when useful.
 | `dot_agents/skills/dbsctr/SKILL.md` | V3 development kernel and completion-gate orchestration | Development and completion, progressive modules |
 | `dot_agents/skills/dbsctr/modules/*.md` | Language, domain, and risk extensions | Progressive modules |
 | `dot_agents/skills/dbsctr/references/*.md` | Optional non-normative examples | Keep examples non-normative |
+| `docs/specs/<context>/PRODUCT.md` | Conditional durable Product Intent | Product-facing users, outcomes, journeys, constraints, and obligations |
 | `dot_agents/skills/qa/SKILL.md` | Scoped/full QA plus optional capability coverage | Capability-aware QA |
 | `private_dot_config/opencode/commands/{discovery,dbsctr,qa}.md` | Stable public command surfaces | Public commands |
 | `private_dot_config/opencode/AGENTS.md` | Default V3 routing and execution policy | Route lifecycle work to V3 |
@@ -669,6 +684,8 @@ tool and provider examples and load only when useful.
 - Every cycle has one BACKLOG item before implementation and updates its state as
   work progresses.
 - README, BACKLOG, and CHANGELOG each receive an Artifact Review before completion.
+- Applicable Product Intent is reviewed when affected; it is not a fourth
+  universal lifecycle artifact and does not alter the helper's fixed reviews.
 - README changes only when durable truth changes; a no-change review is valid.
 - Completed backlog work moves to a concise Completed section with date and commit.
 - Every completed cycle receives one compact CHANGELOG entry with outcome,
@@ -839,8 +856,8 @@ directory, branch, base commit, creation authority, upstream, and lock identity.
 schema-less/schema-1/schema-2 records remain readable without implicit rewriting.
 Method Revision `3.8` creates schema version `3` records with an Evidence Envelope
 collection; old records retain their original transition and evidence semantics.
-Method Revision `3.9` retains schema version `3`; new records use the helper's
-single `CURRENT_METHOD_REVISION = "3.9"` constant.
+Method Revisions `3.9` and `3.10` retain schema version `3`; new records use the
+helper's single `CURRENT_METHOD_REVISION = "3.10"` constant.
 
 Final Push acquires a nonblocking lock derived from push URL and upstream before
 readiness evaluation and holds it through push verification and completion.
@@ -1018,12 +1035,18 @@ schema.
   changes status, commits, deploys, or cleans up; every remediation starts a
   separately approved context-scoped DBSCTR cycle.
 
-### Approved V3.10 Product Intent And Web/UI Contract
+Method Revision `3.10` adds conditional Product Intent discovery and Web/UI
+module routing without changing Cycle Record schema or public commands.
+
+### V3.10 Product Intent And Web/UI Contract
 
 - Product-facing contexts may own `docs/specs/<context>/PRODUCT.md`, referenced
   by the Engineering Profile. It records users/stakeholders, problem and desired
   outcomes, non-goals, core journeys, success evidence, product constraints,
   accessibility, privacy/trust, compatibility, and retirement obligations.
+- Product Intent stores durable outcomes rather than current cycle status,
+  implementation design, or speculative feature lists. Existing authoritative
+  product artifacts may satisfy the contract without duplication.
 - Libraries, infrastructure, and internal tooling do not receive synthetic
   Product Intent unless their Engineering Profile establishes product-facing
   behavior.
@@ -1033,10 +1056,14 @@ schema.
 - Applicable evidence covers keyboard, focus, semantics, contrast, zoom/reflow,
   errors, and reduced motion. Visual evidence never replaces semantic or
   accessibility checks.
+- Applicable WCAG 2.2 outcomes also include unobscured focus, non-drag
+  alternatives, target sizing, consistent help, redundant-entry reduction, and
+  accessible authentication. Automated tools alone never prove conformance.
 - Existing project frameworks and authorities take precedence. Playwright and
   Flowbite Pro are non-normative references.
 - MCP configuration is project-local and explicitly applicable; DBSCTR never
-  creates or modifies global MCP configuration.
+  creates or modifies user-global, machine-global, or unrelated-project MCP
+  configuration. MCP output remains a hint verified against project source.
 
 ### Git Lifecycle Contract
 
