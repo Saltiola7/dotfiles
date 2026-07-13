@@ -1,5 +1,23 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.6.2 Permission And Revision Correctness
+
+- Routed typed `dbsctr_begin` through OpenCode permission evaluation before any
+  helper execution; Plan, reviewer, and Builder subagents deny it, selected Build
+  agents allow it, and the global fallback asks.
+- Prompt-gated DBSCTR cleanup and destructive Herdr commands while preserving
+  normal Herdr agent launch behavior.
+- New Cycle Records now report Method Revision `3.6` from one helper constant;
+  historical records remain readable and are not rewritten.
+- Validation: 235 tests passed and 1 skipped; Python compile, Bun tool build,
+  `git diff --check`, focused chezmoi dry-run/apply/idempotence, deployed-file
+  identity, and fresh `opencode debug config` passed.
+- Independent review completed. Its Build-allow concern was rejected because the
+  approved permission policy intentionally grants selected Build agents standing
+  authorization while requiring every custom-tool call to evaluate policy.
+- Gate Commit: `95ef8ba`. Deployment: targeted local chezmoi apply. Gate
+  Exceptions: none. Intended Final Push: `origin/main`.
+
 ## 2026-07-12 — V3.6.1 Integrated Review Corrections
 
 - Added target refresh and explicit stale-base rejection under the delivery lock

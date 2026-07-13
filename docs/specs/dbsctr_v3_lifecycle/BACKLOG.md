@@ -6,7 +6,6 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.6.2-1 | Authorize isolated cycle begin and correct Method Revision | high | active | V3.6.1 | helper, OpenCode tool/config/agent permission frontmatter, DBSCTR skill/spec/tests | lifecycle artifacts and current OpenCode tool contract | no | Begin creates Git and optional Herdr state; permission and record revision must be correct | small | focused helper, control-plane, and lifecycle tests; no deployment |
 
 ## Completed
 
@@ -21,7 +20,6 @@ Discovery readiness: complete.
 | V3.5-1–V3.5-4 | Add typed OpenCode and Herdr execution adapters | 2026-07-12 | `d9a7363`, `9916235` |
 | V3.6-1–V3.6-3 | Add fixed-commit lifecycle reconciliation audit | 2026-07-12 | `696971c`, `178bf26` |
 | V3.6.1-1 | Correct integrated roadmap and stale-base delivery | 2026-07-12 | `02bcf34`, `1b75001` |
+| V3.6.2-1 | Enforce begin authorization and correct Method Revision | 2026-07-12 | `95ef8ba` |
 
-V3.6.2-1 owner: selected Build agent for implementation; orchestrator owns review,
-validation, artifact closure, managed-config deployment, and delivery. No roadmap
-expansion is approved.
+Further roadmap implementation remains separately approved per milestone.
