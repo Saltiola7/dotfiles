@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.6.2 permission and Method Revision correction implemented
+**Status:** V3.6.2 implemented; V3.7–V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 
@@ -16,7 +16,7 @@ The public OpenCode entry points are `/discovery`, `/dbsctr`, and `/qa`.
 OpenCode is the first harness because its skills, commands, todos, agents,
 permissions, and Plan/Build separation should shape the workflow directly.
 Future harnesses may implement adapters to the same artifacts and contracts.
-The approved staged evolution through V3.6 is recorded in [`ROADMAP.md`](ROADMAP.md).
+The approved staged evolution through V3.10 is recorded in [`ROADMAP.md`](ROADMAP.md).
 
 ## Problem
 
@@ -109,6 +109,9 @@ Adjacent contexts:
 | Method Revision | The lifecycle contract revision loaded by the active process. |
 | Applicability Plan | Explicit JSON input declaring the Engineering Profile and applicability of every gate for a new cycle. |
 | Cycle Record Schema | Integer version for the serialized Cycle Record shape, independent of Method Revision. |
+| Fixed-Commit Inspection | Read-only access to repository objects after resolving one immutable commit identity. |
+| Evidence Envelope | Sanitized metadata plus an optional hash-addressed local sidecar proving a gate result. |
+| Product Intent | Conditional product-facing context held in `PRODUCT.md` and referenced by an Engineering Profile. |
 
 ## Domain Model
 
@@ -123,6 +126,10 @@ Adjacent contexts:
   authority.
 - **Module:** owns progressive domain guidance and optional references.
 - **QA Run:** executes authorities for an affected scope and Engineering Profile.
+- **Evidence Envelope:** retains bounded, sanitized gate evidence without secret
+  or environment-value capture.
+- **Product Intent:** owns users, outcomes, journeys, constraints, accessibility,
+  trust boundaries, compatibility, and retirement for product-facing contexts.
 
 ### Value Objects
 
@@ -153,6 +160,10 @@ Adjacent contexts:
 - `GateExceptionApproved`
 - `RiskRaised`
 - `GateApplicabilityTightened`
+- `CommitResolved`
+- `EvidenceRecorded`
+- `EvidenceWithheld`
+- `ProductIntentSelected`
 
 ### Sources And Sinks
 
@@ -357,6 +368,40 @@ records, and retirement decisions. External writes remain approval-gated.
 - Then risk and applicability tighten and dependent passed gates reopen
 - And neither risk nor applicability can loosen within the active cycle
 
+### Feature: Approved V3.7–V3.10 Evolution
+
+**Scenario: Inspect one committed repository state**
+- Given a caller supplies a Git reference and repository-relative scope
+- When fixed-commit inspection begins
+- Then the reference resolves once and all reads use that immutable object ID
+- And dirty overlay, traversal, repository escape, mutation, and unbounded output
+  are excluded or rejected explicitly
+
+**Scenario: Retain evidence without retaining secrets**
+- Given a project-selected authority produces gate evidence
+- When DBSCTR records an Evidence Envelope
+- Then it stores sanitized invocation metadata and hash-addressed local output
+- And environment values, stdin, resolved `op://` values, secret-bearing URLs,
+  and unclassifiable output are never persisted
+
+**Scenario: Reconcile semantic claims without mutation**
+- Given lifecycle claims and evidence exist at one resolved commit
+- When a semantic reconciliation audit runs
+- Then it classifies each material claim against source and project policy
+- And every remediation requires a separately approved context-scoped cycle
+
+**Scenario: Load Product Intent conditionally**
+- Given an Engineering Profile identifies product-facing behavior
+- When Discovery selects durable product artifacts
+- Then `PRODUCT.md` records the applicable Product Intent
+- And non-product work receives no synthetic Product Intent
+
+**Scenario: Load Web/UI guidance conditionally**
+- Given an Engineering Profile identifies browser UI or frontend component work
+- When DBSCTR selects modules
+- Then the Web/UI module applies with WCAG 2.2 AA by default
+- And non-browser product work receives no UI gates
+
 ## Engineering Profile
 
 ### Defaults
@@ -397,6 +442,15 @@ records, and retirement decisions. External writes remain approval-gated.
 | Delivery intent | Merge; local managed-config deployment remains orchestrator-owned after validation |
 | Scope | `dbsctr_begin` authorization, narrow destructive-command prompts, Cycle Record Method Revision, compatibility evidence |
 | Overrides | Keep public commands and schema unchanged; no helper runs when OpenCode denies or cancels begin authorization |
+
+### Approved V3.7–V3.10 Evolution
+
+| Field | Value |
+|---|---|
+| Risk | Elevated: introduces repository-read and evidence trust boundaries |
+| Delivery intent | Separate isolated merge/deploy cycles per milestone |
+| Scope | Fixed-commit inspection, evidence envelopes, semantic reconciliation, conditional Product Intent and Web/UI guidance |
+| Overrides | Preserve public commands and compatibility; keep Graphify and Herdr runtime hygiene in separate cycles |
 
 ## Gate Ledger — V3.1 Completion
 
@@ -807,6 +861,80 @@ lifecycle audit reconciles specifications, profiles, backlogs, changelogs,
 decisions, tests, and implementation claims. A request to update or reconcile
 findings starts explicit context-scoped DBSCTR cycles; audit alone never rewrites
 semantic truth, archives files, executes external systems, commits, or pushes.
+
+### Approved V3.7 Fixed-Commit Inspection Contract
+
+- One helper interface and typed read-only adapter expose `read`, `tree`,
+  `search`, and `object` actions. Concrete output caps are selected and tested as
+  Project Policy during V3.7 implementation.
+- A supplied ref resolves once to one immutable object ID; every result reports
+  that identity and reads Git objects rather than the filesystem overlay.
+- Absolute paths, `..`, traversal, repository escape, invalid object types,
+  shell interpolation, checkout, fetch, and index/worktree mutation are rejected.
+- Search and output have caller limits and hard caps. Truncation is explicit and
+  continuable; binary content is identified rather than emitted as unbounded text.
+- Dirty overlay remains visible as excluded context and cannot affect a result.
+
+### Approved V3.8 Evidence Envelope Contract
+
+- Cycle Records retain evidence metadata; sanitized large output resides in
+  hash-addressed sidecars beneath
+  `<git-common-dir>/dbsctr/evidence/<cycle-id>/<sha256>`.
+- Metadata records evidence ID, cycle, gate, authority, sanitized argument
+  vector, resolved HEAD, timestamps, result, digest when safe, byte count,
+  truncation, classified summary, canonical non-sensitive URLs, and sidecar or
+  `content_withheld` status.
+- Evidence never records inherited environment, environment values, stdin, shell
+  expansion results, resolved `op://` values, or secret-bearing URLs.
+- Known secret forms are redacted before persistence. Summaries and URLs pass the
+  same conservative classifier; URL userinfo, query, fragment, internal hosts,
+  paths, account identifiers, and personal data are removed unless Project
+  Policy explicitly marks a canonical value non-sensitive. Output that cannot be
+  classified safely is withheld; only byte count, result, and withheld status
+  remain because a raw digest can disclose low-entropy secrets by verification.
+- Evidence and completed Cycle Records share retention. Only explicit,
+  permission-gated cleanup removes both; there is no automatic expiry.
+- DBSCTR never retrieves project secrets. A project authority may use a
+  project-owned 1Password wrapper. Conditional Python guidance may use committed
+  `op://` templates, `op run`, grouped lazy Pydantic Settings, and `SecretStr`,
+  unwrapping only at client trust boundaries. Tests use fake environment values,
+  not real 1Password data. Required credential files use restrictive permissions,
+  validation, cleanup, and documented residual exposure.
+- Approved private local repositories may inform implementation research but are
+  not public artifacts, distributable examples, or automatic project authority.
+
+### Approved V3.9 Semantic Reconciliation Contract
+
+- Semantic reconciliation uses one V3.7-resolved commit and V3.8 metadata without
+  exposing withheld content.
+- Findings are confirmed drift, stale evidence, missing artifact, authority
+  conflict, historical-but-unlabelled content, unverified claim, consistent, or
+  out of scope.
+- Source and project policy outrank graph inference and approved private local
+  references. Uncertainty stays explicit.
+- The audit remains report-only and distinct from `/qa full`. It never rewrites,
+  changes status, commits, deploys, or cleans up; every remediation starts a
+  separately approved context-scoped DBSCTR cycle.
+
+### Approved V3.10 Product Intent And Web/UI Contract
+
+- Product-facing contexts may own `docs/specs/<context>/PRODUCT.md`, referenced
+  by the Engineering Profile. It records users/stakeholders, problem and desired
+  outcomes, non-goals, core journeys, success evidence, product constraints,
+  accessibility, privacy/trust, compatibility, and retirement obligations.
+- Libraries, infrastructure, and internal tooling do not receive synthetic
+  Product Intent unless their Engineering Profile establishes product-facing
+  behavior.
+- Browser UI, product-facing web flows, or frontend component work load the
+  Web/UI module. WCAG 2.2 AA is the default accessibility target unless stronger
+  Project Policy applies.
+- Applicable evidence covers keyboard, focus, semantics, contrast, zoom/reflow,
+  errors, and reduced motion. Visual evidence never replaces semantic or
+  accessibility checks.
+- Existing project frameworks and authorities take precedence. Playwright and
+  Flowbite Pro are non-normative references.
+- MCP configuration is project-local and explicitly applicable; DBSCTR never
+  creates or modifies global MCP configuration.
 
 ### Git Lifecycle Contract
 

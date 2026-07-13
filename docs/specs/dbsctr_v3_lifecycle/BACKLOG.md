@@ -6,6 +6,22 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
+| ROADMAP-1 | Persist approved V3.7–V3.10 roadmap | high | active | - | lifecycle README/ROADMAP/BACKLOG/CHANGELOG | approved discovery | no | creates durable implementation boundaries | small | lifecycle tests/diff/review |
+| V3.7-1 | Lock inspection limits and interface policy | high | approved | ROADMAP-1 | V3.7 implementation policy | approved fixed-commit contract | no | selects concrete caps before code | small | scenario/contract review |
+| V3.7-2 | Implement helper inspection interface | high | pending | V3.7-1 | `dbsctrctl` | lifecycle specs | no | shared helper surface | medium | helper tests |
+| V3.7-3 | Add typed read-only adapter | high | pending | V3.7-2 | OpenCode tool/config | helper JSON | yes | exposes safe inspection | small | Bun build/control tests |
+| V3.7-4 | Add security and compatibility evidence | high | pending | V3.7-2,V3.7-3 | tests | helper/tool | no | gates traversal and overlay safety | medium | affected test suite |
+| V3.8-1 | Specify evidence schema and retention | high | pending | V3.7-4 | lifecycle specs | inspection contract | no | establishes evidence boundary | medium | scenario/contract review |
+| V3.8-2 | Implement sanitized evidence sidecars | high | pending | V3.8-1 | `dbsctrctl` | Cycle Records | no | retains bounded evidence | large | helper tests |
+| V3.8-3 | Test redaction and withheld content | high | pending | V3.8-2 | tests | helper output | no | prevents secret retention | medium | secret-canary tests |
+| V3.8-4 | Add Python 1Password settings reference | medium | pending | V3.8-1 | Python reference | approved local pattern | yes | documents conditional project pattern | small | static contracts |
+| V3.9-1 | Specify semantic audit classifications | high | pending | V3.8-3,V3.8-4 | lifecycle specs | V3.7/V3.8 | no | fixes report semantics | medium | scenario/contract review |
+| V3.9-2 | Implement semantic audit orchestration | high | pending | V3.9-1 | audit skill/tool | fixed-commit inspection | no | traces claims without mutation | medium | audit smoke/tests |
+| V3.9-3 | Test report-only authority boundaries | high | pending | V3.9-2 | tests | audit surfaces | no | prevents automatic rewriting | medium | affected test suite |
+| V3.10-1 | Specify conditional Product Intent | medium | pending | V3.9-3 | Discovery/lifecycle specs | Engineering Profile | no | avoids synthetic product artifacts | medium | static contracts |
+| V3.10-2 | Add generic Web/UI module | medium | pending | V3.10-1 | DBSCTR module | product/accessibility policy | no | adds UI lifecycle outcomes | medium | module tests |
+| V3.10-3 | Add tool references and local MCP rule | medium | pending | V3.10-2 | Web/UI references | project authorities | yes | keeps examples non-normative | small | static contracts |
+| V3.10-4 | Test conditional loading/accessibility | medium | pending | V3.10-2,V3.10-3 | tests | module/reference | no | gates applicability and defaults | medium | affected test suite |
 
 ## Completed
 

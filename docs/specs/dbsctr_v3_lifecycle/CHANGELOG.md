@@ -1,5 +1,22 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.7–V3.10 Roadmap Discovery
+
+- Approved separate milestones for fixed-commit inspection, sanitized retained
+  evidence, report-only semantic reconciliation, and conditional Product Intent
+  plus Web/UI guidance.
+- Selected Git-object-only reads with bounded output and traversal/overlay
+  rejection; hash-addressed local evidence sidecars with conservative withholding;
+  and permission-gated record/evidence cleanup.
+- Kept DBSCTR out of secret retrieval. Approved conditional Python reference
+  guidance for project-owned 1Password wrappers feeding lazy grouped Pydantic
+  Settings with `SecretStr` and fake-value tests.
+- Kept approved private local repositories non-public and non-authoritative.
+  Selected WCAG 2.2 AA by default, non-normative Playwright/Flowbite Pro guidance,
+  and project-local MCP only.
+- Separated Graphify duplicate-registration cleanup and Herdr LaunchAgent
+  reconciliation from the V3.7–V3.10 milestone sequence.
+
 ## 2026-07-12 — V3.6.2 Permission And Revision Correctness
 
 - Routed typed `dbsctr_begin` through OpenCode permission evaluation before any
