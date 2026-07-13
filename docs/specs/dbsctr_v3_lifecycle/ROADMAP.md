@@ -99,7 +99,7 @@
   feeding grouped lazy Pydantic Settings with `SecretStr`; DBSCTR never retrieves
   project secrets itself.
 
-### V3.9 — Semantic Reconciliation (active)
+### V3.9 — Semantic Reconciliation (complete)
 
 - Trace lifecycle claims at one V3.7-resolved commit and classify confirmed
   drift, stale evidence, missing artifacts, authority conflicts,
