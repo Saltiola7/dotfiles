@@ -1,6 +1,6 @@
 # Changelog — DBSCTR V3 Lifecycle
 
-## 2026-07-12 — V3.7–V3.10 Roadmap Discovery
+## 2026-07-12 — V3.7–V3.10 Roadmap Approval
 
 - Approved separate milestones for fixed-commit inspection, sanitized retained
   evidence, report-only semantic reconciliation, and conditional Product Intent
@@ -16,6 +16,13 @@
   and project-local MCP only.
 - Separated Graphify duplicate-registration cleanup and Herdr LaunchAgent
   reconciliation from the V3.7–V3.10 milestone sequence.
+- Validation: 18 lifecycle tests passed; `git diff --check` passed; private
+  reference identity was absent from durable artifacts; independent review
+  findings were resolved, including conservative withholding of unsafe raw
+  digests, summaries, and URLs.
+- Gate Commit: `08cd102`. Deployment and operation: not applicable because this
+  cycle changes repository documentation only. Gate Exceptions: none. Intended
+  Final Push: `origin/main`.
 
 ## 2026-07-12 — V3.6.2 Permission And Revision Correctness
 

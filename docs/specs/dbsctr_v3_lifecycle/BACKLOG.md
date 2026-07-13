@@ -6,7 +6,6 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| ROADMAP-1 | Persist approved V3.7–V3.10 roadmap | high | active | - | lifecycle README/ROADMAP/BACKLOG/CHANGELOG | approved discovery | no | creates durable implementation boundaries | small | lifecycle tests/diff/review |
 | V3.7-1 | Lock inspection limits and interface policy | high | approved | ROADMAP-1 | V3.7 implementation policy | approved fixed-commit contract | no | selects concrete caps before code | small | scenario/contract review |
 | V3.7-2 | Implement helper inspection interface | high | pending | V3.7-1 | `dbsctrctl` | lifecycle specs | no | shared helper surface | medium | helper tests |
 | V3.7-3 | Add typed read-only adapter | high | pending | V3.7-2 | OpenCode tool/config | helper JSON | yes | exposes safe inspection | small | Bun build/control tests |
@@ -37,5 +36,6 @@ Discovery readiness: complete.
 | V3.6-1–V3.6-3 | Add fixed-commit lifecycle reconciliation audit | 2026-07-12 | `696971c`, `178bf26` |
 | V3.6.1-1 | Correct integrated roadmap and stale-base delivery | 2026-07-12 | `02bcf34`, `1b75001` |
 | V3.6.2-1 | Enforce begin authorization and correct Method Revision | 2026-07-12 | `95ef8ba` |
+| ROADMAP-1 | Persist approved V3.7–V3.10 roadmap and boundaries | 2026-07-12 | `08cd102` |
 
 Further roadmap implementation remains separately approved per milestone.
