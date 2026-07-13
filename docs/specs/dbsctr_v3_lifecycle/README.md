@@ -1,6 +1,6 @@
 # DBSCTR V3 Lifecycle
 
-**Status:** V3.7 fixed-commit inspection active; V3.8–V3.10 roadmap approved
+**Status:** V3.7 fixed-commit inspection implemented; V3.8–V3.10 roadmap approved
 **Discovery readiness:** Complete
 **Created:** 2026-07-11
 

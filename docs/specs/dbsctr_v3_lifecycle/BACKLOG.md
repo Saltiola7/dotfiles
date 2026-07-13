@@ -6,10 +6,6 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.7-1 | Lock inspection limits and interface policy | high | implemented | ROADMAP-1 | V3.7 implementation policy | approved fixed-commit contract | no | selects concrete caps before code | small | scenario/contract review |
-| V3.7-2 | Implement helper inspection interface | high | implemented | V3.7-1 | `dbsctrctl` | lifecycle specs | no | shared helper surface | medium | helper tests |
-| V3.7-3 | Add typed read-only adapter | high | implemented | V3.7-2 | OpenCode tool/config | helper JSON | yes | exposes safe inspection | small | Bun build/control tests |
-| V3.7-4 | Add security and compatibility evidence | high | implemented | V3.7-2,V3.7-3 | tests | helper/tool | no | gates traversal and overlay safety | medium | affected test suite |
 | V3.8-1 | Specify evidence schema and retention | high | pending | V3.7-4 | lifecycle specs | inspection contract | no | establishes evidence boundary | medium | scenario/contract review |
 | V3.8-2 | Implement sanitized evidence sidecars | high | pending | V3.8-1 | `dbsctrctl` | Cycle Records | no | retains bounded evidence | large | helper tests |
 | V3.8-3 | Test redaction and withheld content | high | pending | V3.8-2 | tests | helper output | no | prevents secret retention | medium | secret-canary tests |
@@ -37,5 +33,6 @@ Discovery readiness: complete.
 | V3.6.1-1 | Correct integrated roadmap and stale-base delivery | 2026-07-12 | `02bcf34`, `1b75001` |
 | V3.6.2-1 | Enforce begin authorization and correct Method Revision | 2026-07-12 | `95ef8ba` |
 | ROADMAP-1 | Persist approved V3.7–V3.10 roadmap and boundaries | 2026-07-12 | `08cd102` |
+| V3.7-1–V3.7-4 | Add bounded fixed-commit inspection and typed adapter | 2026-07-12 | `4af8365` |
 
 Further roadmap implementation remains separately approved per milestone.

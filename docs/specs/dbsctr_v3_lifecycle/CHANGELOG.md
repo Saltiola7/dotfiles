@@ -16,7 +16,9 @@
   `git diff --check`, real fixed-commit action smoke, and independent security
   review passed. Builder patch was reviewed and its initial bounds gaps were
   corrected before integration.
-- Deployment: targeted local chezmoi apply pending. Gate Exceptions: none.
+- Gate Commit: `4af8365`. Deployment: targeted local chezmoi apply completed;
+  source/deployed identity, idempotent dry-run, fresh config resolution, deployed
+  helper actions, and typed-tool execution passed. Gate Exceptions: none.
   Intended Final Push: `origin/main`.
 
 ## 2026-07-12 — V3.7–V3.10 Roadmap Approval
