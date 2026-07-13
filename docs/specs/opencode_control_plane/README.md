@@ -3,6 +3,20 @@
 **Status:** Approved
 **Discovery2 confidence:** 99%
 
+## Engineering Profile
+
+### Defaults
+
+| Field | Value |
+|---|---|
+| Deliverable | Managed OpenCode providers, agents, commands, permissions, skills, and routing |
+| Languages/frameworks | JSON/JSONC configuration, Markdown agent prompts, Python contract tests |
+| Modules | ML/AI |
+| Runtime/platform support | OpenCode in the managed macOS dotfiles environment; Python `>=3.12` tests |
+| Public compatibility | Preserve provider-affine Plan and Build workflows; retire provider entries that current authentication cannot use |
+| Trust/data classification | Local configuration and public provider metadata; credentials remain outside the repository |
+| Operational owner | Dotfiles owner maintains deployment and OpenCode compatibility |
+
 ## Overview
 
 The OpenCode control plane owns global providers, agents, commands, permissions,
@@ -12,7 +26,7 @@ surfaces.
 
 ## Goals
 
-- Keep native Plan, `Build-GPT`, `Build-GPT-Pro`, and `Build-Claude`.
+- Keep native Plan, `Build-GPT`, and `Build-Claude`.
 - Keep direct Bedrock Claude and raw LM Studio models.
 - Make workflow commands inherit the selected primary agent.
 - Allow local Build commands by default while gating external or destructive writes.
@@ -63,6 +77,16 @@ Given an OpenAI primary, it delegates only to OpenAI optimized agents. Given
 `Build-Claude`, it delegates only to Bedrock optimized agents. No fallback
 crosses providers silently.
 
+### ChatGPT OAuth model exposure
+
+Given OpenAI uses ChatGPT OAuth, only models and reasoning-effort variants
+supported by that route are exposed. Native Plan and `Build-GPT` use base
+GPT-5.6 Sol with medium effort by default, while the user may select another
+supported effort variant. No agent or provider override claims unavailable Pro
+reasoning mode. The ChatGPT OAuth backend rejects base Sol requests containing
+`reasoning.mode: "pro"` with `unsupported_value`. OpenAI Explore, Scout, and
+Builder remain on GPT-5.6 Terra.
+
 ### Removed integrations
 
 Given deployment completes, Claude Code, Meridian, Headroom, OMO, their wrappers,
@@ -83,6 +107,10 @@ hook behavior remains available without a duplicate project plugin.
 - Direct provider `anthropic` is denied; `amazon-bedrock` is not.
 - Raw `lmstudio` remains configured; `headroom` and `headroom-lmstudio` do not.
 - Native Build stays disabled and native Plan remains the startup default.
+- `gpt-5.6-sol-pro`, `Plan-GPT-Pro`, `Plan-GPT-Pro-Max`, and `Build-GPT-Pro`
+  are absent while ChatGPT OAuth excludes Pro reasoning mode.
+- Native Plan and `Build-GPT` resolve to `openai/gpt-5.6-sol` with `medium` as
+  their default effort; OpenAI optimized subagents remain on Terra.
 - Commands contain no fixed `agent` field.
 - Skill names visible to OpenCode are unique.
 - Unversioned lifecycle commands load DBSCTR V3; V1 is removed and V2 source is
@@ -106,3 +134,5 @@ hook behavior remains available without a duplicate project plugin.
 - Runtime deletion cannot be rolled back without reinstalling removed tools.
 - Removing the duplicate Graphify project integration must not remove its global
   skill, graph, or hooks.
+- OpenCode provider behavior may change across upgrades; focused contract tests
+  prevent unsupported aliases from silently returning.

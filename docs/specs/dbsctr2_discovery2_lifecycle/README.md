@@ -4,6 +4,13 @@
 2026-07-11. V2 source is retained under `docs/archive/opencode/skills/v2/` and is
 not deployed. The remainder of this document is historical.
 
+**Historical correction (2026-07-13):** References below to Sol Pro agents
+describe the configuration as understood on 2026-07-11. OpenCode later confirmed
+that the OAuth alias had not sent genuine Pro reasoning mode, and 1.17.19+
+excludes genuine Pro mode from ChatGPT OAuth. A direct base-Sol OAuth probe with
+`reasoning.mode: "pro"` was also rejected as unsupported. The current contract
+is `docs/specs/opencode_control_plane/README.md`.
+
 ## Overview
 
 The bounded context is the v2 lifecycle for OpenCode-native DBSCTR and

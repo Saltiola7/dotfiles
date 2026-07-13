@@ -11,3 +11,4 @@
 | OCP-7 | Clean approved machine runtime | high | done | OCP-3,OCP-4,OCP-5,OCP-6 | installed packages, services, state | package ownership | no | Match runtime to source | M | Runtime absence checks passed |
 | OCP-8 | Deploy and validate | high | done | OCP-7 | managed targets | all changes | no | Activate safely | M | Config and OpenAI probes passed; Bedrock blocked by expired SSO |
 | OCP-9 | Finalize artifacts | medium | done | OCP-8 | control-plane artifacts and indexes | evidence | no | Prevent stale docs | S | Final review passed |
+| OCP-10 | Retire unsupported OpenAI Pro aliases | high | in_progress | OCP-9 | OpenAI provider override, primary agents, control-plane artifacts and tests | OpenCode 1.17.20 OAuth behavior, PR #36694, and live OAuth rejection | no | Keep managed model exposure truthful and compatible with ChatGPT OAuth | S | Pro probe rejected with `unsupported_value`; focused tests and deployment pending |
