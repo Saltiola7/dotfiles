@@ -1,5 +1,23 @@
 # Changelog — DBSCTR V3 Lifecycle
 
+## 2026-07-12 — V3.10 Product Intent And Web/UI
+
+- Added conditional Product Intent discovery that reuses an authoritative product
+  artifact and creates `PRODUCT.md` only when needed; non-product contexts receive
+  no synthetic artifact.
+- Added a generic Web/UI module with WCAG 2.2 AA defaults, browser trust-boundary
+  outcomes, lifecycle obligations, and explicit semantic, keyboard, focus,
+  contrast, zoom/reflow, target-size, error-state, and reduced-motion evidence.
+- Added non-normative Playwright and Flowbite Pro references plus a strict
+  project-local MCP boundary. Existing frameworks and project authorities remain
+  authoritative; automated and visual evidence alone cannot prove conformance.
+- Validation: 258 tests passed and 1 skipped; Python compile and `git diff --check`
+  passed. Independent accessibility review findings were remediated and final
+  review reported no findings.
+- Gate Commit: `d0bc5bd`. Deployment: targeted local chezmoi apply completed;
+  source/deployed identity, idempotent dry-run, and deployed fixed-commit helper
+  smoke passed. Gate Exceptions: none. Intended Final Push: `origin/main`.
+
 ## 2026-07-12 — V3.9 Semantic Reconciliation
 
 - Added a report-only semantic audit protocol after deterministic fixed-commit

@@ -6,10 +6,7 @@ Discovery readiness: complete.
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V3.10-1 | Specify conditional Product Intent | medium | implemented | V3.9-3 | Discovery/lifecycle specs | Engineering Profile | no | avoids synthetic product artifacts | medium | static contracts |
-| V3.10-2 | Add generic Web/UI module | medium | implemented | V3.10-1 | DBSCTR module | product/accessibility policy | no | adds UI lifecycle outcomes | medium | module tests |
-| V3.10-3 | Add tool references and local MCP rule | medium | implemented | V3.10-2 | Web/UI references | project authorities | yes | keeps examples non-normative | small | static contracts |
-| V3.10-4 | Test conditional loading/accessibility | medium | implemented | V3.10-2,V3.10-3 | tests | module/reference | no | gates applicability and defaults | medium | affected test suite |
+| — | No active V3.7–V3.10 roadmap item | — | — | — | — | — | — | roadmap complete | — | — |
 
 ## Completed
 
@@ -29,5 +26,6 @@ Discovery readiness: complete.
 | V3.7-1–V3.7-4 | Add bounded fixed-commit inspection and typed adapter | 2026-07-12 | `4af8365` |
 | V3.8-1–V3.8-4 | Add secret-safe Evidence Envelopes and Python reference | 2026-07-12 | `9fd353d` |
 | V3.9-1–V3.9-3 | Add report-only semantic reconciliation protocol | 2026-07-12 | `82dd3da` |
+| V3.10-1–V3.10-4 | Add conditional Product Intent and Web/UI guidance | 2026-07-12 | `d0bc5bd` |
 
-Further roadmap implementation remains separately approved per milestone.
+Graphify and Herdr runtime hygiene remain separate bounded-context work.
