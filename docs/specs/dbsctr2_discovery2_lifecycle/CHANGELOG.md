@@ -1,5 +1,15 @@
 # Changelog — DBSCTR2 and Discovery2 Lifecycle
 
+## 2026-07-13 Correction: Sol Pro Was Not Available Through ChatGPT OAuth
+
+- Corrected the July 11 evidence: the successful Sol-Pro alias requests used
+  base Sol without transmitting genuine Pro reasoning mode.
+- OpenCode 1.17.19 added correct Pro serialization but filters it from ChatGPT
+  OAuth; a direct base-Sol OAuth probe with `reasoning.mode: "pro"` was rejected
+  by the backend with `unsupported_value`.
+- Retired all three managed Pro agents and their deployed targets. Current
+  behavior is governed by `docs/specs/opencode_control_plane/README.md`.
+
 ## 2026-07-11 Follow-Up: Maximum-Effort Sol Pro Planning
 
 - Added selectable `Plan-GPT-Pro-Max` for exceptional architectural and

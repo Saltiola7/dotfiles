@@ -1,5 +1,22 @@
 # OpenCode Control Plane Changelog
 
+## 2026-07-13 — Retire Unsupported Pro Agents and Restore Native Build
+
+- Confirmed `gpt-5.6-sol-pro` had not sent genuine Pro reasoning before
+  OpenCode 1.17.19, then bypassed the new OAuth filter with a correctly formed
+  base-Sol request and observed the ChatGPT backend reject
+  `reasoning.mode: "pro"` with `unsupported_value`.
+- Removed the Sol-Pro override and the `Plan-GPT-Pro`, `Plan-GPT-Pro-Max`, and
+  `Build-GPT-Pro` agents, including explicit chezmoi target retirement.
+- Re-enabled native Build because OpenCode 1.17.20 hard-codes native Plan exit to
+  agent key `build`; retained `Build-GPT` Sol medium and Terra subagents for
+  manual provider-affine execution.
+- Passed 35 affected tests, JSON parsing, diff checks, independent review,
+  source-bound chezmoi dry-run/apply/status, resolved-config checks, and fresh
+  native Build and `Build-GPT` tool probes. No gate exceptions were used.
+- Gate commits: `af14f90`, `98900a3`, `4da132f`, `dcebd6c`. Deployment is local;
+  intended Final Push target is `origin/main`.
+
 ## 2026-07-11 — Discovery
 
 - Approved provider-neutral workflow commands and provider-affine delegation.
