@@ -53,7 +53,8 @@ __op_fail_ssh_without_service_token() {
 
 __op_fail_herdr_without_service_token() {
   echo "op-session: Herdr shells require OP_SERVICE_ACCOUNT_TOKEN from env or macOS Keychain." >&2
-  echo "op-session: store it with: security add-generic-password -U -s $__OP_KEYCHAIN_SERVICE -a $__OP_ACCOUNT -w \"\$OP_SERVICE_ACCOUNT_TOKEN\"" >&2
+  echo "op-session: repair it in Keychain Access (login keychain):" >&2
+  echo "op-session: item=$__OP_KEYCHAIN_SERVICE account=$__OP_ACCOUNT; allow /usr/bin/security" >&2
   return 1
 }
 
@@ -91,8 +92,18 @@ __op_session_valid() {
 
 __op_load_keychain_service_token() {
   command -v security >/dev/null 2>&1 || return 1
-  local tok
-  tok="$(security find-generic-password -s "$__OP_KEYCHAIN_SERVICE" -a "$__OP_ACCOUNT" -w 2>/dev/null)" || return 1
+  local tok err
+  err="$(mktemp "${TMPDIR:-/tmp}/op-keychain.XXXXXX")" || return 1
+  tok="$(security find-generic-password -s "$__OP_KEYCHAIN_SERVICE" -a "$__OP_ACCOUNT" -w 2>"$err")" || {
+    if [ -s "$err" ]; then
+      sed 's/^/op-session: Keychain: /' "$err" >&2
+    else
+      echo "op-session: Keychain item is missing or inaccessible." >&2
+    fi
+    command rm -f "$err"
+    return 1
+  }
+  command rm -f "$err"
   [ -n "$tok" ] || return 1
   export OP_SERVICE_ACCOUNT_TOKEN="$tok"
 }

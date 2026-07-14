@@ -417,7 +417,7 @@ The programmatic approach (`kitty @ launch`) is reliable, composable, and allows
 
 ### Why `secret &&` Before opencode
 
-Opencode tabs are launched with `bash -l -c "secret && exec opencode-kitty"`. The `secret` function (defined in `.common_profile`) loads API keys from 1Password into environment variables (e.g., `AWS_PROFILE`, `AWS_REGION` for Bedrock). Without it, opencode cannot authenticate with the provider. The login shell (`bash -l`) ensures `.common_profile` is sourced so the `secret` function is available. If `secret` fails (e.g., 1Password not unlocked), the opencode tab will not launch.
+Opencode tabs are launched with `bash -l -c "secret && exec opencode-kitty"`. The `secret` function (defined in `.common_profile`) loads non-AWS API keys from 1Password. AWS profile and region are permanent non-secret shell settings, while AWS CLI and the dedicated refresh service own SSO credentials. The login shell (`bash -l`) ensures `.common_profile` is sourced. If `secret` fails, the opencode tab still does not launch because its other configured providers require those secrets.
 
 ### Why Pre-Type Instead of Auto-Execute
 

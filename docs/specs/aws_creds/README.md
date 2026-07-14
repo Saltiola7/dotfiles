@@ -2,13 +2,15 @@
 
 **Status:** Stable
 **Created:** 2026-04-28
-**Last updated:** 2026-06-01
+**Last updated:** 2026-07-13
 
 ## Overview
 
 MGM work uses AWS IAM Identity Center (SSO) chained to Microsoft Entra ID for authentication. The `aws sso login` flow opens a browser tab, which redirects through `myapps.microsoft.com`, and completes silently when the Microsoft session cookie is still valid.
 
 This spec automates re-acquiring the AWS SSO **refresh token** three times per day via a launchd LaunchAgent, so the AWS SDK can keep renewing short-lived access tokens without interaction throughout the work day. The schedule is chosen to overlap the refresh token's ~8-hour lifetime (slots ~7h59m apart) while staying inside an 08:00–23:00 window.
+
+`AWS_PROFILE=BedrockDeveloperAccess-302432775606` and `AWS_REGION=us-west-2` are non-secret shell configuration in Bash and Xonsh. The `secret` command does not read, export, clear, or validate AWS settings or credentials. AWS CLI and this refresh service exclusively own AWS SSO tokens.
 
 ### Token model (important — don't confuse these)
 

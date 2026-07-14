@@ -10,6 +10,7 @@ Entities:
 - `OnePasswordCommand`: `op` CLI command that can require app integration or biometric approval.
 - `TemplateRenderer`: chezmoi render path that must not require live 1Password access.
 - `HerdrPane`: restored or newly opened Herdr pane with `HERDR_ENV` set.
+- `HerdrServer`: persistent pane owner launched in the macOS Aqua bootstrap context.
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 
 Value objects:
@@ -45,6 +46,13 @@ Glossary:
 - When each `LoginShell` starts
 - Then no `SecretLoader` runs automatically
 - And no `OnePasswordCommand` runs from shell startup
+
+**Scenario: Herdr server starts in the GUI security context**
+- Given the user has an active Aqua login session
+- When the managed `HerdrServer` starts
+- Then launchd runs it with `LimitLoadToSessionType=Aqua`
+- And no credential is stored in its plist or environment configuration
+- And restored `HerdrPane` processes can request the login-Keychain service token
 
 ### Feature: Fail-fast secret loading
 
@@ -89,6 +97,13 @@ Glossary:
 - When `SecretLoader` resolves 1Password authentication
 - Then it fails fast without calling `op signin`
 - And it tells the user to configure a Keychain-backed `OP_SERVICE_ACCOUNT_TOKEN`
+
+**Scenario: Herdr cannot read the Keychain service token**
+- Given the Keychain item exists but macOS denies non-interactive access
+- When `SecretLoader` resolves 1Password authentication
+- Then it reports the Keychain failure without exposing the token
+- And it provides Keychain Access guidance that trusts `/usr/bin/security`
+- And it does not call delegated `op signin`
 
 **Scenario: SSH session lacks service account token**
 - Given `SecretLoadRequested` runs in an SSH `LoginShell`
@@ -149,6 +164,11 @@ Glossary:
 - **Invariant:** `OnePasswordServiceAccountToken` takes precedence over cached and biometric session paths.
 - **Invariant:** `HerdrPane` uses `OnePasswordServiceAccountToken` from environment or `MacOSKeychainServiceToken` only; it must not call delegated desktop `op signin`.
 - **Invariant:** `MacOSKeychainServiceToken` is read from service `op-service-account-token` and account `my`.
+- **Invariant:** Keychain failures retain actionable diagnostics without printing credential values.
+- **Invariant:** Keychain repair is explicit and interactive; `SecretLoader` never mutates Keychain ACLs.
+- **Invariant:** repair guidance does not use `security -w` interactive input because it truncates the service-account token.
+- **Invariant:** `HerdrServer` runs in the Aqua launchd domain without embedding credentials in its plist.
+- **Invariant:** chezmoi deployment never stops an unmanaged `HerdrServer`; initial handoff is explicit or occurs at the next GUI login.
 - **Post:** valid service account tokens must not call `op signin` or write `OnePasswordSessionCache`.
 - **Post:** invalid service account tokens fail fast with a service-account-specific error.
 - **Post:** SSH shells without a service account token must not attempt biometric or password-based `op signin`.

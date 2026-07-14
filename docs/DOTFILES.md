@@ -41,7 +41,6 @@ Secrets are managed via **1Password CLI** (`op`). Two patterns are used dependin
 | Gemini API Key | Personal | Shell env (`$GEMINI_API_KEY`) via `secret` |
 | Google AI API Key | Personal | Shell env (`$GOOGLE_GENERATIVE_AI_API_KEY`) via `secret` |
 | OpenAI API Key | Personal | Shell env (`$OPENAI_API_KEY`) via `secret` |
-| AWS Bedrock | Personal | Shell env (`$AWS_PROFILE`, `$AWS_REGION`) via `secret` |
 | ClickHouse Cloud | Personal | `ch` alias fetches host inline at invocation |
 | Databricks | Personal | `.databrickscfg` template (host + token) |
 
@@ -59,7 +58,8 @@ Secrets are cached for the lifetime of the shell session via `_SECRETS_LOADED` g
 - `$GEMINI_API_KEY` / `$GEMINI_DEEP_RESEARCH_API_KEY`
 - `$GOOGLE_GENERATIVE_AI_API_KEY`
 - `$OPENAI_API_KEY`
-- `$AWS_PROFILE` / `$AWS_REGION`
+
+AWS profile and region are non-secret shell configuration loaded at Bash and Xonsh startup. AWS SSO credentials remain in the AWS CLI cache and are maintained by the dedicated refresh service, not `secret`.
 
 The ClickHouse alias (`ch`) fetches its host inline via `op read` at invocation time — no `secret` call needed.
 

@@ -16,3 +16,9 @@
 - Added explicit `Automation` vault scoping for the `Shell Secrets` item fetch required by service accounts.
 - Changed the default `ShellSecretsItem` id to the copied item in `Automation`.
 - Changed `secret` to source sibling `op-session` directly so existing panes do not need `hash -r` after deploys.
+
+## 2026-07-13
+
+- Preserved actionable macOS Keychain errors while keeping service-account tokens out of output.
+- Added Keychain Access repair guidance after `security -w` interactive input truncated the service-account token to 128 characters.
+- Added a credential-free Aqua LaunchAgent after RCA found the headless persistent Herdr server could not access the login Keychain.

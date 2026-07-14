@@ -25,3 +25,4 @@ All tasks are independent — can be worked in any order or concurrently.
 | — | Aerospace outer.top snap to bar | 2026-05-28 | `65b9d4c` |
 | — | Background aws sso login after MS auth | 2026-05-31 | `c40ef54` |
 | — | Single-flow recovery (drop sleep 30 + redundant browser) | 2026-06-01 | `7a19462` |
+| — | Decouple AWS shell settings from `secret` | 2026-07-13 | done |

@@ -27,6 +27,19 @@ def _base_env(tmp_path: Path, bin_dir: Path) -> dict[str, str]:
     return env
 
 
+def test_aws_settings_are_shell_config_not_secrets() -> None:
+    secret = (ROOT / "dot_local/bin/executable_secret").read_text()
+    bash_profile = (ROOT / "dot_common_profile.tmpl").read_text()
+    xonsh_profile = (ROOT / "dot_xonshrc.tmpl").read_text()
+
+    assert "AWS_PROFILE" not in secret
+    assert "AWS_REGION" not in secret
+    assert "CLAUDE_CODE_USE_BEDROCK" not in secret
+    for profile in (bash_profile, xonsh_profile):
+        assert "BedrockDeveloperAccess-302432775606" in profile
+        assert "us-west-2" in profile
+
+
 def _run_bash_in_pty(command: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
     wrapper = """
 import os
@@ -257,6 +270,39 @@ exit 2
     assert not log_file.exists()
 
 
+def test_op_session_reports_keychain_access_error_without_signin(tmp_path: Path) -> None:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    log_file = tmp_path / "op.log"
+    quoted_log_file = shlex.quote(str(log_file))
+
+    _write_executable(
+        bin_dir / "security",
+        "#!/bin/bash\nprintf '%s\\n' 'User interaction is not allowed.' >&2\nexit 36\n",
+    )
+    _write_executable(
+        bin_dir / "op",
+        f"#!/bin/bash\nprintf '%s\\n' \"$*\" >> {quoted_log_file}\nexit 9\n",
+    )
+
+    env = _base_env(tmp_path, bin_dir)
+    env["HERDR_ENV"] = "1"
+
+    result = subprocess.run(
+        ["bash", "-c", f"source {ROOT / 'dot_local/bin/executable_op-session'}"],
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "User interaction is not allowed" in result.stderr
+    assert "Keychain Access" in result.stderr
+    assert "allow /usr/bin/security" in result.stderr
+    assert not log_file.exists()
+
+
 def test_op_session_ssh_without_service_token_does_not_signin(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     cache_dir = tmp_path / ".cache" / "op"
@@ -410,8 +456,6 @@ cat <<'JSON'
 {{"label":"OPENAI_API_KEY","value":"openai"}},
 {{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
 {{"label":"DATABRICKS_TOKEN","value":"db-token"}},
-{{"label":"AWS_PROFILE","value":"bedrock"}},
-{{"label":"AWS_REGION","value":"us-west-2"}},
 {{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\\"type\\\":\\\"service_account\\\"}}"}},
 {{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
 {{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
@@ -437,10 +481,15 @@ JSON
 
     env = _base_env(tmp_path, bin_dir)
     env["SECRET_PROFILE"] = "1"
+    env["AWS_PROFILE"] = "existing-profile"
+    env["AWS_REGION"] = "existing-region"
 
     command = f"""
 source {ROOT / 'dot_local/bin/executable_secret'}
 test "$GEMINI_API_KEY" = gemini
+test "$AWS_PROFILE" = existing-profile
+test "$AWS_REGION" = existing-region
+test -z "${{CLAUDE_CODE_USE_BEDROCK:-}}"
 test "$GOOGLE_APPLICATION_CREDENTIALS" = "$HOME/.cache/gcp/enterprise-seo-tools-sa.json"
 test "$GWS_CONTENT_READER_CREDENTIALS" = "$HOME/.cache/gcp/gws-content-reader-key.json"
 test "$(cat "$GOOGLE_APPLICATION_CREDENTIALS")" = '{{"type":"service_account"}}'
@@ -498,8 +547,6 @@ cat <<'JSON'
 {{"label":"OPENAI_API_KEY","value":"openai"}},
 {{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
 {{"label":"DATABRICKS_TOKEN","value":"db-token"}},
-{{"label":"AWS_PROFILE","value":"bedrock"}},
-{{"label":"AWS_REGION","value":"us-west-2"}},
 {{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}},
 {{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
 {{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},

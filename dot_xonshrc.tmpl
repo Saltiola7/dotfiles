@@ -124,6 +124,10 @@ def _cleanup_gcp_cache():
 
 _cleanup_gcp_cache()
 
+# AWS SSO credentials are owned by the AWS CLI cache and refresh service.
+$AWS_PROFILE = 'BedrockDeveloperAccess-302432775606'
+$AWS_REGION = 'us-west-2'
+
 # ── Secrets (lazy-loaded via 1Password CLI) ───────────────────────────────────
 # Run 'secret' to load all secrets into the current shell session.
 # Secrets are cached in memory — only one biometric prompt per session.
@@ -141,8 +145,6 @@ def _load_secrets(args=None, stdin=None):
         $GEMINI_DEEP_RESEARCH_API_KEY = $GEMINI_API_KEY
         $GOOGLE_GENERATIVE_AI_API_KEY = $(op read 'op://Personal/Google AI API Key/credential').strip()
         $OPENAI_API_KEY = $(op read 'op://Personal/OpenAI API Key/credential').strip()
-        $AWS_PROFILE = $(op read 'op://Personal/AWS Bedrock/profile').strip()
-        $AWS_REGION = $(op read 'op://Personal/AWS Bedrock/region').strip()
 
         # GCP Service Account
         import os

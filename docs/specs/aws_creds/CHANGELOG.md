@@ -2,6 +2,12 @@
 
 All notable changes to the AWS SSO credential automation.
 
+## [2026-07-13]
+
+### Changed
+- `AWS_PROFILE` and `AWS_REGION` are permanent non-secret Bash/Xonsh settings; `secret` no longer manages AWS or Bedrock state.
+- AWS CLI caches and the existing refresh service remain the sole owners of AWS SSO credentials.
+
 ## [2026-06-03]
 
 ### Fixed
