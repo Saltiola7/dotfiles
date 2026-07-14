@@ -33,8 +33,10 @@ def test_provider_and_primary_contracts():
 
 
 def test_oauth_incompatible_pro_agents_are_absent():
+    removals = (ROOT / ".chezmoiremove").read_text().splitlines()
     for name in ("plan-gpt-pro.md", "plan-gpt-pro-max.md", "build-gpt-pro.md"):
         assert not (OC / "agents" / name).exists()
+        assert f".config/opencode/agents/{name}" in removals
 
     build = (OC / "agents/build-gpt.md").read_text()
     assert "model: openai/gpt-5.6-sol" in build

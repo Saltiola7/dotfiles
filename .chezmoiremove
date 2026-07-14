@@ -8,3 +8,6 @@
 .local/bin/opencode-personal
 Library/LaunchAgents/ai.headroom.proxy.bedrock.plist
 Library/LaunchAgents/ai.headroom.proxy.lmstudio.plist
+.config/opencode/agents/plan-gpt-pro.md
+.config/opencode/agents/plan-gpt-pro-max.md
+.config/opencode/agents/build-gpt-pro.md
