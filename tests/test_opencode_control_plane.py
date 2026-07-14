@@ -16,17 +16,39 @@ def test_provider_and_primary_contracts():
     config = json.loads((OC / "opencode.json.tmpl").read_text())
     assert config["$schema"] == "https://opencode.ai/config.json"
     assert config["default_agent"] == "plan"
-    assert config["agent"]["build"]["disable"] is True
+    assert not config["agent"].get("build", {}).get("disable", False)
     assert config["agent"]["plan"]["permission"]["edit"] == "deny"
     assert config["agent"]["plan"]["permission"]["bash"] == "ask"
     assert "amazon-bedrock" in config["provider"]
     assert "lmstudio" in config["provider"]
     assert "headroom" not in config["provider"]
     assert "headroom-lmstudio" not in config["provider"]
+    assert "gpt-5.6-sol-pro" not in config["provider"]["openai"]["models"]
+    assert config["agent"]["plan"]["model"] == "openai/gpt-5.6-sol"
+    assert config["agent"]["plan"]["variant"] == "medium"
     assert any(
         p == {"effect": "deny", "action": "provider.use", "resource": "anthropic"}
         for p in config["experimental"]["policies"]
     )
+
+
+def test_oauth_incompatible_pro_agents_are_absent():
+    for name in ("plan-gpt-pro.md", "plan-gpt-pro-max.md", "build-gpt-pro.md"):
+        assert not (OC / "agents" / name).exists()
+
+    build = (OC / "agents/build-gpt.md").read_text()
+    assert "model: openai/gpt-5.6-sol" in build
+    assert "variant: medium" in build
+
+    expected = {
+        "explore-openai.md": ("openai/gpt-5.6-terra", "low"),
+        "scout-openai.md": ("openai/gpt-5.6-terra", "medium"),
+        "builder-openai.md": ("openai/gpt-5.6-terra", "medium"),
+    }
+    for name, (model, variant) in expected.items():
+        body = (OC / "agents" / name).read_text()
+        assert f"model: {model}" in body
+        assert f"variant: {variant}" in body
 
 
 def test_commands_inherit_current_agent():
@@ -37,7 +59,6 @@ def test_commands_inherit_current_agent():
 def test_provider_affine_task_permissions():
     expected = {
         "build-gpt.md": ("explore-openai", "scout-openai", "builder-openai"),
-        "build-gpt-pro.md": ("explore-openai", "scout-openai", "builder-openai"),
         "build-claude.md": ("explore-bedrock", "scout-bedrock", "builder-bedrock"),
     }
     for name, allowed in expected.items():
@@ -89,9 +110,7 @@ def test_dbsctr_safe_git_permissions_and_reviewer():
     assert "task: deny" in reviewer
     assert "dbsctr_begin: deny" in reviewer
 
-    for name in ("plan-gpt-pro.md", "plan-gpt-pro-max.md"):
-        assert "dbsctr_begin: deny" in (OC / "agents" / name).read_text()
-    for name in ("build-gpt.md", "build-gpt-pro.md", "build-claude.md"):
+    for name in ("build-gpt.md", "build-claude.md"):
         assert "dbsctr_begin: allow" in (OC / "agents" / name).read_text()
     for name in ("builder-openai.md", "builder-bedrock.md"):
         assert "dbsctr_begin: deny" in (OC / "agents" / name).read_text()
