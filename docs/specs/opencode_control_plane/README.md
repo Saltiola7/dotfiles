@@ -13,7 +13,7 @@
 | Languages/frameworks | JSON/JSONC configuration, Markdown agent prompts, Python contract tests |
 | Modules | ML/AI |
 | Runtime/platform support | OpenCode in the managed macOS dotfiles environment; Python `>=3.12` tests |
-| Public compatibility | Preserve provider-affine Plan and Build workflows; retire provider entries that current authentication cannot use |
+| Public compatibility | Preserve native Plan-to-Build and provider-affine Build workflows; retire provider entries that current authentication cannot use |
 | Trust/data classification | Local configuration and public provider metadata; credentials remain outside the repository |
 | Operational owner | Dotfiles owner maintains deployment and OpenCode compatibility |
 
@@ -26,7 +26,7 @@ surfaces.
 
 ## Goals
 
-- Keep native Plan, `Build-GPT`, and `Build-Claude`.
+- Keep native Plan and Build, plus provider-affine `Build-GPT` and `Build-Claude`.
 - Keep direct Bedrock Claude and raw LM Studio models.
 - Make workflow commands inherit the selected primary agent.
 - Allow local Build commands by default while gating external or destructive writes.
@@ -64,6 +64,13 @@ the command uses that primary and does not force OpenAI.
 Given a Plan primary, edits are denied and Bash requires approval. Given a Build
 primary, local commands run by default while known external, destructive,
 deployment, publishing, and Git-write commands require approval.
+
+### Native Plan-to-Build handoff
+
+Given native Plan completes planning, its built-in exit path targets the native
+`build` agent. Native Build therefore remains enabled. `Build-GPT` remains a
+separate primary selected manually for OpenAI provider-affine Sol-to-Terra
+orchestration; changing only the model does not change the active agent.
 
 ### Bounded Builder
 
@@ -106,7 +113,8 @@ hook behavior remains available without a duplicate project plugin.
   the current schema/runtime parser.
 - Direct provider `anthropic` is denied; `amazon-bedrock` is not.
 - Raw `lmstudio` remains configured; `headroom` and `headroom-lmstudio` do not.
-- Native Build stays disabled and native Plan remains the startup default.
+- Native Plan remains the startup default and native Build stays enabled as the
+  built-in Plan exit target.
 - `gpt-5.6-sol-pro`, `Plan-GPT-Pro`, `Plan-GPT-Pro-Max`, and `Build-GPT-Pro`
   are absent while ChatGPT OAuth excludes Pro reasoning mode.
 - Native Plan and `Build-GPT` resolve to `openai/gpt-5.6-sol` with `medium` as
@@ -136,3 +144,5 @@ hook behavior remains available without a duplicate project plugin.
   skill, graph, or hooks.
 - OpenCode provider behavior may change across upgrades; focused contract tests
   prevent unsupported aliases from silently returning.
+- OpenCode 1.17.20 cannot retarget native `plan_exit` to a custom primary;
+  `Build-GPT` therefore requires manual selection and a new message.
