@@ -1,7 +1,0 @@
-onboarding = false
-
-[experimental]
-pane_history = false
-
-[theme]
-name = "catppuccin"

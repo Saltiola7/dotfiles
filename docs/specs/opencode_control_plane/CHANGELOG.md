@@ -1,5 +1,17 @@
 # OpenCode Control Plane Changelog
 
+## 2026-07-13 — Transfer Ownership To dotfiles-ai
+
+- Transferred DBSCTR, OpenCode control-plane, Herdr, and optional `op-session`
+  source ownership to `Saltiola7/dotfiles-ai` v0.1.0.
+- Removed the transferred source and tests without adding live targets to
+  `.chezmoiremove`.
+- Retained vendor integration installers and historical lifecycle evidence.
+- Verified the new source rendered the intended OpenCode configuration, restored
+  Herdr workspaces under `dev.dotfiles-ai.herdr-server`, and had no core managed
+  target overlap after retirement.
+- Intended Final Push: `origin/main`.
+
 ## 2026-07-13 — Retire Unsupported Pro Agents and Restore Native Build
 
 - Confirmed `gpt-5.6-sol-pro` had not sent genuine Pro reasoning before

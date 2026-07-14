@@ -1,5 +1,8 @@
 # analytics_agent_data
 
+> **Ownership note (2026-07-13):** Deployed DBSCTR target paths remain valid, but
+> their source is now `Saltiola7/dotfiles-ai`, not this personal repository.
+
 **Status:** Implemented; module interfaces normalized by DBSCTR V3
 **Created:** 2026-06-10
 **Last updated:** 2026-06-10

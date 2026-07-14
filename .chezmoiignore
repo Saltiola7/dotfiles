@@ -15,13 +15,3 @@ zen-catppuccin-mocha/
 interactive_installers.sh
 graphify-out/
 .agents/.skill-lock.json
-
-# Graphify-managed (produced by run_onchange_install-graphify.sh)
-.config/opencode/skills
-
-# OpenCode runtime artifacts
-.config/opencode/node_modules
-.config/opencode/package.json
-.config/opencode/package-lock.json
-.config/opencode/bun.lock
-.config/opencode/.gitignore

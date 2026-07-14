@@ -10,7 +10,7 @@ Entities:
 - `OnePasswordCommand`: `op` CLI command that can require app integration or biometric approval.
 - `TemplateRenderer`: chezmoi render path that must not require live 1Password access.
 - `HerdrPane`: restored or newly opened Herdr pane with `HERDR_ENV` set.
-- `HerdrServer`: persistent pane owner launched in the macOS Aqua bootstrap context.
+- `HerdrServer`: persistent pane owner configured by the external `dotfiles-ai` source and launched in the macOS Aqua bootstrap context.
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 
 Value objects:
@@ -163,11 +163,11 @@ Glossary:
 - **Invariant:** cached tokens must pass one bounded validity probe before grouped item fetches start.
 - **Invariant:** `OnePasswordServiceAccountToken` takes precedence over cached and biometric session paths.
 - **Invariant:** `HerdrPane` uses `OnePasswordServiceAccountToken` from environment or `MacOSKeychainServiceToken` only; it must not call delegated desktop `op signin`.
-- **Invariant:** `MacOSKeychainServiceToken` is read from service `op-service-account-token` and account `my`.
+- **Invariant:** `MacOSKeychainServiceToken` service/account values and `op-session` are managed by the machine-local `dotfiles-ai` configuration.
 - **Invariant:** Keychain failures retain actionable diagnostics without printing credential values.
 - **Invariant:** Keychain repair is explicit and interactive; `SecretLoader` never mutates Keychain ACLs.
 - **Invariant:** repair guidance does not use `security -w` interactive input because it truncates the service-account token.
-- **Invariant:** `HerdrServer` runs in the Aqua launchd domain without embedding credentials in its plist.
+- **Invariant:** `HerdrServer` runs in the Aqua launchd domain without embedding credentials in its plist; this repository does not own that plist.
 - **Invariant:** chezmoi deployment never stops an unmanaged `HerdrServer`; initial handoff is explicit or occurs at the next GUI login.
 - **Post:** valid service account tokens must not call `op signin` or write `OnePasswordSessionCache`.
 - **Post:** invalid service account tokens fail fast with a service-account-specific error.

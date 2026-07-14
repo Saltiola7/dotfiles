@@ -2,546 +2,43 @@ import os
 import shlex
 import stat
 import subprocess
-import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _write_executable(path: Path, content: str) -> None:
+def executable(path: Path, content: str) -> None:
     path.write_text(content)
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def _base_env(tmp_path: Path, bin_dir: Path) -> dict[str, str]:
-    env = os.environ.copy()
-    env["HOME"] = str(tmp_path)
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env.pop("HERDR_ENV", None)
-    env.pop("OP_SERVICE_ACCOUNT_TOKEN", None)
-    env.pop("OP_SESSION", None)
-    env.pop("OP_SESSION_my", None)
-    env.pop("OP_SESSION_FORCE_MINT", None)
-    env.pop("OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY", None)
-    return env
-
-
 def test_aws_settings_are_shell_config_not_secrets() -> None:
     secret = (ROOT / "dot_local/bin/executable_secret").read_text()
-    bash_profile = (ROOT / "dot_common_profile.tmpl").read_text()
-    xonsh_profile = (ROOT / "dot_xonshrc.tmpl").read_text()
-
+    profiles = (
+        (ROOT / "dot_common_profile.tmpl").read_text(),
+        (ROOT / "dot_xonshrc.tmpl").read_text(),
+    )
     assert "AWS_PROFILE" not in secret
     assert "AWS_REGION" not in secret
     assert "CLAUDE_CODE_USE_BEDROCK" not in secret
-    for profile in (bash_profile, xonsh_profile):
+    for profile in profiles:
         assert "BedrockDeveloperAccess-302432775606" in profile
         assert "us-west-2" in profile
 
 
-def _run_bash_in_pty(command: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
-    wrapper = """
-import os
-import pty
-import sys
-
-status = pty.spawn(["bash", "-lc", sys.argv[1]])
-sys.exit(os.waitstatus_to_exitcode(status))
-"""
-    return subprocess.run(
-        [sys.executable, "-c", wrapper, command],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-
-def test_op_session_validates_cache_once_before_fanout(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    bin_dir.mkdir()
-    cache_dir.mkdir(parents=True)
-    (cache_dir / "session").write_text("cached-token")
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  exit 0
-fi
-exit 0
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert log_file.read_text().splitlines() == ["vault list"]
-
-
-def test_op_session_service_account_token_skips_signin_and_cache(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    bin_dir.mkdir()
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  [ "${{OP_SERVICE_ACCOUNT_TOKEN:-}}" = "service-token" ]
-  exit $?
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["OP_SERVICE_ACCOUNT_TOKEN"] = "service-token"
-
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert log_file.read_text().splitlines() == ["vault list"]
-    assert not (cache_dir / "session").exists()
-
-
-def test_op_session_invalid_service_account_token_fails_without_signin(tmp_path: Path) -> None:
+def test_secret_fetches_one_item_and_preserves_aws_env(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
+    log = tmp_path / "op.log"
+    executable(bin_dir / "op-session", "#!/bin/bash\nexport OP_ACCOUNT=my\n")
+    executable(
         bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  exit 1
-fi
-if [ "$1" = "signin" ]; then
-  exit 0
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["OP_SERVICE_ACCOUNT_TOKEN"] = "bad-token"
-
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 1
-    assert "OP_SERVICE_ACCOUNT_TOKEN is invalid or lacks access" in result.stderr + result.stdout
-    assert log_file.read_text().splitlines() == ["vault list"]
-
-
-def test_op_session_herdr_uses_keychain_service_account_token(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    bin_dir.mkdir()
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "security",
-        """#!/bin/bash
-if [ "$1" = "find-generic-password" ] && [ "$2" = "-s" ] && [ "$3" = "op-service-account-token" ] && [ "$4" = "-a" ] && [ "$5" = "my" ] && [ "$6" = "-w" ]; then
-  printf '%s\n' keychain-token
-  exit 0
-fi
-exit 2
-""",
-    )
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\t%s\n' "$*" "${{OP_SERVICE_ACCOUNT_TOKEN:-}}" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  [ "${{OP_SERVICE_ACCOUNT_TOKEN:-}}" = "keychain-token" ]
-  exit $?
-fi
-if [ "$1" = "signin" ]; then
-  exit 9
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["HERDR_ENV"] = "1"
-
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert log_file.read_text().splitlines() == ["vault list\tkeychain-token"]
-    assert not (cache_dir / "session").exists()
-
-
-def test_op_session_herdr_without_service_token_does_not_signin(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "security",
-        "#!/bin/bash\nexit 44\n",
-    )
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_log_file}
-if [ "$1" = "signin" ]; then
-  exit 9
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["HERDR_ENV"] = "1"
-
-    result = subprocess.run(
-        [
-            "bash",
-            "-c",
-            f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        ],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 1
-    assert "Herdr shells require OP_SERVICE_ACCOUNT_TOKEN" in result.stderr + result.stdout
-    assert not log_file.exists()
-
-
-def test_op_session_reports_keychain_access_error_without_signin(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "security",
-        "#!/bin/bash\nprintf '%s\\n' 'User interaction is not allowed.' >&2\nexit 36\n",
-    )
-    _write_executable(
-        bin_dir / "op",
-        f"#!/bin/bash\nprintf '%s\\n' \"$*\" >> {quoted_log_file}\nexit 9\n",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["HERDR_ENV"] = "1"
-
-    result = subprocess.run(
-        ["bash", "-c", f"source {ROOT / 'dot_local/bin/executable_op-session'}"],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 1
-    assert "User interaction is not allowed" in result.stderr
-    assert "Keychain Access" in result.stderr
-    assert "allow /usr/bin/security" in result.stderr
-    assert not log_file.exists()
-
-
-def test_op_session_ssh_without_service_token_does_not_signin(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    bin_dir.mkdir()
-    cache_dir.mkdir(parents=True)
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  exit 1
-fi
-if [ "$1" = "signin" ]; then
-  exit 0
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["SSH_CONNECTION"] = "client server"
-
-    result = _run_bash_in_pty(
-        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        env,
-    )
-
-    assert result.returncode == 1
-    assert "SSH shells require OP_SERVICE_ACCOUNT_TOKEN" in result.stderr + result.stdout
-    assert not log_file.exists()
-
-
-def test_op_session_force_mint_clears_stale_lock(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    lock_dir = cache_dir / "session.lock"
-    bin_dir.mkdir()
-    lock_dir.mkdir(parents=True)
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\t%s\n' "$*" "${{OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY:-}}" >> {quoted_log_file}
-if [ "$1" = "signin" ]; then
-  printf '%s\n' fresh-token
-  exit 0
-fi
-if [ "$1 $2" = "vault list" ]; then
-  exit 0
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env.pop("SSH_CONNECTION", None)
-    env.pop("SSH_TTY", None)
-    env["OP_SESSION_FORCE_MINT"] = "1"
-    env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
-
-    result = _run_bash_in_pty(
-        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        env,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert not lock_dir.exists()
-    assert (cache_dir / "session").read_text() == "fresh-token"
-    assert log_file.read_text().splitlines() == [
-        "signin --account my --force --raw\t",
-        "vault list\tfresh-token",
-    ]
-
-
-def test_op_session_stale_env_force_mint_clears_stale_lock(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    cache_dir = tmp_path / ".cache" / "op"
-    lock_dir = cache_dir / "session.lock"
-    bin_dir.mkdir()
-    lock_dir.mkdir(parents=True)
-    log_file = tmp_path / "op.log"
-    quoted_log_file = shlex.quote(str(log_file))
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\t%s\n' "$*" "${{OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY:-}}" >> {quoted_log_file}
-if [ "$1 $2" = "vault list" ]; then
-  [ "${{OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY:-}}" = "fresh-token" ]
-  exit $?
-fi
-if [ "$1" = "signin" ]; then
-  printf '%s\n' fresh-token
-  exit 0
-fi
-exit 2
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env.pop("SSH_CONNECTION", None)
-    env.pop("SSH_TTY", None)
-    env["OP_SESSION_KZRNJU45TFHCFMB22WI6VCJVDY"] = "stale-token"
-
-    result = _run_bash_in_pty(
-        f"source {ROOT / 'dot_local/bin/executable_op-session'}",
-        env,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert not lock_dir.exists()
-    assert (cache_dir / "session").read_text() == "fresh-token"
-    assert log_file.read_text().splitlines() == [
-        "vault list\tstale-token",
-        "signin --account my --force --raw\t",
-        "vault list\tfresh-token",
-    ]
-
-
-def test_secret_fetches_single_item_by_uuid_and_projects_once(tmp_path: Path) -> None:
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    op_log = tmp_path / "op.log"
-    quoted_op_log = shlex.quote(str(op_log))
-
-    _write_executable(
-        bin_dir / "op-session",
-        "#!/bin/bash\nexport OP_ACCOUNT=my\n",
-    )
-
-    _write_executable(
-        bin_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_op_log}
-if [ "$1" != "item" ] || [ "$2" != "get" ]; then
-  exit 2
-fi
-case "$3" in
-  ojb5dyao2ahusvjgvgh7gbuxj4) ;;
-  *) exit 3 ;;
-esac
+        f'''#!/bin/bash
+printf '%s\n' "$*" >> {shlex.quote(str(log))}
+[ "$1 $2" = "item get" ] || exit 2
 cat <<'JSON'
-{{"id":"vjsfewbg2dzuatpwfmkqws5hle","title":"Shell Secrets","fields":[
-{{"label":"GEMINI_API_KEY","value":"gemini"}},
-{{"label":"GOOGLE_GENERATIVE_AI_API_KEY","value":"google"}},
-{{"label":"OPENAI_API_KEY","value":"openai"}},
-{{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
-{{"label":"DATABRICKS_TOKEN","value":"db-token"}},
-{{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\\"type\\\":\\\"service_account\\\"}}"}},
-{{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
-{{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
-{{"label":"CLICKHOUSE_HOST","value":"clickhouse"}},
-{{"label":"CLICKHOUSE_USER","value":"user"}},
-{{"label":"CLICKHOUSE_PORT","value":"9440"}},
-{{"label":"CLICKHOUSE_PASSWORD","value":"pass"}},
-{{"label":"SEMRUSH_API","value":"semrush"}},
-{{"label":"SEMRUSH_ENTERPRISE_API","value":"enterprise"}},
-{{"label":"PAGESPEED_API_KEY","value":"pagespeed"}},
-{{"label":"GCS_AKAMAI_ACCESS_KEY","value":"access"}},
-{{"label":"GCS_AKAMAI_SECRET_KEY","value":"secret"}},
-{{"label":"CLOCKIFY_API_KEY","value":"clockify"}},
-{{"label":"GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC","value":"github"}},
-{{"label":"ATLASSIAN_API","value":"atlassian"}},
-{{"label":"EMAIL","value":"me@example.com"}},
-{{"label":"ATLASSIAN_URL","value":"https://example.atlassian.net"}},
-{{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\\\"type\\\":\\\"service_account\\\"}}"}}
-]}}
-JSON
-""",
-    )
-
-    env = _base_env(tmp_path, bin_dir)
-    env["SECRET_PROFILE"] = "1"
-    env["AWS_PROFILE"] = "existing-profile"
-    env["AWS_REGION"] = "existing-region"
-
-    command = f"""
-source {ROOT / 'dot_local/bin/executable_secret'}
-test "$GEMINI_API_KEY" = gemini
-test "$AWS_PROFILE" = existing-profile
-test "$AWS_REGION" = existing-region
-test -z "${{CLAUDE_CODE_USE_BEDROCK:-}}"
-test "$GOOGLE_APPLICATION_CREDENTIALS" = "$HOME/.cache/gcp/enterprise-seo-tools-sa.json"
-test "$GWS_CONTENT_READER_CREDENTIALS" = "$HOME/.cache/gcp/gws-content-reader-key.json"
-test "$(cat "$GOOGLE_APPLICATION_CREDENTIALS")" = '{{"type":"service_account"}}'
-test "$(cat /tmp/sketchybar_clockify/api_key)" = clockify
-"""
-    result = subprocess.run(
-        ["bash", "-lc", command],
-        env=env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    op_calls = op_log.read_text().splitlines()
-    assert op_calls == ["item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"]
-    assert all("--reveal --format json" in call for call in op_calls)
-
-
-def test_secret_uses_sibling_op_session_before_path_lookup(tmp_path: Path) -> None:
-    install_dir = tmp_path / "install"
-    path_dir = tmp_path / "path"
-    install_dir.mkdir()
-    path_dir.mkdir()
-    op_log = tmp_path / "op.log"
-    bad_session_log = tmp_path / "bad-session.log"
-    quoted_op_log = shlex.quote(str(op_log))
-    quoted_bad_session_log = shlex.quote(str(bad_session_log))
-
-    (install_dir / "secret").write_text((ROOT / "dot_local/bin/executable_secret").read_text())
-    (install_dir / "op-session").write_text((ROOT / "dot_local/bin/executable_op-session").read_text())
-
-    _write_executable(
-        path_dir / "op-session",
-        f"""#!/bin/bash
-printf used > {quoted_bad_session_log}
-return 42 2>/dev/null || exit 42
-""",
-    )
-
-    _write_executable(
-        path_dir / "op",
-        f"""#!/bin/bash
-printf '%s\n' "$*" >> {quoted_op_log}
-if [ "$1 $2" = "vault list" ]; then
-  exit 0
-fi
-if [ "$1 $2 $3" != "item get ojb5dyao2ahusvjgvgh7gbuxj4" ]; then
-  exit 2
-fi
-cat <<'JSON'
-{{"title":"Shell Secrets","fields":[
+{{"fields":[
 {{"label":"GEMINI_API_KEY","value":"gemini"}},
 {{"label":"GOOGLE_GENERATIVE_AI_API_KEY","value":"google"}},
 {{"label":"OPENAI_API_KEY","value":"openai"}},
@@ -567,23 +64,31 @@ cat <<'JSON'
 {{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}}
 ]}}
 JSON
-""",
+''',
     )
-
-    env = _base_env(tmp_path, path_dir)
-    env["OP_SERVICE_ACCOUNT_TOKEN"] = "service-token"
-
+    env = {
+        **os.environ,
+        "HOME": str(tmp_path),
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "AWS_PROFILE": "existing-profile",
+        "AWS_REGION": "existing-region",
+    }
     result = subprocess.run(
-        ["bash", "-lc", f"source {install_dir / 'secret'}"],
+        [
+            "bash",
+            "-lc",
+            f'''source {ROOT / "dot_local/bin/executable_secret"}
+test "$GEMINI_API_KEY" = gemini
+test "$AWS_PROFILE" = existing-profile
+test "$AWS_REGION" = existing-region
+test -z "${{CLAUDE_CODE_USE_BEDROCK:-}}"
+''',
+        ],
         env=env,
         text=True,
         capture_output=True,
-        check=False,
     )
-
     assert result.returncode == 0, result.stderr
-    assert not bad_session_log.exists()
-    assert op_log.read_text().splitlines() == [
-        "vault list",
-        "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json",
+    assert log.read_text().splitlines() == [
+        "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"
     ]

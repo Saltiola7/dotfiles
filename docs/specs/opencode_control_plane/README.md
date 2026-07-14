@@ -1,6 +1,6 @@
 # OpenCode Control Plane
 
-**Status:** Approved
+**Status:** Ownership transferred to `Saltiola7/dotfiles-ai`
 **Discovery2 confidence:** 99%
 
 ## Engineering Profile
@@ -16,6 +16,11 @@
 | Public compatibility | Preserve native Plan-to-Build and provider-affine Build workflows; retire provider entries that current authentication cannot use |
 | Trust/data classification | Local configuration and public provider metadata; credentials remain outside the repository |
 | Operational owner | Dotfiles owner maintains deployment and OpenCode compatibility |
+
+As of 2026-07-13, the public `dotfiles-ai` repository owns the deployed
+OpenCode control plane, DBSCTR skills/helper, Herdr configuration, and optional
+`op-session`. This personal repository retains historical lifecycle evidence
+but no longer contains or removes those target paths.
 
 ## Overview
 

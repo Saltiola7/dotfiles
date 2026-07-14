@@ -1,5 +1,9 @@
 # Quality Assurance Skill
 
+> **Ownership note (2026-07-13):** Active QA skill and OpenCode command source
+> moved to `Saltiola7/dotfiles-ai`. Source paths below are historical unless
+> explicitly described as deployed target paths.
+
 **Status:** Experimental
 **Created:** 2026-07-10
 **Last updated:** 2026-07-10

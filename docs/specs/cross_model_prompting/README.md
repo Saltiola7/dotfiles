@@ -1,5 +1,9 @@
 # Cross-Model Prompting
 
+> **Ownership note (2026-07-13):** Active OpenCode agents, routing, and lifecycle
+> skills moved to `Saltiola7/dotfiles-ai`. Source paths below document historical
+> implementation in this repository.
+
 ## Overview
 
 OpenCode's managed routing and lifecycle skills must work predictably with both

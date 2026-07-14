@@ -1,5 +1,12 @@
 # Shell Auth Startup Changelog
 
+## 2026-07-13
+
+- Transferred `op-session` and the Herdr Aqua LaunchAgent to the public
+  `dotfiles-ai` source while retaining the personal `secret` bundle here.
+- `secret` continues to source its installed sibling `op-session`; ownership is
+  split by target without changing the runtime interface.
+
 ## 2026-06-22
 
 - Created shell auth startup spec after RCA found stuck `op read` processes and Herdr auth fanout.

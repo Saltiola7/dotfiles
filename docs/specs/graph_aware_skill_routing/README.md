@@ -1,5 +1,9 @@
 # Graph-Aware Skill Routing
 
+> **Ownership note (2026-07-13):** Active DBSCTR and Discovery skill source moved
+> to `Saltiola7/dotfiles-ai`; source paths below are retained as historical
+> lifecycle evidence.
+
 **Status:** Draft
 **Created:** 2026-06-18
 **Last updated:** 2026-06-18

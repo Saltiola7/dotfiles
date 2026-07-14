@@ -1,5 +1,8 @@
 # DBSCTR2 and Discovery2 Lifecycle
 
+> **Ownership note (2026-07-13):** The V2 archive and active V3/OpenCode source
+> moved to `Saltiola7/dotfiles-ai`; paths below describe the former implementation.
+
 **Status:** Archived and superseded by `docs/specs/dbsctr_v3_lifecycle/` on
 2026-07-11. V2 source is retained under `docs/archive/opencode/skills/v2/` and is
 not deployed. The remainder of this document is historical.
