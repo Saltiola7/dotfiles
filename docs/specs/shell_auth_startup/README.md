@@ -15,7 +15,7 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-009-atuin-self-host` is elevated-risk deployment work. The
+Current cycle `AUTH-010-lmsh-target-boundary` is elevated-risk remediation. The
 security and cloud modules apply. Release is not applicable because this source
 publishes no project artifact; Review/Integrate, Deploy, Operate, and
 Maintain/Retire are required.
@@ -34,6 +34,8 @@ Entities:
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 - `TerminalProfile`: portable Bash, Atuin, zoxide, and Starship configuration
   selected by chezmoi machine intent and operating system.
+- `TerminalTargetAllowlist`: deny-by-default set of files and scripts that the
+  personal source may apply to an `lmsh` guest.
 - `AtuinClient`: one machine-local history database, record store, encryption
   key, and authenticated sync session.
 - `AtuinServer`: pinned single-user container accepting authenticated encrypted
@@ -187,6 +189,15 @@ Glossary:
   not installed
 - And shell startup performs no network authentication
 
+**Scenario: Full source initialization remains terminal-only**
+- Given the personal source also contains macOS, credential, editor, and AI
+  automation targets
+- When chezmoi evaluates that source with `machine_type=lmsh`
+- Then only the Bash/common profiles, Atuin and Starship configuration, and the
+  pinned terminal installer are eligible to apply
+- And unrelated files and scripts remain ignored even when later added to the
+  personal source
+
 ### Feature: Private self-hosted history sync
 
 **Scenario: Tailnet client reaches Atuin**
@@ -277,6 +288,10 @@ Glossary:
 - **Invariant:** optional shell tools are command-guarded.
 - **Invariant:** the lmsh target excludes SSH private keys, GitHub credentials,
   1Password integration, GUI applications, and macOS service configuration.
+- **Invariant:** `TerminalTargetAllowlist` denies all targets by default and
+  re-includes only `.bash_profile`, `.bashrc`, `.common_profile`,
+  `.config/atuin/config.toml`, `.config/starship.toml`, and
+  `install-lmsh-terminal.sh`.
 
 ### AtuinServer
 - **Invariant:** server and clients use pinned compatible Atuin `18.17.1`.

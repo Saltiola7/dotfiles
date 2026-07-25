@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-010 | Enforce deny-by-default lmsh targets | P0 | active | AUTH-009 | `.chezmoiignore`, terminal profile contract and test | personal source target inventory | no | One policy boundary and its evidence must change atomically | S | exact allowlist test and Linux dry-run |
 
 ## Completed
 

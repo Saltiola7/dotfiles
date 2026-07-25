@@ -13,8 +13,6 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "atuin_sync_address" in text(".chezmoi.toml.tmpl")
     ignored = text(".chezmoiignore")
     assert '{{ if eq .machine_type "lmsh" }}' in ignored
-    for path in (".ssh/", ".config/gh/", ".databrickscfg", "Library/", ".config/sketchybar/"):
-        assert path in ignored
 
     bashrc = text("dot_bashrc.tmpl")
     for tool in ("atuin", "zoxide", "starship"):
@@ -28,6 +26,25 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "/opt/homebrew" not in lmsh
     assert "/Applications" not in lmsh
     assert "/opt/homebrew" in macos
+
+
+def test_lmsh_targets_are_deny_by_default():
+    ignored = text(".chezmoiignore")
+    lmsh = ignored.split('{{ if eq .machine_type "lmsh" }}', 1)[1].split("{{ end }}", 1)[0]
+    rules = {line.strip() for line in lmsh.splitlines() if line.strip()}
+    assert rules == {
+        "*",
+        ".config/*",
+        ".config/atuin/*",
+        "!.bash_profile",
+        "!.bashrc",
+        "!.common_profile",
+        "!.config/",
+        "!.config/atuin/",
+        "!.config/atuin/config.toml",
+        "!.config/starship.toml",
+        "!install-lmsh-terminal.sh",
+    }
 
 
 def test_lmsh_installer_pins_terminal_binaries():
