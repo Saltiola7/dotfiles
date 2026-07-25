@@ -38,7 +38,8 @@ Entities:
   key, and authenticated sync session.
 - `AtuinServer`: pinned single-user container accepting authenticated encrypted
   record synchronization.
-- `AtuinStore`: SQLite WAL database in a persistent host directory outside Git.
+- `AtuinStore`: SQLite WAL database in a persistent Docker named volume on the
+  Colima Linux filesystem, outside Git and macOS file sharing.
 - `TailnetEndpoint`: Tailscale-terminated HTTPS proxy to loopback-only server
   ingress.
 
@@ -219,8 +220,7 @@ Glossary:
 
 **Scenario: SQLite store is recoverable**
 - Given the server is stopped cleanly
-- When the complete persistent config directory is copied and restored in
-  isolation
+- When the stopped named volume is exported and restored in isolation
 - Then the restored `/healthz` succeeds
 - And an authenticated client can synchronize without changing its encryption
   key
@@ -280,10 +280,14 @@ Glossary:
 
 ### AtuinServer
 - **Invariant:** server and clients use pinned compatible Atuin `18.17.1`.
+- **Invariant:** the tailnet endpoint is machine-local chezmoi data and never
+  enters source, rendered diagnostics, or public lifecycle artifacts.
 - **Invariant:** the container publishes only to `127.0.0.1`; Tailscale Serve is
   the only remote ingress.
 - **Invariant:** the image is `ghcr.io/atuinsh/atuin:18.17.1` and the state URI is
   `sqlite:///config/atuin.db`.
+- **Invariant:** SQLite WAL state uses a Docker named volume rather than a macOS
+  bind mount; bind-mounted WAL produced a live `disk I/O error` during validation.
 - **Invariant:** open registration is an explicit temporary deployment override
   and defaults to false.
 - **Invariant:** credentials, sessions, encryption keys, databases, and backups

@@ -2,9 +2,7 @@
 
 ## Active
 
-| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-009 | Self-host portable Atuin history | P0 | active | none | shell templates, Atuin config/server, tests, this context | Lima and Tailscale contracts | no | Shared encrypted terminal history requires one migration and trust boundary | M | pytest, render, shell, Compose, health, sync, offline, restore |
+None.
 
 ## Completed
 
@@ -18,3 +16,4 @@
 | AUTH-006 | Avoid stale shell command lookup for `op-session` | done |
 | AUTH-007 | Preserve safe Keychain failure diagnostics and repair guidance | done |
 | AUTH-008 | Run persistent Herdr server in the Aqua security context | done |
+| AUTH-009 | Self-host portable Atuin history through tailnet-only SQLite service | done |

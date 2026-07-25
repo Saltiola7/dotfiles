@@ -10,6 +10,7 @@ def text(path):
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "macbook/mac-mini/lmsh" in text(".chezmoi.toml.tmpl")
+    assert "atuin_sync_address" in text(".chezmoi.toml.tmpl")
     ignored = text(".chezmoiignore")
     assert '{{ if eq .machine_type "lmsh" }}' in ignored
     for path in (".ssh/", ".config/gh/", ".databrickscfg", "Library/", ".config/sketchybar/"):
@@ -19,6 +20,7 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     for tool in ("atuin", "zoxide", "starship"):
         assert f"command -v {tool}" in bashrc
     assert '{{ if eq .machine_type "lmsh" -}}' in bashrc
+    assert "[ -t 0 ]" in bashrc
 
     profile = text("dot_common_profile.tmpl")
     assert '{{ if eq .machine_type "lmsh" -}}' in profile
@@ -41,7 +43,14 @@ def test_lmsh_installer_pins_terminal_binaries():
 
 def test_atuin_client_uses_private_bounded_sync():
     config = text("private_dot_config/atuin/private_config.toml.tmpl")
-    assert 'sync_address = "https://mac-mini.tail62e96c.ts.net"' in config
+    assert "sync_address = {{ .atuin_sync_address | quote }}" in config
+    for path in (
+        ".chezmoi.toml.tmpl",
+        "private_dot_config/atuin/private_config.toml.tmpl",
+        "docs/ATUIN.md",
+        "docs/specs/shell_auth_startup/README.md",
+    ):
+        assert "tail62e96c" not in text(path)
     assert "auto_sync = true" in config
     assert 'sync_frequency = "10m"' in config
     assert "network_connect_timeout = 2" in config
@@ -60,6 +69,8 @@ def test_atuin_server_is_pinned_private_and_closed_by_default():
     assert "sqlite:///config/atuin.db" in compose
     assert "ATUIN_OPEN_REGISTRATION: ${ATUIN_OPEN_REGISTRATION:-false}" in compose
     assert "restart: unless-stopped" in compose
+    assert "atuin-data:/config" in compose
+    assert "${HOME}" not in compose
     assert "latest" not in compose
 
     brewfile = text("Brewfile")

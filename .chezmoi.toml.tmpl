@@ -1,6 +1,7 @@
 {{- $name := promptStringOnce . "name" "Your full name" "" -}}
 {{- $email := promptStringOnce . "email" "Your email address" "" -}}
 {{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook" -}}
+{{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
 encryption = "age"
 [age]
@@ -11,3 +12,4 @@ encryption = "age"
     name = {{ $name | quote }}
     email = {{ $email | quote }}
     machine_type = {{ $machineType | quote }}
+    atuin_sync_address = {{ $atuinSyncAddress | quote }}

@@ -1,9 +1,10 @@
 # Self-hosted Atuin
 
 The Mac Mini runs Atuin `18.17.1` in Colima with SQLite. Docker publishes only
-to Mac loopback; Tailscale Serve owns tailnet HTTPS at
-`https://mac-mini.tail62e96c.ts.net`. Client databases, keys, sessions, server
-state, and backups stay outside Git.
+to Mac loopback; Tailscale Serve owns tailnet HTTPS. The private endpoint is
+machine-local chezmoi data `atuin_sync_address` and never enters Git. Server
+SQLite WAL state stays in the `atuin-server_atuin-data` Docker volume; client
+state and backup archives remain outside Git.
 
 ## Deploy
 
@@ -11,8 +12,8 @@ Inspect storage before starting the existing Colima profile:
 
 ```sh
 colima start
+brew services start colima
 docker system df
-mkdir -p ~/.local/share/atuin-server
 docker compose -f ~/.config/atuin-server/compose.yaml config
 ATUIN_OPEN_REGISTRATION=true docker compose \
   -f ~/.config/atuin-server/compose.yaml up -d
@@ -50,14 +51,17 @@ Atuin state between machines.
 
 ## Backup And Restore
 
-Stop the container, archive the complete server directory, restart it, and keep
-the archive outside the Mac Mini. Copying only `atuin.db` while WAL is active is
-not a valid cold backup.
+Stop the container, archive the complete named volume, restart it, and keep the
+archive outside the Mac Mini. SQLite WAL must not run on a macOS bind mount;
+validation observed a live `disk I/O error` on that boundary.
 
 ```sh
 docker compose -f ~/.config/atuin-server/compose.yaml stop
-tar -czf /approved/off-host/path/atuin-server-$(date +%Y%m%d%H%M%S).tgz \
-  -C ~/.local/share atuin-server
+docker run --rm --entrypoint sh \
+  -v atuin-server_atuin-data:/config:ro \
+  -v /approved/off-host/path:/backup \
+  ghcr.io/atuinsh/atuin:18.17.1 \
+  -c 'tar -czf /backup/atuin-server.tgz -C /config .'
 docker compose -f ~/.config/atuin-server/compose.yaml start
 ```
 

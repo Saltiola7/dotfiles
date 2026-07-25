@@ -1,5 +1,20 @@
 # Shell Auth Startup Changelog
 
+## 2026-07-25
+
+- Added the portable `lmsh` Bash profile with pinned Atuin `18.17.1`, zoxide
+  `0.9.8`, and Starship `1.26.0`; macOS shell rendering remains unchanged.
+- Deployed a loopback-only Atuin `18.17.1` container through Tailscale Serve,
+  migrated 16,229 hosted records with the preserved encryption key, logged both
+  Lima clients into the same account, and closed registration.
+- Replaced the initial macOS bind mount after SQLite WAL produced `disk I/O
+  error`; the production store is a Docker named volume on Colima Linux storage.
+- Validation: 168 tests, template/shell/TOML/Compose checks, disposable sync for
+  both VMs, three-client production sync, denied registration, offline recovery,
+  and isolated cold restore passed. Accepted risk `AUTH-009-AR1` remains owned
+  by the operator through 2026-08-18. Implementation Gate Commit: `b44b1eb`.
+  Intended Final Push: `origin/main`.
+
 ## 2026-07-13
 
 - Transferred `op-session` and the Herdr Aqua LaunchAgent to the public

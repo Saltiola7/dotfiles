@@ -7,7 +7,7 @@ fi
 [[ $- != *i* ]] && return
 
 {{ if eq .machine_type "lmsh" -}}
-if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ] && [ -t 0 ]; then
     command -v atuin >/dev/null && eval "$(atuin init bash)"
     command -v zoxide >/dev/null && eval "$(zoxide init bash)"
     if command -v starship >/dev/null; then
@@ -15,7 +15,9 @@ if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
         eval "$(starship init bash)"
     fi
 fi
-command -v atuin >/dev/null && bind '"\e[A": "\eOA"'
+if command -v atuin >/dev/null && [ -t 0 ]; then
+    bind '"\e[A": "\eOA"'
+fi
 {{ else -}}
 # --- ble.sh early init (must come before oh-my-bash) ---
 # Provides autosuggestions, syntax highlighting, enhanced completion
