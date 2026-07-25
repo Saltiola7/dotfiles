@@ -6,6 +6,17 @@ fi
 # Everything below is interactive-only (skip for bash -l -c "..." contexts)
 [[ $- != *i* ]] && return
 
+{{ if eq .machine_type "lmsh" -}}
+if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
+    command -v atuin >/dev/null && eval "$(atuin init bash)"
+    command -v zoxide >/dev/null && eval "$(zoxide init bash)"
+    if command -v starship >/dev/null; then
+        export SHELL_LABEL="bash ${BASH_VERSION%%(*}"
+        eval "$(starship init bash)"
+    fi
+fi
+command -v atuin >/dev/null && bind '"\e[A": "\eOA"'
+{{ else -}}
 # --- ble.sh early init (must come before oh-my-bash) ---
 # Provides autosuggestions, syntax highlighting, enhanced completion
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
@@ -74,3 +85,4 @@ bind '"\e[A": "\eOA"'
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
     [[ ${BLE_VERSION-} ]] && ble-attach
 fi
+{{ end -}}

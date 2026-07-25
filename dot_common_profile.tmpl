@@ -1,6 +1,13 @@
 # Common Shell Configuration (Bash & Zsh)
 # Shared PATH, environment variables, and aliases for both shells and all machines
 
+{{ if eq .machine_type "lmsh" -}}
+export PATH="{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
+alias vim='nvim'
+alias python='python3'
+alias py='python3'
+export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
+{{ else -}}
 # --- PATH Setup ---
 
 # Homebrew (must be early for brew commands to work)
@@ -160,3 +167,4 @@ secret() { . "$HOME/.local/bin/secret"; }
 
 # Shell startup must stay auth-free. `secret` is intentionally manual so Herdr
 # restore storms cannot fan out into many concurrent 1Password prompts.
+{{ end -}}

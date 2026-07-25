@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+{{ if ne .machine_type "lmsh" -}}
+exit 0
+{{ else -}}
+test "{{ .chezmoi.os }}" = linux
+test "{{ .chezmoi.arch }}" = arm64
+
+bin="$HOME/.local/bin"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$bin"
+
+install_release() {
+    name=$1
+    url=$2
+    digest=$3
+    archive="$tmp/$name.tar.gz"
+    curl --proto '=https' --tlsv1.2 -fsSL "$url" -o "$archive"
+    printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
+    tar -xzf "$archive" -C "$tmp" "$name"
+    install -m 0755 "$tmp/$name" "$bin/$name"
+    rm -f "$tmp/$name" "$archive"
+}
+
+install_release atuin \
+  https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-unknown-linux-gnu.tar.gz \
+  9412210a9cdd6d0ff7635693e940096d82b368628326d334d27a8ca0ba173b0f
+# zoxide publishes no upstream checksum; this pins the verified official v0.9.8 asset.
+install_release zoxide \
+  https://github.com/ajeetdsouza/zoxide/releases/download/v0.9.8/zoxide-0.9.8-aarch64-unknown-linux-musl.tar.gz \
+  078cc9cc8cedb6c45edb84c0f5bad53518c610859c73bdb3009a52b89652c103
+install_release starship \
+  https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-unknown-linux-musl.tar.gz \
+  dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b
+{{ end -}}

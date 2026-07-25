@@ -15,6 +15,14 @@ on:
       - "docs/specs/dbsctr_v3_lifecycle/**"
       - ".chezmoiignore"
       - ".chezmoiremove"
+      - "Brewfile"
+      - "dot_bash_profile.tmpl"
+      - "dot_bashrc.tmpl"
+      - "dot_common_profile.tmpl"
+      - "private_dot_config/atuin/**"
+      - "private_dot_config/atuin-server/**"
+      - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "docs/specs/shell_auth_startup/**"
   pull_request:
     paths:
       - ".github/workflows/test.yml"
@@ -27,6 +35,14 @@ on:
       - "docs/specs/dbsctr_v3_lifecycle/**"
       - ".chezmoiignore"
       - ".chezmoiremove"
+      - "Brewfile"
+      - "dot_bash_profile.tmpl"
+      - "dot_bashrc.tmpl"
+      - "dot_common_profile.tmpl"
+      - "private_dot_config/atuin/**"
+      - "private_dot_config/atuin-server/**"
+      - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "docs/specs/shell_auth_startup/**"
 
 jobs:
   test:

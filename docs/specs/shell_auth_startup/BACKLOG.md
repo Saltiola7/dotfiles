@@ -2,7 +2,9 @@
 
 ## Active
 
-None.
+| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-009 | Self-host portable Atuin history | P0 | active | none | shell templates, Atuin config/server, tests, this context | Lima and Tailscale contracts | no | Shared encrypted terminal history requires one migration and trust boundary | M | pytest, render, shell, Compose, health, sync, offline, restore |
 
 ## Completed
 

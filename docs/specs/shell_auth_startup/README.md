@@ -1,5 +1,25 @@
 # Shell Auth Startup
 
+## Engineering Profile
+
+| Concern | Default |
+| --- | --- |
+| Deliverable and owner | Personal chezmoi shell configuration and single-user Atuin service; operator owned |
+| Runtime | macOS arm64 workstations and Fedora arm64 Lima guests; Bash; Atuin `18.17.1` |
+| Platform | Docker on Colima, SQLite WAL storage, and Tailscale Serve HTTPS |
+| Interfaces | Chezmoi `machine_type`, shell startup files, Atuin `config.toml`, Compose, `/healthz`, and Atuin sync protocol |
+| Compatibility | Existing macOS rendering remains unchanged; `machine_type=lmsh` receives the portable terminal subset |
+| Trust/data | Shell commands, arguments, working directories, account sessions, and encryption keys are sensitive |
+| Deployment | Test account before migration; preserve hosted history and key; close registration after cutover |
+| Operations | Loopback container ingress, tailnet-only HTTPS, health checks, bounded client timeouts, cold SQLite backup and restore |
+| Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
+| Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
+
+Current cycle `AUTH-009-atuin-self-host` is elevated-risk deployment work. The
+security and cloud modules apply. Release is not applicable because this source
+publishes no project artifact; Review/Integrate, Deploy, Operate, and
+Maintain/Retire are required.
+
 ## Domain
 
 Bounded context: shell authentication startup for interactive panes, agents, and status-bar plugins.
@@ -12,6 +32,15 @@ Entities:
 - `HerdrPane`: restored or newly opened Herdr pane with `HERDR_ENV` set.
 - `HerdrServer`: persistent pane owner configured by the external `dotfiles-ai` source and launched in the macOS Aqua bootstrap context.
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
+- `TerminalProfile`: portable Bash, Atuin, zoxide, and Starship configuration
+  selected by chezmoi machine intent and operating system.
+- `AtuinClient`: one machine-local history database, record store, encryption
+  key, and authenticated sync session.
+- `AtuinServer`: pinned single-user container accepting authenticated encrypted
+  record synchronization.
+- `AtuinStore`: SQLite WAL database in a persistent host directory outside Git.
+- `TailnetEndpoint`: Tailscale-terminated HTTPS proxy to loopback-only server
+  ingress.
 
 Value objects:
 - `CachedClockifyApiKey`: local API key file used by the poller.
@@ -31,11 +60,20 @@ Events:
 - `OnePasswordCommandTimedOut`
 - `HerdrPaneRestored`
 - `ClockifyPollSkipped`
+- `HistoryRecordedLocally`
+- `HistorySyncRequested`
+- `AtuinServerUnavailable`
+- `HostedHistoryMigrated`
+- `AtuinRegistrationClosed`
 
 Glossary:
 - **Startup-safe**: shell/profile path must not block on interactive auth or network credentials.
 - **Fail-fast**: auth command exits with an error after a bounded timeout.
 - **Poll loop**: recurring SketchyBar script execution driven by `update_freq`.
+- **lmsh:** portable personal terminal profile shared by personal and MGM Lima
+  guests; it does not imply a shared VM filesystem or client identity.
+- **Cold backup:** complete copy of stopped SQLite config storage, including WAL
+  companions when present.
 
 ## Behavior Scenarios
 
@@ -137,6 +175,56 @@ Glossary:
 - Then it does not call `OnePasswordCommand`
 - And it hides the Clockify item
 
+### Feature: Portable terminal profile
+
+**Scenario: Lima shell starts with personal terminal behavior**
+- Given a Linux machine has `machine_type=lmsh`
+- When chezmoi applies the personal source and Bash starts
+- Then only portable shell configuration is rendered
+- And Atuin, zoxide, and Starship initialize only when installed
+- And macOS applications, LaunchAgents, credential helpers, and private keys are
+  not installed
+- And shell startup performs no network authentication
+
+### Feature: Private self-hosted history sync
+
+**Scenario: Tailnet client reaches Atuin**
+- Given the pinned Atuin container is healthy on Mac loopback
+- When an authorized Mac or Lima client connects to the stable tailnet URL
+- Then Tailscale terminates HTTPS and proxies to the loopback service
+- And no LAN or public listener exposes the container
+
+**Scenario: Server is unavailable**
+- Given an authenticated client cannot reach the Atuin server
+- When the shell records and searches history
+- Then local capture and search continue
+- And encrypted unsynchronized records remain durable locally
+- And bounded network timeouts prevent an unbounded shell delay
+- And a later successful sync reconciles missing record chains
+
+**Scenario: Hosted history moves after isolated validation**
+- Given a disposable account synchronized between the Mac and both Lima clients
+- And the hosted client has completed a final sync and local backup
+- When the operator preserves the existing encryption key, registers the local
+  account, and changes the sync endpoint
+- Then existing local encrypted records upload to the self-hosted server
+- And a second client decrypts the same representative history
+- And the hosted account remains available for rollback until restore is proven
+
+**Scenario: Registration closes after migration**
+- Given the production account exists and client sync passes
+- When the server restarts with open registration disabled
+- Then existing authenticated clients continue to sync
+- And an unregistered client cannot create another account
+
+**Scenario: SQLite store is recoverable**
+- Given the server is stopped cleanly
+- When the complete persistent config directory is copied and restored in
+  isolation
+- Then the restored `/healthz` succeeds
+- And an authenticated client can synchronize without changing its encryption
+  key
+
 ## Contracts & Invariants
 
 ### LoginShell
@@ -181,9 +269,56 @@ Glossary:
 - **Invariant:** recurring poll path never calls `op read`.
 - **Post:** missing API key hides the Clockify item and exits successfully.
 
+### TerminalProfile
+- **Invariant:** `.chezmoi.os` expresses platform and `machine_type=lmsh`
+  expresses Lima terminal intent.
+- **Invariant:** macOS rendering remains byte-compatible outside intentional
+  Atuin endpoint and daemon changes.
+- **Invariant:** optional shell tools are command-guarded.
+- **Invariant:** the lmsh target excludes SSH private keys, GitHub credentials,
+  1Password integration, GUI applications, and macOS service configuration.
+
+### AtuinServer
+- **Invariant:** server and clients use pinned compatible Atuin `18.17.1`.
+- **Invariant:** the container publishes only to `127.0.0.1`; Tailscale Serve is
+  the only remote ingress.
+- **Invariant:** the image is `ghcr.io/atuinsh/atuin:18.17.1` and the state URI is
+  `sqlite:///config/atuin.db`.
+- **Invariant:** open registration is an explicit temporary deployment override
+  and defaults to false.
+- **Invariant:** credentials, sessions, encryption keys, databases, and backups
+  stay outside Git and command output.
+- **Post:** successful migration retains the original encryption key and closes
+  registration.
+
+### AtuinClient
+- **Invariant:** clients keep unique local host identity and databases; internal
+  Atuin state is never copied between active clients.
+- **Invariant:** the server address is tailnet HTTPS, automatic sync is bounded,
+  and built-in secret filtering remains enabled.
+- **Invariant:** `atuin key`, raw credential retrieval, and password-bearing
+  commands are excluded from history collection.
+- **Post:** remote failure does not prevent local history search or capture.
+
+### Accepted Risk
+- `AUTH-009-AR1`: the operator approved synchronizing MGM shell history through
+  the same personal account, making work commands and paths decryptable on
+  personal clients. End-to-end encryption, secret filters, tailnet-only ingress,
+  and local credential isolation compensate but do not satisfy employer policy.
+  Owner: operator. Review by 2026-08-18 or before connecting another work client.
+
 ## Verification
 
 - Shell syntax checks pass for edited scripts.
 - Static search confirms no Herdr profile auto-`secret` block remains.
 - Static search confirms Clockify poller has no `op read` call.
 - Static search confirms Databricks config has no `onepasswordRead` call.
+- Pytest verifies lmsh exclusions, command guards, pinned assets, loopback-only
+  Compose, closed-by-default registration, and bounded Atuin configuration.
+- `docker compose config` validates the rendered service.
+- Mac and both Lima clients resolve the tailnet endpoint and receive healthy
+  HTTPS without a public or LAN listener.
+- Disposable-account synchronization passes before production migration.
+- Production validation compares representative history across two clients,
+  verifies denied registration, exercises offline recovery, and restores one
+  cold backup in isolation.

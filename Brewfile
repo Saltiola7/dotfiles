@@ -17,7 +17,7 @@ brew "ansible"
 brew "jpeg-xl"
 brew "aom"
 brew "apr-util"
-brew "atuin", restart_service: :changed
+brew "atuin"
 brew "azure-cli"
 brew "carapace"
 brew "chezmoi"

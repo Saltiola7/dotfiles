@@ -1,0 +1,27 @@
+auto_sync = true
+sync_address = "https://mac-mini.tail62e96c.ts.net"
+sync_frequency = "10m"
+filter_mode = "global"
+workspaces = true
+secrets_filter = true
+enter_accept = true
+network_connect_timeout = 2
+network_timeout = 5
+history_filter = [
+  '^atuin key(?:\s|$)',
+  '^gh auth token(?:\s|$)',
+  '^op read(?:\s|$)',
+  '(?i)(?:password|secret|token|api[_-]?key)\s*=',
+]
+
+[stats]
+
+[keys]
+
+[sync]
+records = true
+
+[preview]
+
+[daemon]
+enabled = false

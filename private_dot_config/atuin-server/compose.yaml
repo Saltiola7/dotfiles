@@ -1,0 +1,14 @@
+services:
+  atuin:
+    image: ghcr.io/atuinsh/atuin:18.17.1
+    command: start
+    restart: unless-stopped
+    environment:
+      ATUIN_HOST: 0.0.0.0
+      ATUIN_PORT: 8888
+      ATUIN_DB_URI: sqlite:///config/atuin.db
+      ATUIN_OPEN_REGISTRATION: ${ATUIN_OPEN_REGISTRATION:-false}
+    ports:
+      - "127.0.0.1:8888:8888"
+    volumes:
+      - "${HOME}/.local/share/atuin-server:/config"
