@@ -2,6 +2,14 @@
 
 ## 2026-07-25
 
+- Corrected the `lmsh` source boundary to deny all targets by default and allow
+  only Bash/common profiles, Atuin and Starship configuration, and the pinned
+  terminal installer.
+- Validation: 169 tests, exact Linux chezmoi target inventory, shell rendering,
+  both Lima guest dry-runs, terminal binary checks, and tailnet Atuin health
+  passed. Independent review was unavailable because the reviewer sandbox could
+  not read the cycle worktree; primary diff review passed with no new exception.
+  Implementation Gate Commit: `4fdc25e`. Intended Final Push: `origin/main`.
 - Added the portable `lmsh` Bash profile with pinned Atuin `18.17.1`, zoxide
   `0.9.8`, and Starship `1.26.0`; macOS shell rendering remains unchanged.
 - Deployed a loopback-only Atuin `18.17.1` container through Tailscale Serve,
