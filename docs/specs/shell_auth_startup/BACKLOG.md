@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-010 | Isolate shell credential files and rematerialize stale state | P1 | in_progress | - | `dot_local/bin/executable_secret`, shell-auth lifecycle artifacts | `tests/test_secret_loader.py` | no | Source, tests, and contracts describe one security-sensitive flow | small | shell syntax and focused pytest |
 
 ## Completed
 

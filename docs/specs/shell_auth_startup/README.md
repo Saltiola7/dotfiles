@@ -15,10 +15,10 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-010-lmsh-target-boundary` is elevated-risk remediation. The
-security and cloud modules apply. Release is not applicable because this source
-publishes no project artifact; Review/Integrate, Deploy, Operate, and
-Maintain/Retire are required.
+Current cycle `AUTH-010-session-credentials` is elevated-risk sensitive-data
+handling work. The security module applies. Release, Deploy, Operate, and
+Maintain/Retire are not applicable because this cycle changes only local
+chezmoi source; Review/Integrate is required.
 
 ## Domain
 
@@ -55,6 +55,7 @@ Value objects:
 - `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
 - `ProjectedSecretSet`: validated JSON object containing every scalar secret and file payload needed by the shell.
+- `SessionCredentialDirectory`: private temporary directory owned by one shell and inherited by its child processes.
 - `CommandTimeout`: maximum wall time for external auth calls.
 
 Events:
@@ -111,6 +112,24 @@ Glossary:
 - And it exports all required environment variables
 - And it materializes required credential files
 - And missing required values fail the whole load
+
+**Scenario: Loaded credentials remain valid**
+- Given `SecretLoader` previously completed in a `LoginShell`
+- When it is requested again and every required credential file is non-empty
+- Then it returns without fetching or rematerializing secrets
+
+**Scenario: A loaded credential file disappears**
+- Given `SecretLoader` previously completed in a `LoginShell`
+- And a required credential file is missing or empty
+- When it is requested again
+- Then it clears stale loaded state
+- And it fetches and rematerializes every required credential file
+
+**Scenario: Concurrent shells isolate credential files**
+- Given two `LoginShell` instances request secrets
+- When each materializes required credential files
+- Then each uses a distinct private `SessionCredentialDirectory`
+- And one shell's cleanup cannot remove files referenced by the other shell or its child processes
 
 **Scenario: SSH session uses injected service account token**
 - Given `SecretLoadRequested` runs in an SSH `LoginShell`
@@ -257,6 +276,10 @@ Glossary:
 - **Invariant:** the grouped secret path requires `jq` for JSON field extraction.
 - **Invariant:** installed `SecretLoader` sources sibling `op-session` by path so stale shell command hashes cannot select an old broker.
 - **Post:** all required secrets are non-empty before `_SECRETS_LOADED` is set.
+- **Invariant:** `_SECRETS_LOADED` is trusted only while both exported credential paths name non-empty files.
+- **Invariant:** each loading shell materializes GCP credentials in a distinct mode-700 temporary directory.
+- **Post:** stale loaded state forces a complete reload and rematerialization.
+- **Post:** shell exit removes only that shell's `SessionCredentialDirectory`.
 
 ### OnePasswordSessionCache
 - **Invariant:** cached tokens must pass one bounded validity probe before grouped item fetches start.
@@ -341,3 +364,15 @@ Glossary:
 - Production validation compares representative history across two clients,
   verifies denied registration, exercises offline recovery, and restores one
   cold backup in isolation.
+
+## Visual Evidence
+
+| Concern | Classification |
+| --- | --- |
+| Boundary | not_applicable: shell/process ownership is fully specified by the credential-directory invariants. |
+| Interaction | not_applicable: behavior scenarios state load, reload, and cleanup ordering directly. |
+| State | not_applicable: `_SECRETS_LOADED` has only valid and stale states with an explicit file guard. |
+| Data/trust | not_applicable: credential sensitivity, permissions, and lifetime are explicit contracts above. |
+| Schema | not_applicable: no persistent schema exists. |
+| Dependency/deployment | not_applicable: no deployment topology changes. |
+| Quantitative | not_applicable: no decision depends on quantitative evidence. |

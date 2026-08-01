@@ -52,7 +52,7 @@ In `.common_profile`, API keys are **not** loaded at shell startup. Call `secret
 secret   # prompts once for Touch ID, exports all API keys into the current session
 ```
 
-Secrets are cached for the lifetime of the shell session via `_SECRETS_LOADED` guard — subsequent calls print "Secrets already loaded." without re-prompting.
+Secrets are cached for the shell session via `_SECRETS_LOADED`. Subsequent calls skip 1Password only while both session-specific GCP credential files remain usable; a missing file forces rematerialization.
 
 **Keys loaded by `secret`:**
 - `$GEMINI_API_KEY` / `$GEMINI_DEEP_RESEARCH_API_KEY`
