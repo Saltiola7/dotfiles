@@ -1,5 +1,19 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-01
+
+- Materialized GCP credentials in a private directory per loading shell and
+  changed `_SECRETS_LOADED` to require both credential files before returning.
+  Missing files now clear stale state and force full rematerialization; shell
+  exit leaves inherited files valid for live child processes.
+- Validation: focused secret-loader tests cover valid idempotency, missing-file
+  reload, distinct shell paths, and child-shell cleanup isolation; Bash syntax
+  and diff checks passed. Independent review findings on parent/child lifetime,
+  EXIT-trap preservation, and stale docs were remediated; sandbox access blocked
+  a final independent reread, while primary diff review passed. No Gate Exception
+  or deployment. Implementation Gate Commit: `a8e0d9a`. Intended Final Push:
+  draft PR to `main`.
+
 ## 2026-07-25
 
 - Corrected the `lmsh` source boundary to deny all targets by default and allow
