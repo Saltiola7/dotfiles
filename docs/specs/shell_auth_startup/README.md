@@ -55,7 +55,7 @@ Value objects:
 - `InjectedSecretBundle`: JSON document produced by the `ShellSecretsItem` fetch.
 - `OnePasswordItemId`: stable item UUID used to fetch a secret item without title search.
 - `ProjectedSecretSet`: validated JSON object containing every scalar secret and file payload needed by the shell.
-- `SessionCredentialDirectory`: private temporary directory owned by one shell and inherited by its child processes.
+- `SessionCredentialDirectory`: private temporary directory created by one shell and inherited by its child processes.
 - `CommandTimeout`: maximum wall time for external auth calls.
 
 Events:
@@ -279,7 +279,7 @@ Glossary:
 - **Invariant:** `_SECRETS_LOADED` is trusted only while both exported credential paths name non-empty files.
 - **Invariant:** each loading shell materializes GCP credentials in a distinct mode-700 temporary directory.
 - **Post:** stale loaded state forces a complete reload and rematerialization.
-- **Post:** shell exit removes only that shell's `SessionCredentialDirectory`.
+- **Invariant:** shell exit does not remove a `SessionCredentialDirectory` that a live child process may still reference; the operating system's temporary-storage lifecycle reclaims abandoned directories.
 
 ### OnePasswordSessionCache
 - **Invariant:** cached tokens must pass one bounded validity probe before grouped item fetches start.

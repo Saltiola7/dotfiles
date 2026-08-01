@@ -4,7 +4,6 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-010 | Isolate shell credential files and rematerialize stale state | P1 | in_progress | - | `dot_local/bin/executable_secret`, shell-auth lifecycle artifacts | `tests/test_secret_loader.py` | no | Source, tests, and contracts describe one security-sensitive flow | small | shell syntax and focused pytest |
 
 ## Completed
 
@@ -13,3 +12,4 @@
 | AUTH-001 through AUTH-008 | Startup-safe auth, polling, Keychain, and Herdr behavior | 2026-07-13 | `22c554e` baseline history |
 | AUTH-009 | Tailnet-only self-hosted Atuin and portable lmsh terminal profile | 2026-07-25 | `b44b1eb`, `2cee8ea` |
 | AUTH-010 | Deny-by-default lmsh source target boundary | 2026-07-25 | `4fdc25e` |
+| AUTH-010-session-credentials | Session-isolated GCP credentials with stale-file rematerialization | 2026-08-01 | `a8e0d9a` |

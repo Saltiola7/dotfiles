@@ -31,7 +31,7 @@ Secrets are managed via **1Password CLI** (`op`). Two patterns are used dependin
 
 | Pattern | When | Secrets on disk? |
 |---------|------|-----------------|
-| `secret` function (lazy `op read`) | Environment variables (API keys) — loaded on demand, not at shell start | No |
+| `secret` loader (one grouped item fetch) | API keys and session-specific GCP credential files, loaded on demand | GCP files only (private temporary directory, 0600) |
 | `onepasswordRead` in chezmoi template | Config files that need secrets baked in | Yes (in target file, 0600 perms) |
 
 ### 1Password items
@@ -107,7 +107,7 @@ chezmoi chattr +template ~/.newconfig
 
 1. Create item in 1Password (Personal vault, category: API Credential)
 2. Choose the appropriate pattern:
-   - **Env var needed by CLI tools** → add `op read` line inside the `secret()` function in `.common_profile`
+   - **Env var needed by CLI tools** → add the field to the grouped projection in `~/.local/bin/secret`
    - **Config file needs the value** → use `{{ onepasswordRead "op://..." }}` in a `.tmpl` file
    - **Single command needs a value** → inline `$(op read '...')` directly in an alias (like `ch`)
 

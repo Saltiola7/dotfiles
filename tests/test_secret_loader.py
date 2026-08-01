@@ -1,5 +1,6 @@
 import os
 import shlex
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -74,6 +75,7 @@ JSON
         "AWS_REGION": "existing-region",
     }
     command = f'''set -e
+trap 'touch "$HOME/original-exit-trap-ran"' EXIT
 source {ROOT / "dot_local/bin/executable_secret"}
 test "$GEMINI_API_KEY" = gemini
 test "$AWS_PROFILE" = existing-profile
@@ -90,7 +92,7 @@ test ! -e "$first_gws"
 reloaded_google="$GOOGLE_APPLICATION_CREDENTIALS"
 source {ROOT / "dot_local/bin/executable_secret"}
 test "$GOOGLE_APPLICATION_CREDENTIALS" = "$reloaded_google"
-PARENT_GOOGLE="$GOOGLE_APPLICATION_CREDENTIALS" bash -lc 'set -e; source {ROOT / "dot_local/bin/executable_secret"}; test "$GOOGLE_APPLICATION_CREDENTIALS" != "$PARENT_GOOGLE"'
+PARENT_GOOGLE="$GOOGLE_APPLICATION_CREDENTIALS" bash -lc 'set -e; source {ROOT / "dot_local/bin/executable_secret"}; test "$GOOGLE_APPLICATION_CREDENTIALS" != "$PARENT_GOOGLE"; __cleanup_gcp_cache'
 test -s "$reloaded_google"
 printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
 '''
@@ -101,6 +103,8 @@ printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr
+    assert (tmp_path / "original-exit-trap-ran").is_file()
+    (tmp_path / "original-exit-trap-ran").unlink()
     other_shell = subprocess.run(
         ["bash", "-lc", command],
         env=env,
@@ -108,6 +112,7 @@ printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
         capture_output=True,
     )
     assert other_shell.returncode == 0, other_shell.stderr
+    assert (tmp_path / "original-exit-trap-ran").is_file()
     credential_dir = next(
         line.removeprefix("credential_dir=")
         for line in result.stdout.splitlines()
@@ -119,6 +124,12 @@ printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
         if line.startswith("credential_dir=")
     )
     assert credential_dir != other_credential_dir
+    for directory in (Path(credential_dir), Path(other_credential_dir)):
+        assert directory.is_dir()
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o700
+        for credential in directory.iterdir():
+            assert stat.S_IMODE(credential.stat().st_mode) == 0o600
+        shutil.rmtree(directory)
     assert log.read_text().splitlines() == [
         "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"
     ] * 6
