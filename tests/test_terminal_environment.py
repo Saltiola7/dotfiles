@@ -119,6 +119,9 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     assert "/Volumes/ext/state/.dotfiles-ai-state" in runtime_state
     assert "codex_home=/Volumes/ext/state/codex/home" in runtime_state
     assert "pycharm_properties=/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties" in runtime_state
+    assert "pycharm_system=$pycharm_root/system" in runtime_state
+    assert "pycharm_log=$pycharm_system/log" in runtime_state
+    assert "idea.system.path=%s\\nidea.log.path=%s\\n" in runtime_state
     for variable in ("CODEX_HOME", "PYCHARM_PROPERTIES"):
         assert f"/bin/launchctl setenv {variable}" in runtime_state
         assert f"/bin/launchctl unsetenv {variable}" in runtime_state
@@ -174,6 +177,8 @@ def test_colima_atuin_service_requires_external_state(tmp_path):
 
     bootstrap = text("run_onchange_after_bootstrap-colima-atuin.sh.tmpl")
     assert '{{ if ne .machine_type "mac-mini" -}}' in bootstrap
+    assert 'include "private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl" | sha256sum' in bootstrap
+    assert 'include "dot_local/bin/executable_start-colima-atuin" | sha256sum' in bootstrap
     assert "launchctl bootout" in bootstrap
     assert "launchctl bootstrap" in bootstrap
 
@@ -183,6 +188,7 @@ def test_gui_state_controller_tracks_sentinel_without_overwriting_custom_values(
     state = tmp_path / "launchctl-state"
     state.mkdir()
     launchctl = tmp_path / "launchctl"
+    pycharm_properties = tmp_path / "jetbrains/PyCharm2026.2/idea.properties"
     launchctl.write_text(
         """#!/bin/sh
 case "$1" in
@@ -196,6 +202,7 @@ esac
     script = (
         text("dot_local/bin/executable_configure-runtime-state")
         .replace("/Volumes/ext/state/.dotfiles-ai-state", str(sentinel))
+        .replace("/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties", str(pycharm_properties))
         .replace("/bin/launchctl", str(launchctl))
     )
     env = os.environ | {"LAUNCHCTL_STATE": str(state)}
@@ -204,8 +211,13 @@ esac
     subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
     assert (state / "CODEX_HOME").read_text() == "/Volumes/ext/state/codex/home"
     assert (state / "PYCHARM_PROPERTIES").read_text() == (
-        "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"
+        str(pycharm_properties)
     )
+    assert pycharm_properties.read_text() == (
+        f"idea.system.path={pycharm_properties.parent}/system\n"
+        f"idea.log.path={pycharm_properties.parent}/system/log\n"
+    )
+    assert (pycharm_properties.parent / "system/log").is_dir()
 
     sentinel.unlink()
     subprocess.run(["/bin/sh", "-c", script], env=env, check=True)

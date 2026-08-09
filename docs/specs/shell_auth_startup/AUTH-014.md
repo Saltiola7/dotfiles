@@ -21,6 +21,9 @@
   the sentinel and every native state home; a stale directory tree fails closed.
 - A Mac-mini-only onchange target reloads the LaunchAgent after its managed
   wrapper or plist changes.
+- The runtime-state controller atomically manages both `idea.system.path` and
+  `idea.log.path`; PyCharm keeps its existing external `system/log` directory
+  without compatibility fallback warnings.
 
 ## Visual Evidence
 

@@ -1,4 +1,6 @@
 #!/bin/sh
+# plist hash: {{ include "private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl" | sha256sum }}
+# wrapper hash: {{ include "dot_local/bin/executable_start-colima-atuin" | sha256sum }}
 {{ if ne .machine_type "mac-mini" -}}
 exit 0
 {{ end -}}
