@@ -2,6 +2,13 @@
 
 ## 2026-08-09
 
+- Began AUTH-013 to route validated Prefect and Codex homes through their native
+  controls and PyCharm system state through custom properties. All settings are
+  Mac-mini-only, sentinel-guarded, and excluded from teammate defaults.
+- Preserved 802 Prefect runs; copied databases passed SQLite integrity checks,
+  Prefect server health, Codex GUI file-handle checks, and PyCharm control
+  restarts. Internal copies remain rollback state pending durable deployment.
+
 - Routed Playwright, uv, pre-commit, npm, and Pulumi through their native path
   controls only when the existing external-state sentinel is present. Inherited
   managed values clear on the fallback path without overriding unrelated values.

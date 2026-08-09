@@ -11,6 +11,9 @@ def text(path):
 
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook"' in text(
+        ".chezmoi.toml.tmpl"
+    )
     assert "macbook/mac-mini/lmsh" in text(".chezmoi.toml.tmpl")
     assert "atuin_sync_address" in text(".chezmoi.toml.tmpl")
     ignored = text(".chezmoiignore")
@@ -39,6 +42,9 @@ def test_mac_mini_uses_native_external_cache_paths():
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
         'npm_config_cache="$DOTFILES_CACHE_ROOT/npm"',
         'PULUMI_HOME="/Volumes/ext/state/pulumi"',
+        'PREFECT_HOME="/Volumes/ext/state/prefect/seo-data-science"',
+        'CODEX_HOME="/Volumes/ext/state/codex/home"',
+        'PYCHARM_PROPERTIES="/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"',
     ):
         assert setting in profile
     for variable in (
@@ -48,6 +54,9 @@ def test_mac_mini_uses_native_external_cache_paths():
         "PRE_COMMIT_HOME",
         "npm_config_cache",
         "PULUMI_HOME",
+        "PREFECT_HOME",
+        "CODEX_HOME",
+        "PYCHARM_PROPERTIES",
     ):
         assert f'unset {variable}' in profile
 
@@ -69,6 +78,9 @@ def test_external_cache_exports_and_fallback(tmp_path):
         "PRE_COMMIT_HOME": "/Volumes/ext/state/cache/pre-commit",
         "npm_config_cache": "/Volumes/ext/state/cache/npm",
         "PULUMI_HOME": "/Volumes/ext/state/pulumi",
+        "PREFECT_HOME": "/Volumes/ext/state/prefect/seo-data-science",
+        "CODEX_HOME": "/Volumes/ext/state/codex/home",
+        "PYCHARM_PROPERTIES": "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties",
     }
 
     shells = [shell for shell in ("/bin/bash", "/bin/zsh") if Path(shell).exists()]
@@ -89,6 +101,62 @@ def test_external_cache_exports_and_fallback(tmp_path):
         assert "UV_CACHE_DIR=/custom/uv" in fallback
         for name in managed.keys() - {"UV_CACHE_DIR"}:
             assert f"{name}=" not in fallback
+
+
+def test_mac_mini_gui_state_paths_are_scoped_and_native():
+    ignored = text(".chezmoiignore")
+    mac_mini = ignored.split('{{ if ne .machine_type "mac-mini" }}', 1)[1].split("{{ end }}", 1)[0]
+    assert "Library/LaunchAgents/dev.dotfiles.runtime-state.plist" in mac_mini
+    assert ".local/bin/configure-runtime-state" in mac_mini
+    runtime_state = text("dot_local/bin/executable_configure-runtime-state")
+    assert "/Volumes/ext/state/.dotfiles-ai-state" in runtime_state
+    assert "codex_home=/Volumes/ext/state/codex/home" in runtime_state
+    assert "pycharm_properties=/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties" in runtime_state
+    for variable in ("CODEX_HOME", "PYCHARM_PROPERTIES"):
+        assert f"/bin/launchctl setenv {variable}" in runtime_state
+        assert f"/bin/launchctl unsetenv {variable}" in runtime_state
+    launch_agent = text("private_Library/LaunchAgents/dev.dotfiles.runtime-state.plist.tmpl")
+    assert "<key>WatchPaths</key>" in launch_agent
+    assert "<key>StartInterval</key>" in launch_agent
+
+
+def test_gui_state_controller_tracks_sentinel_without_overwriting_custom_values(tmp_path):
+    sentinel = tmp_path / "sentinel"
+    state = tmp_path / "launchctl-state"
+    state.mkdir()
+    launchctl = tmp_path / "launchctl"
+    launchctl.write_text(
+        """#!/bin/sh
+case "$1" in
+    setenv) printf '%s' "$3" > "$LAUNCHCTL_STATE/$2" ;;
+    getenv) cat "$LAUNCHCTL_STATE/$2" 2>/dev/null ;;
+    unsetenv) rm -f "$LAUNCHCTL_STATE/$2" ;;
+esac
+"""
+    )
+    launchctl.chmod(0o755)
+    script = (
+        text("dot_local/bin/executable_configure-runtime-state")
+        .replace("/Volumes/ext/state/.dotfiles-ai-state", str(sentinel))
+        .replace("/bin/launchctl", str(launchctl))
+    )
+    env = os.environ | {"LAUNCHCTL_STATE": str(state)}
+
+    sentinel.touch()
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
+    assert (state / "CODEX_HOME").read_text() == "/Volumes/ext/state/codex/home"
+    assert (state / "PYCHARM_PROPERTIES").read_text() == (
+        "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"
+    )
+
+    sentinel.unlink()
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
+    assert not list(state.iterdir())
+
+    for variable in ("CODEX_HOME", "PYCHARM_PROPERTIES"):
+        (state / variable).write_text("/custom")
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
+    assert {path.read_text() for path in state.iterdir()} == {"/custom"}
 
 
 def test_lmsh_targets_are_deny_by_default():

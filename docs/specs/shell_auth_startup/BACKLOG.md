@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-013 | Route validated Prefect, Codex, and PyCharm state externally | P1 | active | AUTH-011-cache-relocation | shell profile, Codex login environment, PyCharm system path, lifecycle docs/tests | external state sentinel and migrated runtime state | no | shared shell/spec/test ownership | small | focused tests, renders, SQLite integrity, GUI/runtime smoke |
 
 ## Completed
 
