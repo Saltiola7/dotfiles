@@ -2,6 +2,27 @@
 
 ## 2026-08-09
 
+- Routed direct Lima, Colima, Docker images, and the Atuin named volume through
+  native homes under `/Volumes/ext/state`. Sparse disk conversion passed
+  `qemu-img compare`; personal and rebuilt MGM sandboxes run externally and the
+  stopped MGM v1 rollback is archived externally.
+- Reconstructed the empty Atuin server from the original key and surviving
+  client stores. Host, personal, and MGM clients authenticate as `tommi` and
+  converge on 17,157 encrypted records. Registration is closed, loopback and
+  tailnet health pass, and a 9.6 MiB cold named-volume export passed an isolated
+  restore health check.
+- Replaced the failing Homebrew service with a sentinel-, mount-, and
+  state-root-guarded LaunchAgent. A dependency-hashed onchange target reloads
+  wrapper/plist changes; a live stop/bootstrap restart restored Atuin health.
+- Pinned Atuin to its native client path despite scoped XDG overrides. Added
+  explicit `idea.log.path` beside `idea.system.path`; live PyCharm opened the
+  external log without the compatibility warning.
+- Validation: 174 tests, shell/plist checks, sparse image comparison, both VM
+  readiness gates, three-client sync, closed registration, cold restore, and
+  LaunchAgent restart passed. Accepted risk `AUTH-014-AR1`; the 4.9 GiB internal
+  Lima tree remains the retained rollback. Gate Commits: `3fc478e`, `d758f6a`,
+  `c33b500`, `d007441`, `ce91840`.
+
 - Routed validated Prefect and Codex homes through their native
   controls and PyCharm system state through custom properties. All settings are
   Mac-mini-only, sentinel-guarded, and excluded from teammate defaults.
