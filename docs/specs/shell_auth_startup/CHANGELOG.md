@@ -16,7 +16,7 @@
 - Validation: 7 focused tests, Bash/Zsh render syntax, exact chezmoi deployment,
   Git diff checks, and independent review passed after rollback hardening.
   Accepted risk: `AUTH-011-AR1`. Release is not applicable. Final Push remains
-  pending lifecycle completion.
+  pending lifecycle completion. Implementation Gate Commit: `712e31e`.
 
 ## 2026-08-01
 
