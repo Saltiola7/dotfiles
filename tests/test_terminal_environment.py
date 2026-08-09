@@ -71,7 +71,9 @@ def test_external_cache_exports_and_fallback(tmp_path):
         "PULUMI_HOME": "/Volumes/ext/state/pulumi",
     }
 
-    for shell in ("/bin/bash", "/bin/zsh"):
+    shells = [shell for shell in ("/bin/bash", "/bin/zsh") if Path(shell).exists()]
+    assert shells
+    for shell in shells:
         sentinel.touch()
         exported = subprocess.run(
             [shell, "-c", script + "\nenv"], check=True, capture_output=True, text=True
