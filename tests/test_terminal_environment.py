@@ -26,9 +26,11 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "[ -t 0 ]" in bashrc
 
     profile = text("dot_common_profile.tmpl")
+    assert 'export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"' in profile
     assert '{{ if eq .machine_type "lmsh" -}}' in profile
     lmsh, macos = profile.split("{{ else -}}", 1)
     assert "/opt/homebrew" not in lmsh
+    assert "ATUIN_DATA_DIR" in lmsh
     assert "/Applications" not in lmsh
     assert "/opt/homebrew" in macos
 

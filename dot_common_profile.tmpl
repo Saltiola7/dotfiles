@@ -1,6 +1,9 @@
 # Common Shell Configuration (Bash & Zsh)
 # Shared PATH, environment variables, and aliases for both shells and all machines
 
+# Keep Atuin on its native durable path when a scoped tool overrides XDG_DATA_HOME.
+export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"
+
 {{ if eq .machine_type "lmsh" -}}
 export PATH="{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
 alias vim='nvim'
