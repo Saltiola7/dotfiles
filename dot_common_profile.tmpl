@@ -99,6 +99,9 @@ alias ch="clickhouse client --host \"\$(op read 'op://Personal/ClickHouse Cloud/
 # --- Environment Variables ---
 
 {{ if eq .machine_type "mac-mini" -}}
+export LIMA_HOME="/Volumes/ext/state/lima"
+export COLIMA_HOME="/Volumes/ext/state/colima"
+export COLIMA_CACHE_HOME="/Volumes/ext/state/cache/colima"
 if [ -f "/Volumes/ext/state/.dotfiles-ai-state" ]; then
     export DOTFILES_CACHE_ROOT="/Volumes/ext/state/cache"
     export PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"

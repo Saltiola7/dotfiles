@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-014-lima-atuin-recovery | Move native Lima/Colima state externally and reconstruct one shared Atuin server from surviving clients | high | implementing | AUTH-013-runtime-state-relocation | Shell homes, guarded Colima service, Atuin recovery and operation | Existing client state and dotfiles-ai conditional Lima home | no | Sparse-disk migration and account recovery share one sensitive rollback boundary | M | Rendering/tests, sparse-copy verification, both VM health checks, three-client Atuin sync, closed registration, and cold backup |
 
 ## Completed
 

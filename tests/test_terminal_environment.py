@@ -37,6 +37,9 @@ def test_mac_mini_uses_native_external_cache_paths():
     profile = text("dot_common_profile.tmpl")
     assert '[ -f "/Volumes/ext/state/.dotfiles-ai-state" ]' in profile
     for setting in (
+        'LIMA_HOME="/Volumes/ext/state/lima"',
+        'COLIMA_HOME="/Volumes/ext/state/colima"',
+        'COLIMA_CACHE_HOME="/Volumes/ext/state/cache/colima"',
         'PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"',
         'UV_CACHE_DIR="$DOTFILES_CACHE_ROOT/uv"',
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
@@ -108,6 +111,8 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     mac_mini = ignored.split('{{ if ne .machine_type "mac-mini" }}', 1)[1].split("{{ end }}", 1)[0]
     assert "Library/LaunchAgents/dev.dotfiles.runtime-state.plist" in mac_mini
     assert ".local/bin/configure-runtime-state" in mac_mini
+    assert "Library/LaunchAgents/dev.dotfiles.colima-atuin.plist" in mac_mini
+    assert ".local/bin/start-colima-atuin" in mac_mini
     runtime_state = text("dot_local/bin/executable_configure-runtime-state")
     assert "/Volumes/ext/state/.dotfiles-ai-state" in runtime_state
     assert "codex_home=/Volumes/ext/state/codex/home" in runtime_state
@@ -118,6 +123,40 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     launch_agent = text("private_Library/LaunchAgents/dev.dotfiles.runtime-state.plist.tmpl")
     assert "<key>WatchPaths</key>" in launch_agent
     assert "<key>StartInterval</key>" in launch_agent
+
+
+def test_colima_atuin_service_requires_external_state(tmp_path):
+    state = tmp_path / "state"
+    sentinel = state / ".dotfiles-ai-state"
+    lima = state / "lima"
+    colima = state / "colima"
+    cache = state / "cache/colima"
+    fake = tmp_path / "colima"
+    output = tmp_path / "output"
+    fake.write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$LIMA_HOME|$COLIMA_HOME|$COLIMA_CACHE_HOME|$*\" >\"$OUTPUT\"\n"
+    )
+    fake.chmod(0o755)
+    script = (
+        text("dot_local/bin/executable_start-colima-atuin")
+        .replace("/Volumes/ext/state", str(state))
+        .replace("/opt/homebrew/bin/colima", str(fake))
+    )
+
+    subprocess.run(["/bin/sh", "-c", script], env=os.environ | {"OUTPUT": str(output)}, check=True)
+    assert not output.exists()
+
+    for path in (lima, colima, cache):
+        path.mkdir(parents=True, exist_ok=True)
+    sentinel.touch()
+    subprocess.run(["/bin/sh", "-c", script], env=os.environ | {"OUTPUT": str(output)}, check=True)
+    assert output.read_text().strip() == f"{lima}|{colima}|{cache}|start -f"
+
+    plist = text("private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl")
+    assert "executable_start-colima-atuin" not in plist
+    assert "/.local/bin/start-colima-atuin" in plist
+    assert "<key>RunAtLoad</key>" in plist
+    assert "<key>StartInterval</key>" in plist
 
 
 def test_gui_state_controller_tracks_sentinel_without_overwriting_custom_values(tmp_path):
