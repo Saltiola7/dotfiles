@@ -5,6 +5,8 @@ Library/LaunchAgents/com.mgm.aws-sso-login.plist
 {{ end }}
 {{ if ne .machine_type "mac-mini" }}
 .config/atuin-server/
+Library/LaunchAgents/dev.dotfiles.runtime-state.plist
+.local/bin/configure-runtime-state
 {{ end }}
 {{ if eq .machine_type "lmsh" }}
 *

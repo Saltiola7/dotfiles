@@ -14,3 +14,4 @@
 | AUTH-010 | Deny-by-default lmsh source target boundary | 2026-07-25 | `4fdc25e` |
 | AUTH-010-session-credentials | Session-isolated GCP credentials with stale-file rematerialization | 2026-08-01 | `a8e0d9a` |
 | AUTH-011-cache-relocation | Routed supported CLI caches and Pulumi home through sentinel-guarded native paths; paused PyCharm, Prefect, and Codex | 2026-08-09 | `712e31e` |
+| AUTH-013-runtime-state-relocation | Routed validated Prefect, Codex, and PyCharm state externally with team-safe defaults and runtime fallback | 2026-08-09 | `0e3e9dc` |

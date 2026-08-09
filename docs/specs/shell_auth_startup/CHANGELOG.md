@@ -2,6 +2,20 @@
 
 ## 2026-08-09
 
+- Routed validated Prefect and Codex homes through their native
+  controls and PyCharm system state through custom properties. All settings are
+  Mac-mini-only, sentinel-guarded, and excluded from teammate defaults.
+- Preserved 802 Prefect runs; copied databases passed SQLite integrity checks,
+  Prefect server health, Codex GUI file-handle checks, and PyCharm control
+  restarts. A login controller reconciles GUI state at load, sentinel changes,
+  and 60-second intervals while preserving unrelated inherited values.
+- Deployed the shell profile and LaunchAgent, then moved internal rollback copies
+  to `/Volumes/ext/state/archive/runtime-state-rollback-20260809`. Post-move
+  activation remained external and reclaimed about 12 GiB internally.
+- Validation: 173 tests, Bash/Zsh syntax, plist/render checks, SQLite integrity,
+  launchd state, and post-move GUI/runtime smoke passed. Accepted risk:
+  `AUTH-013-AR1`. Implementation Gate Commit: `0e3e9dc`.
+
 - Routed Playwright, uv, pre-commit, npm, and Pulumi through their native path
   controls only when the existing external-state sentinel is present. Inherited
   managed values clear on the fallback path without overriding unrelated values.

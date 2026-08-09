@@ -106,12 +106,18 @@ if [ -f "/Volumes/ext/state/.dotfiles-ai-state" ]; then
     export PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"
     export npm_config_cache="$DOTFILES_CACHE_ROOT/npm"
     export PULUMI_HOME="/Volumes/ext/state/pulumi"
+    export PREFECT_HOME="/Volumes/ext/state/prefect/seo-data-science"
+    export CODEX_HOME="/Volumes/ext/state/codex/home"
+    export PYCHARM_PROPERTIES="/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"
 else
     [ "${PLAYWRIGHT_BROWSERS_PATH:-}" = "/Volumes/ext/state/cache/playwright" ] && unset PLAYWRIGHT_BROWSERS_PATH
     [ "${UV_CACHE_DIR:-}" = "/Volumes/ext/state/cache/uv" ] && unset UV_CACHE_DIR
     [ "${PRE_COMMIT_HOME:-}" = "/Volumes/ext/state/cache/pre-commit" ] && unset PRE_COMMIT_HOME
     [ "${npm_config_cache:-}" = "/Volumes/ext/state/cache/npm" ] && unset npm_config_cache
     [ "${PULUMI_HOME:-}" = "/Volumes/ext/state/pulumi" ] && unset PULUMI_HOME
+    [ "${PREFECT_HOME:-}" = "/Volumes/ext/state/prefect/seo-data-science" ] && unset PREFECT_HOME
+    [ "${CODEX_HOME:-}" = "/Volumes/ext/state/codex/home" ] && unset CODEX_HOME
+    [ "${PYCHARM_PROPERTIES:-}" = "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties" ] && unset PYCHARM_PROPERTIES
     [ "${DOTFILES_CACHE_ROOT:-}" = "/Volumes/ext/state/cache" ] && unset DOTFILES_CACHE_ROOT
 fi
 {{ end -}}

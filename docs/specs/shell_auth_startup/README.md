@@ -335,10 +335,15 @@ Glossary:
 - **Invariant:** Playwright, uv, pre-commit, and npm use only their
   documented native path controls; shell-wide `XDG_CACHE_HOME` and cache
   symlinks are not used.
-- **Invariant:** Pulumi uses its documented `PULUMI_HOME`; Prefect databases and
-  Codex session state remain internal until their installed runtimes can pass
-  migration integrity tests. PyCharm remains internal until its external paths
-  can fail back when the volume is unavailable.
+- **Invariant:** Pulumi, Prefect, and Codex use their documented native home
+  controls only on the Mac mini with the external-state sentinel present.
+- **Invariant:** Codex GUI processes receive the same native `CODEX_HOME` through
+  the Mac-mini-only login environment; missing-sentinel startup removes only the
+  managed value.
+- **Invariant:** PyCharm settings and plugins remain internal; its regenerable
+  system directory uses `idea.system.path` only on the Mac mini.
+- **Pre:** migrated Prefect and Codex SQLite files pass integrity and runtime
+  activation checks before internal rollback copies may be removed.
 - **Invariant:** `TerminalTargetAllowlist` denies all targets by default and
   re-includes only `.bash_profile`, `.bashrc`, `.common_profile`,
   `.config/atuin/config.toml`, `.config/starship.toml`, and
@@ -371,6 +376,14 @@ Glossary:
 - **Post:** remote failure does not prevent local history search or capture.
 
 ### Accepted Risk
+- `AUTH-013-AR1`: on 2026-08-09 the operator approved storing Prefect history and
+  Codex authentication/session state, and PyCharm Local History on the existing
+  unencrypted, `noowners` external volume after each exposure was reported.
+  Sentinel fallback, validated copies, and physical custody reduce availability
+  and migration risk but do not provide encryption or local ownership isolation.
+  Owner: operator. Review before the volume leaves trusted custody, another local
+  account gains access, or the storage policy changes; encrypt the volume when
+  operationally feasible.
 - `AUTH-011-AR1`: the operator approved moving Pulumi credentials and executable
   caches to the existing unencrypted, `noowners` external state volume after the
   trust limitation was reported. The state sentinel, retained internal rollback
@@ -389,7 +402,12 @@ Glossary:
 - Shell syntax checks pass for edited scripts.
 - Rendered Mac mini shell startup selects external CLI caches only with the
   sentinel present; absent-sentinel startup retains local defaults.
-- PyCharm custom properties remain absent after the attempted migration rollback.
+- Prefect preserves 802 runs, passes SQLite `quick_check`, and serves a healthy
+  local API from the external home.
+- Codex CLI and GUI use the external home; copied SQLite databases pass
+  `quick_check` and live file handles resolve externally.
+- PyCharm control restart opens the external system directory without internal
+  cache file handles.
 - Static search confirms no Herdr profile auto-`secret` block remains.
 - Static search confirms Clockify poller has no `op read` call.
 - Static search confirms Databricks config has no `onepasswordRead` call.

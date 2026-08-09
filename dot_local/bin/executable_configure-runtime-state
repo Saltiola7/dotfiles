@@ -1,0 +1,12 @@
+#!/bin/sh
+
+codex_home=/Volumes/ext/state/codex/home
+pycharm_properties=/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties
+if [ -f /Volumes/ext/state/.dotfiles-ai-state ]; then
+    /bin/launchctl setenv CODEX_HOME "$codex_home"
+    /bin/launchctl setenv PYCHARM_PROPERTIES "$pycharm_properties"
+else
+    [ "$(/bin/launchctl getenv CODEX_HOME)" = "$codex_home" ] && /bin/launchctl unsetenv CODEX_HOME
+    [ "$(/bin/launchctl getenv PYCHARM_PROPERTIES)" = "$pycharm_properties" ] && /bin/launchctl unsetenv PYCHARM_PROPERTIES
+fi
+exit 0
