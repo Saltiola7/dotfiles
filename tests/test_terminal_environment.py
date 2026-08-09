@@ -1,3 +1,5 @@
+import os
+import subprocess
 from pathlib import Path
 
 
@@ -26,6 +28,65 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "/opt/homebrew" not in lmsh
     assert "/Applications" not in lmsh
     assert "/opt/homebrew" in macos
+
+
+def test_mac_mini_uses_native_external_cache_paths():
+    profile = text("dot_common_profile.tmpl")
+    assert '[ -f "/Volumes/ext/state/.dotfiles-ai-state" ]' in profile
+    for setting in (
+        'PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"',
+        'UV_CACHE_DIR="$DOTFILES_CACHE_ROOT/uv"',
+        'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
+        'npm_config_cache="$DOTFILES_CACHE_ROOT/npm"',
+        'PULUMI_HOME="/Volumes/ext/state/pulumi"',
+    ):
+        assert setting in profile
+    for variable in (
+        "DOTFILES_CACHE_ROOT",
+        "PLAYWRIGHT_BROWSERS_PATH",
+        "UV_CACHE_DIR",
+        "PRE_COMMIT_HOME",
+        "npm_config_cache",
+        "PULUMI_HOME",
+    ):
+        assert f'unset {variable}' in profile
+
+
+def cache_env_script(sentinel):
+    profile = text("dot_common_profile.tmpl")
+    return profile.split('{{ if eq .machine_type "mac-mini" -}}', 1)[1].split("{{ end -}}", 1)[0].replace(
+        "/Volumes/ext/state/.dotfiles-ai-state", str(sentinel)
+    )
+
+
+def test_external_cache_exports_and_fallback(tmp_path):
+    sentinel = tmp_path / "sentinel"
+    script = cache_env_script(sentinel)
+    managed = {
+        "DOTFILES_CACHE_ROOT": "/Volumes/ext/state/cache",
+        "PLAYWRIGHT_BROWSERS_PATH": "/Volumes/ext/state/cache/playwright",
+        "UV_CACHE_DIR": "/Volumes/ext/state/cache/uv",
+        "PRE_COMMIT_HOME": "/Volumes/ext/state/cache/pre-commit",
+        "npm_config_cache": "/Volumes/ext/state/cache/npm",
+        "PULUMI_HOME": "/Volumes/ext/state/pulumi",
+    }
+
+    for shell in ("/bin/bash", "/bin/zsh"):
+        sentinel.touch()
+        exported = subprocess.run(
+            [shell, "-c", script + "\nenv"], check=True, capture_output=True, text=True
+        ).stdout
+        for name, value in managed.items():
+            assert f"{name}={value}" in exported
+
+        sentinel.unlink()
+        inherited = os.environ | managed | {"UV_CACHE_DIR": "/custom/uv"}
+        fallback = subprocess.run(
+            [shell, "-c", script + "\nenv"], env=inherited, check=True, capture_output=True, text=True
+        ).stdout
+        assert "UV_CACHE_DIR=/custom/uv" in fallback
+        for name in managed.keys() - {"UV_CACHE_DIR"}:
+            assert f"{name}=" not in fallback
 
 
 def test_lmsh_targets_are_deny_by_default():
