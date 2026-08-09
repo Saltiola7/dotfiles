@@ -8,4 +8,5 @@ done
 export LIMA_HOME="$state/lima"
 export COLIMA_HOME="$state/colima"
 export COLIMA_CACHE_HOME="$state/cache/colima"
+export PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 exec /opt/homebrew/bin/colima start -f

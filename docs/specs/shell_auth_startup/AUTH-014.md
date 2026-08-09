@@ -15,6 +15,8 @@
 - Client databases, host identities, sessions, and encryption keys remain unique
   per machine; only encrypted records synchronize through the server.
 - The scoped OpenCode XDG tree never becomes a second Atuin client store.
+- The guarded Colima service supplies Homebrew's binary directory explicitly so
+  launchd can resolve Colima's `limactl` dependency.
 
 ## Visual Evidence
 

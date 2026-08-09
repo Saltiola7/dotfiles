@@ -144,6 +144,7 @@ def test_colima_atuin_service_requires_external_state(tmp_path):
         .replace("/Volumes/ext/state", str(state))
         .replace("/opt/homebrew/bin/colima", str(fake))
     )
+    assert 'PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"' in script
 
     subprocess.run(["/bin/sh", "-c", script], env=os.environ | {"OUTPUT": str(output)}, check=True)
     assert not output.exists()
