@@ -15,10 +15,9 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-010-session-credentials` is elevated-risk sensitive-data
-handling work. The security module applies. Release, Deploy, Operate, and
-Maintain/Retire are not applicable because this cycle changes only local
-chezmoi source; Review/Integrate is required.
+Current cycle `AUTH-011-cache-relocation` is elevated-risk local storage and
+sensitive-data handling work. The security module applies. Release is not
+applicable; Deploy, Operate, Maintain/Retire, and Review/Integrate are required.
 
 ## Domain
 
@@ -34,6 +33,11 @@ Entities:
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 - `TerminalProfile`: portable Bash, Atuin, zoxide, and Starship configuration
   selected by chezmoi machine intent and operating system.
+- `ExternalCacheRoot`: mounted Mac mini cache storage below `/Volumes/ext/state/cache`.
+- `NativeCacheClient`: Playwright, uv, pre-commit, or npm configured
+  through its supported cache-path interface.
+- `PulumiHome`: Pulumi's credential, workspace, schema, and plugin directory,
+  selected through its supported `PULUMI_HOME` interface.
 - `TerminalTargetAllowlist`: deny-by-default set of files and scripts that the
   personal source may apply to an `lmsh` guest.
 - `AtuinClient`: one machine-local history database, record store, encryption
@@ -219,6 +223,21 @@ Glossary:
 
 ### Feature: Private self-hosted history sync
 
+### Feature: Native external caches
+
+**Scenario: External cache volume is available**
+- Given the Mac mini state sentinel exists
+- When an interactive shell starts
+- Then Playwright, uv, pre-commit, and npm receive native paths below
+  `ExternalCacheRoot`
+- And Pulumi uses `/Volumes/ext/state/pulumi` as `PulumiHome`
+
+**Scenario: External cache volume is unavailable**
+- Given the Mac mini state sentinel is absent
+- When an interactive shell starts
+- Then no external CLI cache variable is exported
+- And each CLI retains its native local default
+
 **Scenario: Tailnet client reaches Atuin**
 - Given the pinned Atuin container is healthy on Mac loopback
 - When an authorized Mac or Lima client connects to the stable tailnet URL
@@ -311,6 +330,15 @@ Glossary:
 - **Invariant:** optional shell tools are command-guarded.
 - **Invariant:** the lmsh target excludes SSH private keys, GitHub credentials,
   1Password integration, GUI applications, and macOS service configuration.
+- **Invariant:** external CLI cache exports are Mac-mini-only and require the
+  existing `/Volumes/ext/state/.dotfiles-ai-state` sentinel.
+- **Invariant:** Playwright, uv, pre-commit, and npm use only their
+  documented native path controls; shell-wide `XDG_CACHE_HOME` and cache
+  symlinks are not used.
+- **Invariant:** Pulumi uses its documented `PULUMI_HOME`; Prefect databases and
+  Codex session state remain internal until their installed runtimes can pass
+  migration integrity tests. PyCharm remains internal until its external paths
+  can fail back when the volume is unavailable.
 - **Invariant:** `TerminalTargetAllowlist` denies all targets by default and
   re-includes only `.bash_profile`, `.bashrc`, `.common_profile`,
   `.config/atuin/config.toml`, `.config/starship.toml`, and
@@ -343,6 +371,13 @@ Glossary:
 - **Post:** remote failure does not prevent local history search or capture.
 
 ### Accepted Risk
+- `AUTH-011-AR1`: the operator approved moving Pulumi credentials and executable
+  caches to the existing unencrypted, `noowners` external state volume after the
+  trust limitation was reported. The state sentinel, retained internal rollback
+  copies, and trusted physical custody compensate but do not provide encryption
+  or offline tamper resistance. Owner: operator. Review before the volume leaves
+  trusted custody, another local account gains access, or the storage policy
+  changes.
 - `AUTH-009-AR1`: the operator approved synchronizing MGM shell history through
   the same personal account, making work commands and paths decryptable on
   personal clients. End-to-end encryption, secret filters, tailnet-only ingress,
@@ -352,6 +387,9 @@ Glossary:
 ## Verification
 
 - Shell syntax checks pass for edited scripts.
+- Rendered Mac mini shell startup selects external CLI caches only with the
+  sentinel present; absent-sentinel startup retains local defaults.
+- PyCharm custom properties remain absent after the attempted migration rollback.
 - Static search confirms no Herdr profile auto-`secret` block remains.
 - Static search confirms Clockify poller has no `op read` call.
 - Static search confirms Databricks config has no `onepasswordRead` call.

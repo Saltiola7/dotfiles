@@ -1,5 +1,23 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-09
+
+- Routed Playwright, uv, pre-commit, npm, and Pulumi through their native path
+  controls only when the existing external-state sentinel is present. Inherited
+  managed values clear on the fallback path without overriding unrelated values.
+- Copied Playwright browsers and Pulumi home to external storage while retaining
+  internal rollback copies. Live path checks passed for all CLI tools, including
+  a Playwright Chromium screenshot, uv package execution, npm cache verification,
+  pre-commit database initialization, and Pulumi plugin inventory.
+- Rolled back the attempted PyCharm properties migration after review found no
+  sentinel-aware fallback. Prefect and Codex remain internal because their CLIs
+  are unavailable for migration integrity tests. Host cleanup remains operator
+  blocked by runtime filesystem policy and interactive `sudo`.
+- Validation: 7 focused tests, Bash/Zsh render syntax, exact chezmoi deployment,
+  Git diff checks, and independent review passed after rollback hardening.
+  Accepted risk: `AUTH-011-AR1`. Release is not applicable. Final Push remains
+  pending lifecycle completion. Implementation Gate Commit: `712e31e`.
+
 ## 2026-08-01
 
 - Materialized GCP credentials in a private directory per loading shell and
