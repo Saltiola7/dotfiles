@@ -2,6 +2,8 @@
 
 state=/Volumes/ext/state
 [ -f "$state/.dotfiles-ai-state" ] || exit 0
+volume=${state%/state}
+/sbin/mount | /usr/bin/grep -Fq " on $volume (apfs," || exit 1
 for path in "$state/lima" "$state/colima" "$state/cache/colima"; do
     [ -d "$path" ] || exit 1
 done

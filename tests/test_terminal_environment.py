@@ -134,32 +134,48 @@ def test_colima_atuin_service_requires_external_state(tmp_path):
     colima = state / "colima"
     cache = state / "cache/colima"
     fake = tmp_path / "colima"
+    fake_mount = tmp_path / "mount"
     output = tmp_path / "output"
     fake.write_text(
         "#!/bin/sh\nprintf '%s\\n' \"$LIMA_HOME|$COLIMA_HOME|$COLIMA_CACHE_HOME|$*\" >\"$OUTPUT\"\n"
     )
     fake.chmod(0o755)
+    fake_mount.write_text("#!/bin/sh\nprintf '/dev/test on %s (apfs, local)\\n' \"$MOUNT_ROOT\"\n")
+    fake_mount.chmod(0o755)
     script = (
         text("dot_local/bin/executable_start-colima-atuin")
         .replace("/Volumes/ext/state", str(state))
         .replace("/opt/homebrew/bin/colima", str(fake))
+        .replace("/sbin/mount", str(fake_mount))
     )
     assert 'PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"' in script
 
-    subprocess.run(["/bin/sh", "-c", script], env=os.environ | {"OUTPUT": str(output)}, check=True)
+    env = os.environ | {"OUTPUT": str(output), "MOUNT_ROOT": str(tmp_path)}
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
     assert not output.exists()
 
     for path in (lima, colima, cache):
         path.mkdir(parents=True, exist_ok=True)
     sentinel.touch()
-    subprocess.run(["/bin/sh", "-c", script], env=os.environ | {"OUTPUT": str(output)}, check=True)
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
     assert output.read_text().strip() == f"{lima}|{colima}|{cache}|start -f"
+
+    output.unlink()
+    assert subprocess.run(
+        ["/bin/sh", "-c", script], env=env | {"MOUNT_ROOT": "/wrong"}
+    ).returncode != 0
+    assert not output.exists()
 
     plist = text("private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl")
     assert "executable_start-colima-atuin" not in plist
     assert "/.local/bin/start-colima-atuin" in plist
     assert "<key>RunAtLoad</key>" in plist
     assert "<key>StartInterval</key>" in plist
+
+    bootstrap = text("run_onchange_after_bootstrap-colima-atuin.sh.tmpl")
+    assert '{{ if ne .machine_type "mac-mini" -}}' in bootstrap
+    assert "launchctl bootout" in bootstrap
+    assert "launchctl bootstrap" in bootstrap
 
 
 def test_gui_state_controller_tracks_sentinel_without_overwriting_custom_values(tmp_path):
