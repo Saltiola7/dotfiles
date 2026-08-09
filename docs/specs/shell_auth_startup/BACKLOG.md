@@ -9,6 +9,7 @@
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| AUTH-014-lima-atuin-recovery | Moved native Lima and Colima state externally, rebuilt shared Atuin sync from surviving clients, added guarded restart and cold restore, and reconciled PyCharm log routing | 2026-08-09 | `3fc478e..ce91840` |
 | AUTH-001 through AUTH-008 | Startup-safe auth, polling, Keychain, and Herdr behavior | 2026-07-13 | `22c554e` baseline history |
 | AUTH-009 | Tailnet-only self-hosted Atuin and portable lmsh terminal profile | 2026-07-25 | `b44b1eb`, `2cee8ea` |
 | AUTH-010 | Deny-by-default lmsh source target boundary | 2026-07-25 | `4fdc25e` |

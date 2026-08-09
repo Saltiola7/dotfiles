@@ -12,7 +12,7 @@ Inspect storage before starting the existing Colima profile:
 
 ```sh
 colima start
-brew services start colima
+launchctl kickstart -k "gui/$(id -u)/dev.dotfiles.colima-atuin"
 docker system df
 docker compose -f ~/.config/atuin-server/compose.yaml config
 ATUIN_OPEN_REGISTRATION=true docker compose \

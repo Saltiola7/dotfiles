@@ -1,6 +1,9 @@
 # Common Shell Configuration (Bash & Zsh)
 # Shared PATH, environment variables, and aliases for both shells and all machines
 
+# Keep Atuin on its native durable path when a scoped tool overrides XDG_DATA_HOME.
+export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"
+
 {{ if eq .machine_type "lmsh" -}}
 export PATH="{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
 alias vim='nvim'
@@ -99,6 +102,9 @@ alias ch="clickhouse client --host \"\$(op read 'op://Personal/ClickHouse Cloud/
 # --- Environment Variables ---
 
 {{ if eq .machine_type "mac-mini" -}}
+export LIMA_HOME="/Volumes/ext/state/lima"
+export COLIMA_HOME="/Volumes/ext/state/colima"
+export COLIMA_CACHE_HOME="/Volumes/ext/state/cache/colima"
 if [ -f "/Volumes/ext/state/.dotfiles-ai-state" ]; then
     export DOTFILES_CACHE_ROOT="/Volumes/ext/state/cache"
     export PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"

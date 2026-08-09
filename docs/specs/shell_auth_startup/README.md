@@ -15,8 +15,9 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-011-cache-relocation` is elevated-risk local storage and
-sensitive-data handling work. The security module applies. Release is not
+Current cycle `AUTH-014-lima-atuin-recovery` is elevated-risk VM storage,
+sensitive-data recovery, and local service work. Security and cloud/platform
+modules apply. Release is not
 applicable; Deploy, Operate, Maintain/Retire, and Review/Integrate are required.
 
 ## Domain
@@ -46,6 +47,12 @@ Entities:
   record synchronization.
 - `AtuinStore`: SQLite WAL database in a persistent Docker named volume on the
   Colima Linux filesystem, outside Git and macOS file sharing.
+- `ExternalLimaHome`: Mac-mini-only Lima instance and sparse disk storage at
+  `/Volumes/ext/state/lima`.
+- `ExternalColimaHome`: Mac-mini-only Colima profile and download-cache storage
+  under `/Volumes/ext/state`.
+- `ColimaAtuinService`: guarded login service that starts Colima only when the
+  external-state sentinel and all configured state roots exist.
 - `TailnetEndpoint`: Tailscale-terminated HTTPS proxy to loopback-only server
   ingress.
 
@@ -274,6 +281,26 @@ Glossary:
 - And an authenticated client can synchronize without changing its encryption
   key
 
+**Scenario: Lima and Colima use external state on the Mac mini**
+- Given the Mac mini external-state sentinel and managed roots exist
+- When a shell, sandbox controller, or guarded Colima service invokes Lima
+- Then direct Lima instances, Colima profile state, container images, and Docker
+  volumes use their native external homes
+- And teammate and non-Mac-mini defaults remain unchanged
+
+**Scenario: External VM state is unavailable**
+- Given the external-state sentinel or a managed state root is absent
+- When the guarded Colima service starts
+- Then it exits without creating an internal fallback profile
+- And existing external VM state remains untouched
+
+**Scenario: Lost Atuin server is reconstructed from clients**
+- Given the server volume is absent and each client has a validated cold backup
+- And surviving clients retain distinct host identities and the same encryption key
+- When an empty server temporarily opens registration and clients synchronize normally
+- Then the server receives the union of encrypted client record streams
+- And registration closes after host and both Lima clients verify shared history
+
 ## Contracts & Invariants
 
 ### LoginShell
@@ -332,6 +359,12 @@ Glossary:
   1Password integration, GUI applications, and macOS service configuration.
 - **Invariant:** external CLI cache exports are Mac-mini-only and require the
   existing `/Volumes/ext/state/.dotfiles-ai-state` sentinel.
+- **Invariant:** `LIMA_HOME`, `COLIMA_HOME`, and `COLIMA_CACHE_HOME` are
+  Mac-mini-only. Lima and Colima use native home controls rather than state-directory symlinks.
+- **Invariant:** the guarded Colima service requires the sentinel and every
+  external home directory before invoking Colima; it never falls back internally.
+- **Invariant:** the dotfiles-ai sandbox `lima_home` is machine-local and empty
+  by default, so teammate configurations retain Lima's native default.
 - **Invariant:** Playwright, uv, pre-commit, and npm use only their
   documented native path controls; shell-wide `XDG_CACHE_HOME` and cache
   symlinks are not used.
@@ -430,5 +463,27 @@ Glossary:
 | State | not_applicable: `_SECRETS_LOADED` has only valid and stale states with an explicit file guard. |
 | Data/trust | not_applicable: credential sensitivity, permissions, and lifetime are explicit contracts above. |
 | Schema | not_applicable: no persistent schema exists. |
-| Dependency/deployment | not_applicable: no deployment topology changes. |
+| Dependency/deployment | required: AUTH-014 moves Lima and Colima state to an external APFS volume and replaces the failing Homebrew service with a guarded login service. |
 | Quantitative | not_applicable: no decision depends on quantitative evidence. |
+
+```mermaid
+flowchart LR
+    accTitle: External Lima and Atuin deployment topology
+    accDescr: The Mac mini selects external native homes for direct Lima and Colima. Colima owns the Docker named volume containing the Atuin SQLite store, while the host and two Lima clients synchronize through tailnet HTTPS.
+    S[External-state sentinel] --> G[Guarded Colima Atuin service]
+    G --> C[Colima profile in external homes]
+    C --> D[Docker named volume]
+    D --> A[Atuin SQLite server]
+    H[Mac host Atuin client] -->|Tailnet HTTPS sync| A
+    P[Personal Lima Atuin client] -->|Tailnet HTTPS sync| A
+    M[MGM Lima Atuin client] -->|Tailnet HTTPS sync| A
+    L[Direct Lima instances] --> E[External Lima home]
+    C --> E
+```
+
+**Text Equivalent:** On the Mac mini, the external-state sentinel authorizes a
+guarded service to start Colima with native external homes. Colima stores the
+Atuin SQLite database in a Docker named volume inside its Linux disk. The Mac,
+personal Lima VM, and MGM Lima VM keep distinct client databases and synchronize
+encrypted records through the tailnet HTTPS endpoint. Direct Lima instances and
+Colima share the external Lima home without filesystem-sharing active databases.

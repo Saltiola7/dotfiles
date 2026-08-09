@@ -26,9 +26,11 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "[ -t 0 ]" in bashrc
 
     profile = text("dot_common_profile.tmpl")
+    assert 'export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"' in profile
     assert '{{ if eq .machine_type "lmsh" -}}' in profile
     lmsh, macos = profile.split("{{ else -}}", 1)
     assert "/opt/homebrew" not in lmsh
+    assert "ATUIN_DATA_DIR" in lmsh
     assert "/Applications" not in lmsh
     assert "/opt/homebrew" in macos
 
@@ -37,6 +39,9 @@ def test_mac_mini_uses_native_external_cache_paths():
     profile = text("dot_common_profile.tmpl")
     assert '[ -f "/Volumes/ext/state/.dotfiles-ai-state" ]' in profile
     for setting in (
+        'LIMA_HOME="/Volumes/ext/state/lima"',
+        'COLIMA_HOME="/Volumes/ext/state/colima"',
+        'COLIMA_CACHE_HOME="/Volumes/ext/state/cache/colima"',
         'PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"',
         'UV_CACHE_DIR="$DOTFILES_CACHE_ROOT/uv"',
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
@@ -108,10 +113,15 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     mac_mini = ignored.split('{{ if ne .machine_type "mac-mini" }}', 1)[1].split("{{ end }}", 1)[0]
     assert "Library/LaunchAgents/dev.dotfiles.runtime-state.plist" in mac_mini
     assert ".local/bin/configure-runtime-state" in mac_mini
+    assert "Library/LaunchAgents/dev.dotfiles.colima-atuin.plist" in mac_mini
+    assert ".local/bin/start-colima-atuin" in mac_mini
     runtime_state = text("dot_local/bin/executable_configure-runtime-state")
     assert "/Volumes/ext/state/.dotfiles-ai-state" in runtime_state
     assert "codex_home=/Volumes/ext/state/codex/home" in runtime_state
     assert "pycharm_properties=/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties" in runtime_state
+    assert "pycharm_system=$pycharm_root/system" in runtime_state
+    assert "pycharm_log=$pycharm_system/log" in runtime_state
+    assert "idea.system.path=%s\\nidea.log.path=%s\\n" in runtime_state
     for variable in ("CODEX_HOME", "PYCHARM_PROPERTIES"):
         assert f"/bin/launchctl setenv {variable}" in runtime_state
         assert f"/bin/launchctl unsetenv {variable}" in runtime_state
@@ -120,11 +130,65 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     assert "<key>StartInterval</key>" in launch_agent
 
 
+def test_colima_atuin_service_requires_external_state(tmp_path):
+    state = tmp_path / "state"
+    sentinel = state / ".dotfiles-ai-state"
+    lima = state / "lima"
+    colima = state / "colima"
+    cache = state / "cache/colima"
+    fake = tmp_path / "colima"
+    fake_mount = tmp_path / "mount"
+    output = tmp_path / "output"
+    fake.write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$LIMA_HOME|$COLIMA_HOME|$COLIMA_CACHE_HOME|$*\" >\"$OUTPUT\"\n"
+    )
+    fake.chmod(0o755)
+    fake_mount.write_text("#!/bin/sh\nprintf '/dev/test on %s (apfs, local)\\n' \"$MOUNT_ROOT\"\n")
+    fake_mount.chmod(0o755)
+    script = (
+        text("dot_local/bin/executable_start-colima-atuin")
+        .replace("/Volumes/ext/state", str(state))
+        .replace("/opt/homebrew/bin/colima", str(fake))
+        .replace("/sbin/mount", str(fake_mount))
+    )
+    assert 'PATH="/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"' in script
+
+    env = os.environ | {"OUTPUT": str(output), "MOUNT_ROOT": str(tmp_path)}
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
+    assert not output.exists()
+
+    for path in (lima, colima, cache):
+        path.mkdir(parents=True, exist_ok=True)
+    sentinel.touch()
+    subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
+    assert output.read_text().strip() == f"{lima}|{colima}|{cache}|start -f"
+
+    output.unlink()
+    assert subprocess.run(
+        ["/bin/sh", "-c", script], env=env | {"MOUNT_ROOT": "/wrong"}
+    ).returncode != 0
+    assert not output.exists()
+
+    plist = text("private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl")
+    assert "executable_start-colima-atuin" not in plist
+    assert "/.local/bin/start-colima-atuin" in plist
+    assert "<key>RunAtLoad</key>" in plist
+    assert "<key>StartInterval</key>" in plist
+
+    bootstrap = text("run_onchange_after_bootstrap-colima-atuin.sh.tmpl")
+    assert '{{ if ne .machine_type "mac-mini" -}}' in bootstrap
+    assert 'include "private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl" | sha256sum' in bootstrap
+    assert 'include "dot_local/bin/executable_start-colima-atuin" | sha256sum' in bootstrap
+    assert "launchctl bootout" in bootstrap
+    assert "launchctl bootstrap" in bootstrap
+
+
 def test_gui_state_controller_tracks_sentinel_without_overwriting_custom_values(tmp_path):
     sentinel = tmp_path / "sentinel"
     state = tmp_path / "launchctl-state"
     state.mkdir()
     launchctl = tmp_path / "launchctl"
+    pycharm_properties = tmp_path / "jetbrains/PyCharm2026.2/idea.properties"
     launchctl.write_text(
         """#!/bin/sh
 case "$1" in
@@ -138,6 +202,7 @@ esac
     script = (
         text("dot_local/bin/executable_configure-runtime-state")
         .replace("/Volumes/ext/state/.dotfiles-ai-state", str(sentinel))
+        .replace("/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties", str(pycharm_properties))
         .replace("/bin/launchctl", str(launchctl))
     )
     env = os.environ | {"LAUNCHCTL_STATE": str(state)}
@@ -146,8 +211,13 @@ esac
     subprocess.run(["/bin/sh", "-c", script], env=env, check=True)
     assert (state / "CODEX_HOME").read_text() == "/Volumes/ext/state/codex/home"
     assert (state / "PYCHARM_PROPERTIES").read_text() == (
-        "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"
+        str(pycharm_properties)
     )
+    assert pycharm_properties.read_text() == (
+        f"idea.system.path={pycharm_properties.parent}/system\n"
+        f"idea.log.path={pycharm_properties.parent}/system/log\n"
+    )
+    assert (pycharm_properties.parent / "system/log").is_dir()
 
     sentinel.unlink()
     subprocess.run(["/bin/sh", "-c", script], env=env, check=True)

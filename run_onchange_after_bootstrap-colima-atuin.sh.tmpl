@@ -1,0 +1,14 @@
+#!/bin/sh
+# plist hash: {{ include "private_Library/LaunchAgents/dev.dotfiles.colima-atuin.plist.tmpl" | sha256sum }}
+# wrapper hash: {{ include "dot_local/bin/executable_start-colima-atuin" | sha256sum }}
+{{ if ne .machine_type "mac-mini" -}}
+exit 0
+{{ end -}}
+set -eu
+label=dev.dotfiles.colima-atuin
+domain="gui/$(id -u)"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+if /bin/launchctl print "$domain/$label" >/dev/null 2>&1; then
+    /bin/launchctl bootout "$domain/$label"
+fi
+/bin/launchctl bootstrap "$domain" "$plist"
