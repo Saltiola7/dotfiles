@@ -2,6 +2,19 @@
 
 ## 2026-08-09
 
+- Routed mise installs, uv-managed tools and Python runtimes, and PyCharm plugins
+  through their supported paths under `/Volumes/ext/state`. Missing-sentinel
+  startup preserves each tool's native fallback instead of creating an internal
+  compatibility path.
+- Reinstalled the exact uv tools externally and verified mise and uv activation.
+  Live PyCharm file handles resolve its system and plugin state externally; its
+  internal plugin directory is absent. Rollback state is retained in the 7.1 GiB
+  `/Volumes/ext/archive/host-cleanup-20260809` bundle.
+- Validation: 10 focused tests, shell syntax, rendered path checks, exact tool
+  probes, PyCharm restart/file-handle checks, and disk accounting passed. Host
+  free space reached 177 GiB. Implementation Gate Commit: `3ead600`. Intended
+  Final Push: draft PR to `main`.
+
 - Routed direct Lima, Colima, Docker images, and the Atuin named volume through
   native homes under `/Volumes/ext/state`. Sparse disk conversion passed
   `qemu-img compare`; personal and rebuilt MGM sandboxes run externally and the
