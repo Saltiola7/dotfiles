@@ -109,6 +109,9 @@ if [ -f "/Volumes/ext/state/.dotfiles-ai-state" ]; then
     export DOTFILES_CACHE_ROOT="/Volumes/ext/state/cache"
     export PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"
     export UV_CACHE_DIR="$DOTFILES_CACHE_ROOT/uv"
+    export UV_TOOL_DIR="/Volumes/ext/state/uv/tools"
+    export UV_PYTHON_INSTALL_DIR="/Volumes/ext/state/uv/python"
+    export MISE_DATA_DIR="/Volumes/ext/state/mise"
     export PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"
     export npm_config_cache="$DOTFILES_CACHE_ROOT/npm"
     export PULUMI_HOME="/Volumes/ext/state/pulumi"
@@ -118,6 +121,9 @@ if [ -f "/Volumes/ext/state/.dotfiles-ai-state" ]; then
 else
     [ "${PLAYWRIGHT_BROWSERS_PATH:-}" = "/Volumes/ext/state/cache/playwright" ] && unset PLAYWRIGHT_BROWSERS_PATH
     [ "${UV_CACHE_DIR:-}" = "/Volumes/ext/state/cache/uv" ] && unset UV_CACHE_DIR
+    [ "${UV_TOOL_DIR:-}" = "/Volumes/ext/state/uv/tools" ] && unset UV_TOOL_DIR
+    [ "${UV_PYTHON_INSTALL_DIR:-}" = "/Volumes/ext/state/uv/python" ] && unset UV_PYTHON_INSTALL_DIR
+    [ "${MISE_DATA_DIR:-}" = "/Volumes/ext/state/mise" ] && unset MISE_DATA_DIR
     [ "${PRE_COMMIT_HOME:-}" = "/Volumes/ext/state/cache/pre-commit" ] && unset PRE_COMMIT_HOME
     [ "${npm_config_cache:-}" = "/Volumes/ext/state/cache/npm" ] && unset npm_config_cache
     [ "${PULUMI_HOME:-}" = "/Volumes/ext/state/pulumi" ] && unset PULUMI_HOME

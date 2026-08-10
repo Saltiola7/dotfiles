@@ -44,6 +44,9 @@ def test_mac_mini_uses_native_external_cache_paths():
         'COLIMA_CACHE_HOME="/Volumes/ext/state/cache/colima"',
         'PLAYWRIGHT_BROWSERS_PATH="$DOTFILES_CACHE_ROOT/playwright"',
         'UV_CACHE_DIR="$DOTFILES_CACHE_ROOT/uv"',
+        'UV_TOOL_DIR="/Volumes/ext/state/uv/tools"',
+        'UV_PYTHON_INSTALL_DIR="/Volumes/ext/state/uv/python"',
+        'MISE_DATA_DIR="/Volumes/ext/state/mise"',
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
         'npm_config_cache="$DOTFILES_CACHE_ROOT/npm"',
         'PULUMI_HOME="/Volumes/ext/state/pulumi"',
@@ -56,6 +59,9 @@ def test_mac_mini_uses_native_external_cache_paths():
         "DOTFILES_CACHE_ROOT",
         "PLAYWRIGHT_BROWSERS_PATH",
         "UV_CACHE_DIR",
+        "UV_TOOL_DIR",
+        "UV_PYTHON_INSTALL_DIR",
+        "MISE_DATA_DIR",
         "PRE_COMMIT_HOME",
         "npm_config_cache",
         "PULUMI_HOME",
@@ -80,6 +86,9 @@ def test_external_cache_exports_and_fallback(tmp_path):
         "DOTFILES_CACHE_ROOT": "/Volumes/ext/state/cache",
         "PLAYWRIGHT_BROWSERS_PATH": "/Volumes/ext/state/cache/playwright",
         "UV_CACHE_DIR": "/Volumes/ext/state/cache/uv",
+        "UV_TOOL_DIR": "/Volumes/ext/state/uv/tools",
+        "UV_PYTHON_INSTALL_DIR": "/Volumes/ext/state/uv/python",
+        "MISE_DATA_DIR": "/Volumes/ext/state/mise",
         "PRE_COMMIT_HOME": "/Volumes/ext/state/cache/pre-commit",
         "npm_config_cache": "/Volumes/ext/state/cache/npm",
         "PULUMI_HOME": "/Volumes/ext/state/pulumi",
@@ -121,7 +130,8 @@ def test_mac_mini_gui_state_paths_are_scoped_and_native():
     assert "pycharm_properties=/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties" in runtime_state
     assert "pycharm_system=$pycharm_root/system" in runtime_state
     assert "pycharm_log=$pycharm_system/log" in runtime_state
-    assert "idea.system.path=%s\\nidea.log.path=%s\\n" in runtime_state
+    assert "pycharm_plugins=$pycharm_root/plugins" in runtime_state
+    assert "idea.system.path=%s\\nidea.log.path=%s\\nidea.plugins.path=%s\\n" in runtime_state
     for variable in ("CODEX_HOME", "PYCHARM_PROPERTIES"):
         assert f"/bin/launchctl setenv {variable}" in runtime_state
         assert f"/bin/launchctl unsetenv {variable}" in runtime_state
@@ -216,8 +226,10 @@ esac
     assert pycharm_properties.read_text() == (
         f"idea.system.path={pycharm_properties.parent}/system\n"
         f"idea.log.path={pycharm_properties.parent}/system/log\n"
+        f"idea.plugins.path={pycharm_properties.parent}/plugins\n"
     )
     assert (pycharm_properties.parent / "system/log").is_dir()
+    assert (pycharm_properties.parent / "plugins").is_dir()
 
     sentinel.unlink()
     subprocess.run(["/bin/sh", "-c", script], env=env, check=True)

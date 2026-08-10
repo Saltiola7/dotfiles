@@ -15,10 +15,10 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-014-lima-atuin-recovery` is elevated-risk VM storage,
-sensitive-data recovery, and local service work. Security and cloud/platform
-modules apply. Release is not
-applicable; Deploy, Operate, Maintain/Retire, and Review/Integrate are required.
+Current cycle `AUTH-015-host-native-state` is elevated-risk native developer
+state relocation on the Mac mini. Security and cloud/platform modules apply.
+Release is not applicable; Deploy, Operate, Maintain/Retire, and
+Review/Integrate are required.
 
 ## Domain
 
@@ -37,6 +37,10 @@ Entities:
 - `ExternalCacheRoot`: mounted Mac mini cache storage below `/Volumes/ext/state/cache`.
 - `NativeCacheClient`: Playwright, uv, pre-commit, or npm configured
   through its supported cache-path interface.
+- `NativeToolHome`: mise installs and uv-managed tools and Python runtimes
+  configured through their supported data-path interfaces.
+- `PyCharmPluginHome`: externally stored PyCharm plugins selected through
+  JetBrains' supported `idea.plugins.path` property.
 - `PulumiHome`: Pulumi's credential, workspace, schema, and plugin directory,
   selected through its supported `PULUMI_HOME` interface.
 - `TerminalTargetAllowlist`: deny-by-default set of files and scripts that the
@@ -294,6 +298,15 @@ Glossary:
 - Then it exits without creating an internal fallback profile
 - And existing external VM state remains untouched
 
+**Scenario: Native developer state uses external storage**
+- Given the Mac mini external-state sentinel exists
+- When a login shell invokes mise or uv, or PyCharm starts
+- Then mise installs, uv tools and Python runtimes, and PyCharm plugins use
+  their supported external paths
+- And a missing sentinel removes only shell values managed by this profile
+- And active internal state remains available until its runtime-specific
+  cutover validation passes
+
 **Scenario: Lost Atuin server is reconstructed from clients**
 - Given the server volume is absent and each client has a validated cold backup
 - And surviving clients retain distinct host identities and the same encryption key
@@ -368,13 +381,17 @@ Glossary:
 - **Invariant:** Playwright, uv, pre-commit, and npm use only their
   documented native path controls; shell-wide `XDG_CACHE_HOME` and cache
   symlinks are not used.
+- **Invariant:** mise installs and uv-managed tools and Python runtimes use
+  `MISE_DATA_DIR`, `UV_TOOL_DIR`, and `UV_PYTHON_INSTALL_DIR`; a missing
+  external-state sentinel removes only values managed by this profile.
 - **Invariant:** Pulumi, Prefect, and Codex use their documented native home
   controls only on the Mac mini with the external-state sentinel present.
 - **Invariant:** Codex GUI processes receive the same native `CODEX_HOME` through
   the Mac-mini-only login environment; missing-sentinel startup removes only the
   managed value.
-- **Invariant:** PyCharm settings and plugins remain internal; its regenerable
-  system directory uses `idea.system.path` only on the Mac mini.
+- **Invariant:** PyCharm settings remain internal; its regenerable system and
+  plugin directories use `idea.system.path` and `idea.plugins.path` only on the
+  Mac mini.
 - **Pre:** migrated Prefect and Codex SQLite files pass integrity and runtime
   activation checks before internal rollback copies may be removed.
 - **Invariant:** `TerminalTargetAllowlist` denies all targets by default and
@@ -435,6 +452,8 @@ Glossary:
 - Shell syntax checks pass for edited scripts.
 - Rendered Mac mini shell startup selects external CLI caches only with the
   sentinel present; absent-sentinel startup retains local defaults.
+- Rendered Mac mini shell startup selects external mise and uv homes only with
+  the sentinel present; PyCharm properties select the external plugin home.
 - Prefect preserves 802 runs, passes SQLite `quick_check`, and serves a healthy
   local API from the external home.
 - Codex CLI and GUI use the external home; copied SQLite databases pass
@@ -463,14 +482,17 @@ Glossary:
 | State | not_applicable: `_SECRETS_LOADED` has only valid and stale states with an explicit file guard. |
 | Data/trust | not_applicable: credential sensitivity, permissions, and lifetime are explicit contracts above. |
 | Schema | not_applicable: no persistent schema exists. |
-| Dependency/deployment | required: AUTH-014 moves Lima and Colima state to an external APFS volume and replaces the failing Homebrew service with a guarded login service. |
+| Dependency/deployment | required: AUTH-014 moves Lima and Colima state externally; AUTH-015 adds sentinel-guarded native mise, uv, and PyCharm plugin paths. |
 | Quantitative | not_applicable: no decision depends on quantitative evidence. |
 
 ```mermaid
 flowchart LR
-    accTitle: External Lima and Atuin deployment topology
-    accDescr: The Mac mini selects external native homes for direct Lima and Colima. Colima owns the Docker named volume containing the Atuin SQLite store, while the host and two Lima clients synchronize through tailnet HTTPS.
+    accTitle: External host state and Atuin deployment topology
+    accDescr: The Mac mini sentinel selects supported external homes for developer tools, direct Lima, and Colima. Colima owns the Docker named volume containing the Atuin SQLite store, while the host and two Lima clients synchronize through tailnet HTTPS.
     S[External-state sentinel] --> G[Guarded Colima Atuin service]
+    S --> N[Native host path controls]
+    N --> T[mise and uv homes]
+    N --> J[PyCharm plugin home]
     G --> C[Colima profile in external homes]
     C --> D[Docker named volume]
     D --> A[Atuin SQLite server]
@@ -482,7 +504,8 @@ flowchart LR
 ```
 
 **Text Equivalent:** On the Mac mini, the external-state sentinel authorizes a
-guarded service to start Colima with native external homes. Colima stores the
+guarded service to start Colima with native external homes and selects supported
+external homes for mise, uv, and PyCharm plugins. Colima stores the
 Atuin SQLite database in a Docker named volume inside its Linux disk. The Mac,
 personal Lima VM, and MGM Lima VM keep distinct client databases and synchronize
 encrypted records through the tailnet HTTPS endpoint. Direct Lima instances and

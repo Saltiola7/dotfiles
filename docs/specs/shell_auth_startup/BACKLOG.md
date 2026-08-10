@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-015-host-native-state | Relocate supported mise, uv, and PyCharm state from the Mac mini system disk | high | in_progress | AUTH-013-runtime-state-relocation | Native shell paths, PyCharm plugin path, migration and rollback evidence | External-state sentinel, existing runtime homes, AUTH-011-AR1 | no | Live tools and IDE files require ordered copy, activation, validation, and delayed rollback removal | M | Focused pytest, rendered shell checks, mise/uv path probes, PyCharm restart validation, and host disk accounting |
 
 ## Completed
 

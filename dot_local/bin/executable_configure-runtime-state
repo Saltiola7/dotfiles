@@ -6,10 +6,11 @@ if [ -f /Volumes/ext/state/.dotfiles-ai-state ]; then
     pycharm_root=${pycharm_properties%/*}
     pycharm_system=$pycharm_root/system
     pycharm_log=$pycharm_system/log
-    /bin/mkdir -p "$pycharm_log"
+    pycharm_plugins=$pycharm_root/plugins
+    /bin/mkdir -p "$pycharm_log" "$pycharm_plugins"
     tmp=$pycharm_properties.tmp.$$
     trap '/bin/rm -f "$tmp"' EXIT HUP INT TERM
-    /usr/bin/printf 'idea.system.path=%s\nidea.log.path=%s\n' "$pycharm_system" "$pycharm_log" >"$tmp"
+    /usr/bin/printf 'idea.system.path=%s\nidea.log.path=%s\nidea.plugins.path=%s\n' "$pycharm_system" "$pycharm_log" "$pycharm_plugins" >"$tmp"
     if /usr/bin/cmp -s "$tmp" "$pycharm_properties"; then
         /bin/rm -f "$tmp"
     else
