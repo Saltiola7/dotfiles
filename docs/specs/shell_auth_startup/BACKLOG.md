@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-017-personal-source-root | Pin personal chezmoi source independently of scoped XDG data | high | active | OCP-39 | Personal source config template, focused test, and machine config deployment | Existing personal source and chezmoi config semantics | false | Plain chezmoi inside OpenCode resolves an OpenCode-owned XDG source path | small | Focused pytest, rendered config, scoped-XDG source resolution, and native resolution |
 
 ## Completed
 

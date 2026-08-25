@@ -3,6 +3,7 @@
 {{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
+sourceDir = "{{ .chezmoi.homeDir }}/.local/share/chezmoi"
 encryption = "age"
 [age]
     identity = "~/.config/chezmoi/key.txt"
