@@ -4,12 +4,12 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-017-personal-source-root | Pin personal chezmoi source independently of scoped XDG data | high | active | OCP-39 | Personal source config template, focused test, and machine config deployment | Existing personal source and chezmoi config semantics | false | Plain chezmoi inside OpenCode resolves an OpenCode-owned XDG source path | small | Focused pytest, rendered config, scoped-XDG source resolution, and native resolution |
 
 ## Completed
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| AUTH-017-personal-source-root | Pinned the personal chezmoi source beneath each user's home independently of scoped XDG data | 2026-08-24 | `999d6f8` |
 | AUTH-014-lima-atuin-recovery | Moved native Lima and Colima state externally, rebuilt shared Atuin sync from surviving clients, added guarded restart and cold restore, and reconciled PyCharm log routing | 2026-08-09 | `3fc478e..ce91840` |
 | AUTH-001 through AUTH-008 | Startup-safe auth, polling, Keychain, and Herdr behavior | 2026-07-13 | `22c554e` baseline history |
 | AUTH-009 | Tailnet-only self-hosted Atuin and portable lmsh terminal profile | 2026-07-25 | `b44b1eb`, `2cee8ea` |
