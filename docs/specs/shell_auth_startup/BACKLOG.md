@@ -9,6 +9,7 @@
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| AUTH-017-personal-source-root | Pinned the personal chezmoi source beneath each user's home independently of scoped XDG data | 2026-08-24 | `999d6f8` |
 | AUTH-014-lima-atuin-recovery | Moved native Lima and Colima state externally, rebuilt shared Atuin sync from surviving clients, added guarded restart and cold restore, and reconciled PyCharm log routing | 2026-08-09 | `3fc478e..ce91840` |
 | AUTH-001 through AUTH-008 | Startup-safe auth, polling, Keychain, and Herdr behavior | 2026-07-13 | `22c554e` baseline history |
 | AUTH-009 | Tailnet-only self-hosted Atuin and portable lmsh terminal profile | 2026-07-25 | `b44b1eb`, `2cee8ea` |

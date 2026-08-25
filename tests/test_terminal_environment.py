@@ -11,11 +11,11 @@ def text(path):
 
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
-    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook"' in text(
-        ".chezmoi.toml.tmpl"
-    )
-    assert "macbook/mac-mini/lmsh" in text(".chezmoi.toml.tmpl")
-    assert "atuin_sync_address" in text(".chezmoi.toml.tmpl")
+    config = text(".chezmoi.toml.tmpl")
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook"' in config
+    assert "macbook/mac-mini/lmsh" in config
+    assert "atuin_sync_address" in config
+    assert 'sourceDir = "{{ .chezmoi.homeDir }}/.local/share/chezmoi"' in config
     ignored = text(".chezmoiignore")
     assert '{{ if eq .machine_type "lmsh" }}' in ignored
 

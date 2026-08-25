@@ -1,5 +1,18 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-24
+
+- Pinned personal chezmoi `sourceDir` to
+  `{{ .chezmoi.homeDir }}/.local/share/chezmoi`, keeping it portable across user
+  homes and independent of scoped OpenCode XDG storage.
+- The regression failed before implementation; all 174 tests and rendered config
+  validation passed afterward. Chezmoi regenerated the machine config without
+  applying managed targets or changing its `0600` mode.
+- Plain chezmoi resolves `/Users/tis/.local/share/chezmoi` with and without the
+  external XDG environment. Gate Commit: `999d6f8`. Gate Exceptions: none.
+  Intended Final Push: feature branch and draft pull request into protected
+  `main`.
+
 ## 2026-08-09
 
 - Routed direct Lima, Colima, Docker images, and the Atuin named volume through
