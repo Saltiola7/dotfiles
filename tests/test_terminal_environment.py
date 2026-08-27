@@ -18,6 +18,7 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert '{{ if eq $machineType "mac-mini" }}' in config
     assert '"/Volumes/ext/git/Personal/dotfiles"' in config
     assert '"{{ .chezmoi.homeDir }}/.local/share/chezmoi"' in config
+    assert 'hardlink = {{ if eq $machineType "mac-mini" }}false{{ else }}true{{ end }}' in config
     ignored = text(".chezmoiignore")
     assert '{{ if eq .machine_type "lmsh" }}' in ignored
 
