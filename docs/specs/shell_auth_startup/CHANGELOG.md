@@ -1,5 +1,23 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-26
+
+- Made `/Volumes/ext/git/Personal/dotfiles` the Mac-mini-only authoritative
+  chezmoi source while other machines retain the portable home source. Disabled
+  edit hardlinks for the external source after `chezmoi doctor` exposed the
+  cross-filesystem boundary.
+- Imported every branch and the uncommitted stash from the retired home clone.
+  Preserved `AUTH-016` at `0372fcf` and stash `6d30477`, removed only clean
+  merged worktrees, then removed the redundant clone. Git object verification
+  and chezmoi health pass from the external source.
+- Vendored Catppuccin Latte/Mocha from
+  `XXXM1R0XXX/marimo@0b58cb5a4f20c86a70fec915292033df3b366003` and applied
+  marimo dark mode globally. Marimo config, managed checksum, browser-loaded
+  CSS, Mocha computed colors, and visual screenshot validation pass.
+- Validation: 175 tests pass. Gate Commits: `03ad052`, `65a8283`, `59b9066`.
+  Gate Exceptions: none. Intended Final Push: feature branch and draft pull
+  request into protected `main`.
+
 ## 2026-08-24
 
 - Pinned personal chezmoi `sourceDir` to

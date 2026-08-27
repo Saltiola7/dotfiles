@@ -3,8 +3,10 @@
 {{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
-sourceDir = "{{ .chezmoi.homeDir }}/.local/share/chezmoi"
+sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}"{{ .chezmoi.homeDir }}/.local/share/chezmoi"{{ end }}
 encryption = "age"
+[edit]
+    hardlink = {{ if eq $machineType "mac-mini" }}false{{ else }}true{{ end }}
 [age]
     identity = "~/.config/chezmoi/key.txt"
     recipient = "age1agtsh9jxq93rdl68mtjmf9g8qwp3da89xdvkdculnv894aepd4us4m5rdm"
