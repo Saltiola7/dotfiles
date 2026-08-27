@@ -25,6 +25,43 @@ install_release() {
     rm -f "$archive"
 }
 
+install_yazi() {
+    archive="$tmp/yazi.zip"
+    curl --proto '=https' --tlsv1.2 -fsSL \
+      https://github.com/sxyazi/yazi/releases/download/v26.8.15/yazi-aarch64-unknown-linux-gnu.zip \
+      -o "$archive"
+    printf '%s  %s\n' f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1 "$archive" | sha256sum -c -
+    unzip -q "$archive" -d "$tmp"
+    install -m 0755 "$tmp/yazi-aarch64-unknown-linux-gnu/yazi" "$bin/yazi"
+    install -m 0755 "$tmp/yazi-aarch64-unknown-linux-gnu/ya" "$bin/ya"
+}
+
+install_xz_release() {
+    name=$1
+    url=$2
+    digest=$3
+    member=$4
+    archive="$tmp/$name.tar.xz"
+    curl --proto '=https' --tlsv1.2 -fsSL "$url" -o "$archive"
+    printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
+    tar -xJf "$archive" -C "$tmp" "$member"
+    install -m 0755 "$tmp/$member" "$bin/$name"
+}
+
+install_yazi
+install_release fd \
+  https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-unknown-linux-gnu.tar.gz \
+  c0ee43802e3313a317c5af2f4eabd6ba13eeedd595af9775f05e18a13ac4f52c \
+  fd-v10.5.0-aarch64-unknown-linux-gnu/fd
+install_release fzf \
+  https://github.com/junegunn/fzf/releases/download/v0.74.3/fzf-0.74.3-linux_arm64.tar.gz \
+  4a17a17b46bd0c4873e995533de508995c11572c0be0664a5dbcf13f60463046 \
+  fzf
+install_xz_release 7zz \
+  https://github.com/ip7z/7zip/releases/download/26.02/7z2602-linux-arm64.tar.xz \
+  70ea6cc737ae1495ea2d7eb20ef3120fe579bd3f1a83a9d2362b62ec5bde2bba \
+  7zz
+
 install_release atuin \
   https://github.com/atuinsh/atuin/releases/download/v18.17.1/atuin-aarch64-unknown-linux-gnu.tar.gz \
   9412210a9cdd6d0ff7635693e940096d82b368628326d334d27a8ca0ba173b0f \

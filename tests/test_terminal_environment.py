@@ -38,6 +38,111 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "/opt/homebrew" in macos
 
 
+def test_yazi_is_managed_across_terminal_targets(tmp_path):
+    brewfile = text("Brewfile")
+    for formula in ("yazi", "sevenzip", "fd", "ripgrep", "resvg"):
+        assert f'brew "{formula}"' in brewfile
+
+    installer = text("run_onchange_install-lmsh-terminal.sh.tmpl")
+    for asset in (
+        "yazi-aarch64-unknown-linux-gnu.zip",
+        "fd-v10.5.0-aarch64-unknown-linux-gnu.tar.gz",
+        "fzf-0.74.3-linux_arm64.tar.gz",
+        "7z2602-linux-arm64.tar.xz",
+    ):
+        assert asset in installer
+    for digest in (
+        "f5a85771f06bb0e8c488136ae0aedaec8d341a7cee995549df391d7d852fe8d1",
+        "c0ee43802e3313a317c5af2f4eabd6ba13eeedd595af9775f05e18a13ac4f52c",
+        "4a17a17b46bd0c4873e995533de508995c11572c0be0664a5dbcf13f60463046",
+        "70ea6cc737ae1495ea2d7eb20ef3120fe579bd3f1a83a9d2362b62ec5bde2bba",
+    ):
+        assert digest in installer
+    assert "sudo" not in installer
+    assert "dnf" not in installer
+
+    ignored = text(".chezmoiignore")
+    lmsh = ignored.split('{{ if eq .machine_type "lmsh" }}', 1)[1].split(
+        "{{ end }}", 1
+    )[0]
+    rules = {line.strip() for line in lmsh.splitlines() if line.strip()}
+    assert rules == {
+        "*",
+        ".config/*",
+        ".config/atuin/*",
+        ".config/yazi/flavors/",
+        "!.bash_profile",
+        "!.bashrc",
+        "!.common_profile",
+        "!.config/",
+        "!.config/atuin/",
+        "!.config/atuin/config.toml",
+        "!.config/starship.toml",
+        "!.config/yazi/",
+        "!.config/yazi/package.toml",
+        "!.config/yazi/theme.toml",
+        "!install-lmsh-terminal.sh",
+        "!install-yazi-flavor.sh",
+    }
+
+    theme = text("private_dot_config/yazi/theme.toml")
+    assert theme.strip() == '[flavor]\ndark = "catppuccin-mocha"'
+    package = text("private_dot_config/yazi/package.toml")
+    assert 'use = "yazi-rs/flavors:catppuccin-mocha"' in package
+    assert 'rev = "=' in package
+    flavor_installer = text("run_onchange_after_install-yazi-flavor.sh.tmpl")
+    assert '{{ include "private_dot_config/yazi/package.toml" | sha256sum }}' in flavor_installer
+    assert "ya pkg install" in flavor_installer
+
+    profile = text("dot_common_profile.tmpl")
+    wrapper = profile.split("# BEGIN_YAZI_WRAPPER", 1)[1].split(
+        "# END_YAZI_WRAPPER", 1
+    )[0]
+    assert "command yazi" in wrapper
+    assert '--cwd-file="$tmp"' in wrapper
+    assert 'builtin cd -- "$cwd"' in wrapper
+    assert 'command rm -f -- "$tmp"' in wrapper
+
+    start = tmp_path / "start"
+    target = tmp_path / "target"
+    start.mkdir()
+    target.mkdir()
+    fake_yazi = tmp_path / "yazi"
+    fake_yazi.write_text(
+        "#!/bin/sh\n"
+        "for arg do\n"
+        "  case $arg in --cwd-file=*) cwd=${arg#*=} ;; esac\n"
+        "done\n"
+        'printf %s "${YAZI_TEST_CWD:-}" > "$cwd"\n'
+    )
+    fake_yazi.chmod(0o755)
+    command = wrapper + '\ncd "$START"\ny >/dev/null\npwd\n'
+    env = os.environ | {
+        "PATH": f"{tmp_path}:{os.environ['PATH']}",
+        "START": str(start),
+        "YAZI_TEST_CWD": str(target),
+    }
+    changed = subprocess.run(
+        ["bash", "-c", command], env=env, check=True, capture_output=True, text=True
+    )
+    assert changed.stdout.strip() == str(target)
+
+    unchanged = subprocess.run(
+        ["bash", "-c", command],
+        env=env | {"YAZI_TEST_CWD": ""},
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert unchanged.stdout.strip() == str(start)
+
+    xonsh = text("dot_xonshrc.tmpl")
+    assert "def _y(args):" in xonsh
+    assert 'aliases["y"] = _y' in xonsh
+    assert "--cwd-file={tmp}" in xonsh
+    assert "os.chdir(cwd)" in xonsh
+
+
 def test_marimo_uses_pinned_catppuccin_mocha():
     config = text("private_dot_config/marimo/marimo.toml.tmpl")
     assert 'theme = "dark"' in config
@@ -263,7 +368,12 @@ def test_lmsh_targets_are_deny_by_default():
         "!.config/atuin/",
         "!.config/atuin/config.toml",
         "!.config/starship.toml",
+        "!.config/yazi/",
+        ".config/yazi/flavors/",
+        "!.config/yazi/package.toml",
+        "!.config/yazi/theme.toml",
         "!install-lmsh-terminal.sh",
+        "!install-yazi-flavor.sh",
     }
 
 
