@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-019-yazi-terminal-file-manager | Install Yazi with portable shell cwd integration and Catppuccin Mocha | medium | active | none | Brewfile; shell templates; lmsh installer; Yazi config; terminal tests | shell auth startup profile; upstream Yazi docs | no | Shared shell and lifecycle artifacts require serial ownership | M | rendered shells; pytest; macOS and Fedora arm64 smoke |
 
 ## Completed
 
