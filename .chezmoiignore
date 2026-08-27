@@ -21,7 +21,12 @@ Library/LaunchAgents/dev.dotfiles.colima-atuin.plist
 .config/atuin/*
 !.config/atuin/config.toml
 !.config/starship.toml
+!.config/yazi/
+.config/yazi/flavors/
+!.config/yazi/package.toml
+!.config/yazi/theme.toml
 !install-lmsh-terminal.sh
+!install-yazi-flavor.sh
 {{ end }}
 docs/
 tests/

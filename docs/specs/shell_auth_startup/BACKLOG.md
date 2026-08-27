@@ -2,13 +2,13 @@
 
 ## Active
 
-| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+None.
 
 ## Completed
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| AUTH-019-yazi-terminal-file-manager | Installed Yazi with portable cwd wrappers, pinned Fedora arm64 binaries, and locked Catppuccin Mocha on both Macs and both managed guests | 2026-08-26 | `5a4a345`, `9aa14a9` |
 | AUTH-018-marimo-theme-source-root | Made the Mac mini external checkout authoritative, preserved the retired home clone's unique work, and applied pinned Catppuccin Mocha to marimo | 2026-08-26 | `03ad052`, `65a8283`, `59b9066` |
 | AUTH-017-personal-source-root | Pinned the personal chezmoi source beneath each user's home independently of scoped XDG data | 2026-08-24 | `999d6f8` |
 | AUTH-014-lima-atuin-recovery | Moved native Lima and Colima state externally, rebuilt shared Atuin sync from surviving clients, added guarded restart and cold restore, and reconciled PyCharm log routing | 2026-08-09 | `3fc478e..ce91840` |

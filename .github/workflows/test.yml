@@ -19,9 +19,12 @@ on:
       - "dot_bash_profile.tmpl"
       - "dot_bashrc.tmpl"
       - "dot_common_profile.tmpl"
+      - "dot_xonshrc.tmpl"
       - "private_dot_config/atuin/**"
       - "private_dot_config/atuin-server/**"
       - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "run_onchange_after_install-yazi-flavor.sh.tmpl"
+      - "private_dot_config/yazi/**"
       - "docs/specs/shell_auth_startup/**"
   pull_request:
     paths:
@@ -39,9 +42,12 @@ on:
       - "dot_bash_profile.tmpl"
       - "dot_bashrc.tmpl"
       - "dot_common_profile.tmpl"
+      - "dot_xonshrc.tmpl"
       - "private_dot_config/atuin/**"
       - "private_dot_config/atuin-server/**"
       - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "run_onchange_after_install-yazi-flavor.sh.tmpl"
+      - "private_dot_config/yazi/**"
       - "docs/specs/shell_auth_startup/**"
 
 jobs:

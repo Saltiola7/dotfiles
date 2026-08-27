@@ -1,0 +1,10 @@
+#!/bin/sh
+# package.toml hash: {{ include "private_dot_config/yazi/package.toml" | sha256sum }}
+set -eu
+
+if ! command -v ya >/dev/null 2>&1; then
+    echo "Skipping Yazi flavor install: ya is unavailable." >&2
+    exit 0
+fi
+
+ya pkg install

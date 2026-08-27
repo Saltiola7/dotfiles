@@ -4,6 +4,19 @@
 # Keep Atuin on its native durable path when a scoped tool overrides XDG_DATA_HOME.
 export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"
 
+# BEGIN_YAZI_WRAPPER
+if command -v yazi >/dev/null 2>&1; then
+  y() {
+    local tmp cwd
+    tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
+    command yazi "$@" --cwd-file="$tmp"
+    IFS= read -r -d '' cwd < "$tmp"
+    [ "$cwd" != "$PWD" ] && [ -d "$cwd" ] && builtin cd -- "$cwd" || builtin true
+    command rm -f -- "$tmp"
+  }
+fi
+# END_YAZI_WRAPPER
+
 {{ if eq .machine_type "lmsh" -}}
 export PATH="{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
 alias vim='nvim'

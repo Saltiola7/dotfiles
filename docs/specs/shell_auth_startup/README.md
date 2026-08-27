@@ -15,9 +15,11 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-018-marimo-theme-source-root` is routine
-managed-configuration work. No progressive module applies. Release is not
-applicable; Deploy, Operate, Maintain/Retire, and Review/Integrate are required.
+Current cycle `AUTH-019-yazi-terminal-file-manager` is routine
+managed-configuration work. It adds an on-demand terminal file manager without
+changing authentication, secrets, or services. No progressive module applies.
+Release and Operate are not applicable; Deploy, Maintain/Retire, and
+Review/Integrate are required.
 
 ## Domain
 
@@ -36,6 +38,12 @@ Entities:
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
 - `TerminalProfile`: portable Bash, Atuin, zoxide, and Starship configuration
   selected by chezmoi machine intent and operating system.
+- `TerminalFileManager`: Yazi plus the command-line tools available to its
+  search, navigation, archive, and preview adapters.
+- `CwdWrapper`: shell-local `y` command that adopts Yazi's final directory when
+  the user exits with `q` and preserves the original directory with `Q`.
+- `YaziFlavor`: locked Catppuccin Mocha package selected by Yazi's dark flavor
+  setting.
 - `ExternalCacheRoot`: mounted Mac mini cache storage below `/Volumes/ext/state/cache`.
 - `NativeCacheClient`: Playwright, uv, pre-commit, or npm configured
   through its supported cache-path interface.
@@ -82,6 +90,8 @@ Events:
 - `AtuinServerUnavailable`
 - `HostedHistoryMigrated`
 - `AtuinRegistrationClosed`
+- `TerminalFileManagerInstalled`
+- `TerminalFileManagerExited`
 
 Glossary:
 - **Startup-safe**: shell/profile path must not block on interactive auth or network credentials.
@@ -252,6 +262,43 @@ Glossary:
 - And unrelated files and scripts remain ignored even when later added to the
   personal source
 
+**Scenario: Managed workstations launch Yazi with the practical tool set**
+- Given `machine_type` is `macbook` or `mac-mini`
+- When chezmoi applies the personal source
+- Then Homebrew installs Yazi, 7-Zip, fd, ripgrep, and resvg
+- And Yazi reuses the managed ffmpeg, jq, Poppler, fzf, zoxide, ImageMagick, and
+  Nerd Font dependencies already present
+- And Kitty requires no Yazi-specific configuration
+
+**Scenario: Portable guests launch Yazi without privileged installation**
+- Given Fedora arm64 has `machine_type=lmsh`
+- When chezmoi applies the portable terminal subset
+- Then pinned Yazi, fd, fzf, and 7-Zip binaries install below `~/.local/bin`
+- And Yazi reuses the guest's existing file, jq, and ripgrep commands
+- And no package manager or privileged command runs
+
+**Scenario: Yazi adopts its final directory**
+- Given an interactive Bash, Zsh, or Xonsh shell has Yazi installed
+- When the user launches `y` and exits with `q`
+- Then `CwdWrapper` changes the parent shell to Yazi's final directory
+- And exiting with `Q` leaves the parent shell directory unchanged
+- And the temporary cwd file is removed after Yazi exits
+
+**Scenario: Yazi uses Catppuccin Mocha**
+- Given the locked `YaziFlavor` is installed
+- When Yazi starts in dark mode
+- Then it selects `catppuccin-mocha`
+- And package installation uses the revision and hash recorded in managed
+  `package.toml`
+
+**Scenario: Guest preview helper is unavailable**
+- Given Yazi runs inside an `lmsh` guest
+- And Poppler, ffmpeg, resvg, or ImageMagick is absent in that guest
+- When Yazi encounters the corresponding PDF, video, SVG, or advanced image
+- Then the unsupported preview is unavailable without affecting navigation,
+  search, archive handling, or file opening
+- And host-side preview tools are not treated as guest executables
+
 ### Feature: Private self-hosted history sync
 
 ### Feature: Native external caches
@@ -387,6 +434,16 @@ Glossary:
 - **Invariant:** optional shell tools are command-guarded.
 - **Invariant:** the lmsh target excludes SSH private keys, GitHub credentials,
   1Password integration, GUI applications, and macOS service configuration.
+- **Invariant:** Yazi and its shell wrappers are owned by this personal source;
+  the external `dotfiles-ai` source remains unchanged.
+- **Invariant:** macOS uses Homebrew for Yazi and the practical dependency set.
+- **Invariant:** lmsh installs pinned upstream arm64 binaries without root access
+  and does not install media, PDF, SVG, or advanced-image preview helpers.
+- **Invariant:** `yazi` and `ya` have exactly matching versions.
+- **Invariant:** `CwdWrapper` validates that Yazi's returned path is a directory
+  before changing the parent shell directory and removes its temporary file.
+- **Invariant:** `YaziFlavor` is locked by revision and content hash; managed
+  `theme.toml` contains only the dark flavor selection.
 - **Invariant:** external CLI cache exports are Mac-mini-only and require the
   existing `/Volumes/ext/state/.dotfiles-ai-state` sentinel.
 - **Invariant:** `LIMA_HOME`, `COLIMA_HOME`, and `COLIMA_CACHE_HOME` are
@@ -409,8 +466,8 @@ Glossary:
   activation checks before internal rollback copies may be removed.
 - **Invariant:** `TerminalTargetAllowlist` denies all targets by default and
   re-includes only `.bash_profile`, `.bashrc`, `.common_profile`,
-  `.config/atuin/config.toml`, `.config/starship.toml`, and
-  `install-lmsh-terminal.sh`.
+  `.config/atuin/config.toml`, `.config/starship.toml`, Yazi configuration, the
+  Yazi flavor installer, and `install-lmsh-terminal.sh`.
 
 ### AtuinServer
 - **Invariant:** server and clients use pinned compatible Atuin `18.17.1`.
@@ -477,6 +534,13 @@ Glossary:
 - Pytest verifies lmsh exclusions, command guards, pinned assets, loopback-only
   Compose, closed-by-default registration, and bounded Atuin configuration.
 - Pytest verifies machine-specific source selection and the pinned marimo theme.
+- Pytest verifies managed Yazi packages, pinned lmsh assets, the restricted
+  target allowlist, Catppuccin Mocha selection, and Bash/Zsh/Xonsh wrappers.
+- Rendered shell checks and focused wrapper tests prove `y` adopts a valid final
+  directory, preserves the current directory otherwise, and removes its
+  temporary cwd file.
+- `ya pkg list`, `yazi --version`, and `ya --version` verify the locked flavor
+  and matching CLI versions after deployment.
 - Rendered config and browser-computed CSS verify dark mode and the Mocha base
   palette after targeted deployment.
 - `docker compose config` validates the rendered service.
@@ -498,6 +562,11 @@ Glossary:
 | Schema | not_applicable: no persistent schema exists. |
 | Dependency/deployment | required: AUTH-014 moves Lima and Colima state to an external APFS volume and replaces the failing Homebrew service with a guarded login service. |
 | Quantitative | not_applicable: no decision depends on quantitative evidence. |
+
+AUTH-019 adds no required visual. Package ownership, cwd handoff, and the
+macOS/lmsh capability difference are fully represented by behavior and contract
+text; no spatial, state, trust, schema, quantitative, or deployment decision is
+made clearer by another diagram.
 
 ```mermaid
 flowchart LR
