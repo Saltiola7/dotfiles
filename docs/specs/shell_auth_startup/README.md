@@ -15,9 +15,9 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-017-personal-source-root` is routine managed-configuration
-work. No progressive module applies. Release is not applicable; Deploy, Operate,
-Maintain/Retire, and Review/Integrate are required.
+Current cycle `AUTH-018-marimo-theme-source-root` is routine
+managed-configuration work. No progressive module applies. Release is not
+applicable; Deploy, Operate, Maintain/Retire, and Review/Integrate are required.
 
 ## Domain
 
@@ -28,8 +28,9 @@ Entities:
 - `SecretLoader`: sourceable `secret` command that exports credentials into current shell.
 - `OnePasswordCommand`: `op` CLI command that can require app integration or biometric approval.
 - `TemplateRenderer`: chezmoi render path that must not require live 1Password access.
-- `PersonalSourceRoot`: the personal source checkout below the executing user's
-  home, independent of a scoped tool's XDG data location.
+- `PersonalSourceRoot`: the authoritative personal source checkout on the Mac
+  mini external volume, with a portable home-directory checkout on other
+  machines.
 - `HerdrPane`: restored or newly opened Herdr pane with `HERDR_ENV` set.
 - `HerdrServer`: persistent pane owner configured by the external `dotfiles-ai` source and launched in the macOS Aqua bootstrap context.
 - `ClockifyPoller`: SketchyBar plugin that checks current Clockify timer.
@@ -101,12 +102,26 @@ Glossary:
 - Then no `SecretLoader` runs automatically
 - And no `OnePasswordCommand` runs from shell startup
 
-**Scenario: Scoped tool environment preserves the personal chezmoi source**
+**Scenario: Mac mini uses the authoritative external source**
 - Given a parent tool exports a component-specific `XDG_DATA_HOME`
-- And the personal source exists at `${HOME}/.local/share/chezmoi`
+- And `machine_type=mac-mini`
 - When the user invokes plain `chezmoi`
-- Then chezmoi resolves `PersonalSourceRoot` under that user's home
+- Then chezmoi resolves `PersonalSourceRoot` as
+  `/Volumes/ext/git/Personal/dotfiles`
 - And it does not derive a second source checkout beneath the component XDG tree
+
+**Scenario: Other machines retain a portable personal source**
+- Given `machine_type` is not `mac-mini`
+- When the user invokes plain `chezmoi`
+- Then chezmoi resolves `PersonalSourceRoot` under
+  `${HOME}/.local/share/chezmoi`
+
+**Scenario: Marimo uses Catppuccin Mocha globally**
+- Given chezmoi applies the managed marimo configuration
+- When marimo starts on a managed workstation
+- Then marimo selects dark mode
+- And it loads the pinned Catppuccin Latte/Mocha stylesheet from the user's
+  marimo configuration directory
 
 **Scenario: Herdr server starts in the GUI security context**
 - Given the user has an active Aqua login session
@@ -317,9 +332,8 @@ Glossary:
 
 ### TemplateRenderer
 - **Invariant:** `chezmoi status` and `chezmoi apply` must not call template-time `onepasswordRead` for routine config files.
-- **Invariant:** `.chezmoi.toml.tmpl` renders `sourceDir` from
-  `.chezmoi.homeDir` as `<home>/.local/share/chezmoi`; no username, external
-  volume, or inherited XDG path is embedded.
+- **Invariant:** `.chezmoi.toml.tmpl` renders `/Volumes/ext/git/Personal/dotfiles`
+  for `machine_type=mac-mini` and `<home>/.local/share/chezmoi` otherwise.
 - **Compatibility:** the source pin does not choose the initial clone location;
   it preserves the canonical source after `chezmoi init` has rendered config.
 
@@ -459,6 +473,9 @@ Glossary:
 - Static search confirms Databricks config has no `onepasswordRead` call.
 - Pytest verifies lmsh exclusions, command guards, pinned assets, loopback-only
   Compose, closed-by-default registration, and bounded Atuin configuration.
+- Pytest verifies machine-specific source selection and the pinned marimo theme.
+- Rendered config and browser-computed CSS verify dark mode and the Mocha base
+  palette after targeted deployment.
 - `docker compose config` validates the rendered service.
 - Mac and both Lima clients resolve the tailnet endpoint and receive healthy
   HTTPS without a public or LAN listener.

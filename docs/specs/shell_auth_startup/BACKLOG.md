@@ -4,6 +4,7 @@
 
 | id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-018-marimo-theme-source-root | Make the Mac mini external dotfiles checkout authoritative and apply Catppuccin Mocha to marimo | P2 | active | AUTH-017-personal-source-root | `.chezmoi.toml.tmpl`, marimo config/theme, source-root contract | machine type, upstream theme | no | source migration and deployment share one ordering boundary | S | pytest, chezmoi render, marimo config, browser CSS |
 
 ## Completed
 
