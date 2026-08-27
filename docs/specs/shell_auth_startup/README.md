@@ -109,6 +109,7 @@ Glossary:
 - Then chezmoi resolves `PersonalSourceRoot` as
   `/Volumes/ext/git/Personal/dotfiles`
 - And it does not derive a second source checkout beneath the component XDG tree
+- And source editing does not require cross-filesystem hardlinks
 
 **Scenario: Other machines retain a portable personal source**
 - Given `machine_type` is not `mac-mini`
@@ -334,6 +335,8 @@ Glossary:
 - **Invariant:** `chezmoi status` and `chezmoi apply` must not call template-time `onepasswordRead` for routine config files.
 - **Invariant:** `.chezmoi.toml.tmpl` renders `/Volumes/ext/git/Personal/dotfiles`
   for `machine_type=mac-mini` and `<home>/.local/share/chezmoi` otherwise.
+- **Invariant:** chezmoi edit hardlinks are disabled only when the Mac mini uses
+  the external source because temporary storage is on another filesystem.
 - **Compatibility:** the source pin does not choose the initial clone location;
   it preserves the canonical source after `chezmoi init` has rendered config.
 
