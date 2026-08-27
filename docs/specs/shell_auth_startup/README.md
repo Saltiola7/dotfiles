@@ -536,8 +536,9 @@ Glossary:
 - Pytest verifies machine-specific source selection and the pinned marimo theme.
 - Pytest verifies managed Yazi packages, pinned lmsh assets, the restricted
   target allowlist, Catppuccin Mocha selection, and Bash/Zsh/Xonsh wrappers.
-- Rendered shell checks prove `q` adopts Yazi's final directory while `Q` does
-  not, and both paths remove the temporary cwd file.
+- Rendered shell checks and focused wrapper tests prove `y` adopts a valid final
+  directory, preserves the current directory otherwise, and removes its
+  temporary cwd file.
 - `ya pkg list`, `yazi --version`, and `ya --version` verify the locked flavor
   and matching CLI versions after deployment.
 - Rendered config and browser-computed CSS verify dark mode and the Mocha base

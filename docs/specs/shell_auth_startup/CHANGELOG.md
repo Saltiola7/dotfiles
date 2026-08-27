@@ -2,6 +2,19 @@
 
 ## 2026-08-26
 
+- Installed Yazi `26.8.15` on both managed Macs and both Fedora arm64 guests.
+  macOS uses the practical Homebrew tool set; guests use checksum-verified,
+  non-root Yazi, fd, fzf, and 7-Zip binaries under `~/.local/bin`.
+- Added portable Bash/Zsh and Xonsh `y` wrappers and locked the official
+  Catppuccin Mocha flavor at revision `20b47bf`. Kitty `0.48.2` and the shared
+  `dotfiles-ai` source remain unchanged; advanced guest previews remain out of
+  scope.
+- Validation: red-first regression evidence, 176 tests, rendered Bash/Zsh
+  syntax, Xonsh compilation, flavor lock installation, exact local apply, both
+  Mac deployments, and both guest checksum/version smokes pass. Gate Commits:
+  `5a4a345`, `9aa14a9`. Gate Exceptions: none. Intended Final Push: feature
+  branch and draft pull request into protected `main`.
+
 - Made `/Volumes/ext/git/Personal/dotfiles` the Mac-mini-only authoritative
   chezmoi source while other machines retain the portable home source. Disabled
   edit hardlinks for the external source after `chezmoi doctor` exposed the
