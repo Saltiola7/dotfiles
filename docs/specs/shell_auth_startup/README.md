@@ -15,9 +15,9 @@
 | Maintenance | Pin image and clients, review updates and accepted risks, retain rollback until restore is proven |
 | Authorities | Chezmoi rendering, shell syntax, pytest contracts, Compose validation, health/sync probes, lifecycle audit, and independent review |
 
-Current cycle `AUTH-019-yazi-terminal-file-manager` is routine
-managed-configuration work. It adds an on-demand terminal file manager without
-changing authentication, secrets, or services. No progressive module applies.
+Current cycle `AUTH-020-transfer-opencode-package-ownership` is routine
+managed-configuration work. It transfers package ownership without changing
+authentication, secrets, or services. No progressive module applies.
 Release and Operate are not applicable; Deploy, Maintain/Retire, and
 Review/Integrate are required.
 
@@ -51,6 +51,11 @@ Entities:
   selected through its supported `PULUMI_HOME` interface.
 - `TerminalTargetAllowlist`: deny-by-default set of files and scripts that the
   personal source may apply to an `lmsh` guest.
+- `OpenCodePackageOwner`: the external `dotfiles-ai` source that installs the
+  native OpenCode CLI; this personal source retains only desktop and shell
+  integration.
+- `OpenCodeWrapper`: shell function that resolves the managed local wrapper
+  before package-manager binaries even after later PATH changes.
 - `AtuinClient`: one machine-local history database, record store, encryption
   key, and authenticated sync session.
 - `AtuinServer`: pinned single-user container accepting authenticated encrypted
@@ -103,6 +108,17 @@ Glossary:
   companions when present.
 
 ## Behavior Scenarios
+
+**Scenario: Portable source owns the OpenCode CLI package**
+- Given `dotfiles-ai` installs the native OpenCode CLI
+- When this personal Brewfile is applied
+- Then it declares neither the OpenCode tap nor formula
+- And the separately owned OpenCode desktop cask remains installed
+
+**Scenario: Local OpenCode wrapper survives later PATH updates**
+- Given an executable `~/.local/bin/opencode` wrapper
+- When another package directory is prepended to PATH after shell startup
+- Then `opencode` still invokes the local wrapper with all arguments unchanged
 
 ### Feature: Startup-safe Herdr panes
 
@@ -432,6 +448,10 @@ Glossary:
 - **Invariant:** macOS rendering remains byte-compatible outside intentional
   Atuin endpoint and daemon changes.
 - **Invariant:** optional shell tools are command-guarded.
+- **Invariant:** `OpenCodePackageOwner` is `dotfiles-ai`; this source must not
+  declare the OpenCode tap or CLI formula.
+- **Invariant:** `OpenCodeWrapper` exists only when the local executable exists
+  and forwards its argument vector unchanged.
 - **Invariant:** the lmsh target excludes SSH private keys, GitHub credentials,
   1Password integration, GUI applications, and macOS service configuration.
 - **Invariant:** Yazi and its shell wrappers are owned by this personal source;
@@ -567,6 +587,9 @@ AUTH-019 adds no required visual. Package ownership, cwd handoff, and the
 macOS/lmsh capability difference are fully represented by behavior and contract
 text; no spatial, state, trust, schema, quantitative, or deployment decision is
 made clearer by another diagram.
+
+AUTH-020 changes package ownership and command resolution without changing a
+runtime boundary or interaction sequence, so no visual requires revision.
 
 ```mermaid
 flowchart LR

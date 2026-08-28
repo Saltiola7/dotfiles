@@ -1,5 +1,16 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-27
+
+- Removed duplicate ownership of the OpenCode tap and CLI formula after
+  `dotfiles-ai` adopted the official Homebrew package. Retained the separately
+  owned `opencode-desktop` cask.
+- Added a command-guarded shell function so the managed local wrapper remains
+  authoritative after later PATH updates. Validation: 13 terminal tests,
+  Bash/Zsh syntax, and live wrapper version checks pass. Gate Commits:
+  `080e64f`, `25bcdfa`. Gate Exceptions: none. Intended Final Push: feature
+  branch and draft pull request into protected `main`.
+
 ## 2026-08-26
 
 - Installed Yazi `26.8.15` on both managed Macs and both Fedora arm64 guests.

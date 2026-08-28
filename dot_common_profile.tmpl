@@ -29,9 +29,6 @@ export CARAPACE_BRIDGES="zsh,fish,bash,inshellisense"
 # Homebrew (must be early for brew commands to work)
 export PATH="/opt/homebrew/bin:$PATH"
 
-# Local bin
-export PATH="{{ .chezmoi.homeDir }}/.local/bin:$PATH"
-
 # Cargo / Rust
 export PATH="{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
 
@@ -103,6 +100,14 @@ alias py='python3'
 alias awslogin='~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606'
 export AWS_PROFILE="BedrockDeveloperAccess-302432775606"
 export AWS_REGION="us-west-2"
+
+# Local wrappers must win over package-manager binaries with the same name.
+export PATH="{{ .chezmoi.homeDir }}/.local/bin:$PATH"
+if [ -x "$HOME/.local/bin/opencode" ]; then
+    opencode() {
+        "$HOME/.local/bin/opencode" "$@"
+    }
+fi
 
 # Screaming Frog
 alias sf='/Applications/Screaming\ Frog\ SEO\ Spider.app/Contents/MacOS/ScreamingFrogSEOSpiderLauncher'
