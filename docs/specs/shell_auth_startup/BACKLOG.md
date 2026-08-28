@@ -2,7 +2,9 @@
 
 ## Active
 
-None.
+| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| AUTH-020-transfer-opencode-package-ownership | Transfer OpenCode package ownership | high | active | DAI-032 | Brewfile; common profile; terminal tests | dotfiles-ai package contract | no | Shared package ownership requires serial migration | S | pytest; rendered shell; live wrapper |
 
 ## Completed
 
