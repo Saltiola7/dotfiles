@@ -38,6 +38,31 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     assert "/opt/homebrew" in macos
 
 
+def test_opencode_wrapper_survives_later_path_updates(tmp_path):
+    profile = text("dot_common_profile.tmpl")
+    lines = profile.splitlines()
+    start = lines.index("    opencode() {")
+    function = "\n".join(line[4:] for line in lines[start : start + 3])
+    wrapper = tmp_path / ".local/bin/opencode"
+    native = tmp_path / "homebrew/opencode"
+    wrapper.parent.mkdir(parents=True)
+    native.parent.mkdir()
+    wrapper.write_text('#!/bin/sh\nprintf "wrapper %s\\n" "$*"\n')
+    native.write_text('#!/bin/sh\nprintf "native %s\\n" "$*"\n')
+    wrapper.chmod(0o755)
+    native.chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", "-c", f'{function}\nPATH="{native.parent}:$PATH" opencode --version'],
+        check=True,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "HOME": str(tmp_path)},
+    )
+
+    assert result.stdout == "wrapper --version\n"
+
+
 def test_yazi_is_managed_across_terminal_targets(tmp_path):
     brewfile = text("Brewfile")
     for formula in ("yazi", "sevenzip", "fd", "ripgrep", "resvg"):
