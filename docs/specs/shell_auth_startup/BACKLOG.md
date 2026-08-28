@@ -2,14 +2,13 @@
 
 ## Active
 
-| id | title | priority | status | depends_on | owns | reads | parallel_safe | reason | effort | validation |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| AUTH-020-transfer-opencode-package-ownership | Transfer OpenCode package ownership | high | active | DAI-032 | Brewfile; common profile; terminal tests | dotfiles-ai package contract | no | Shared package ownership requires serial migration | S | pytest; rendered shell; live wrapper |
+None.
 
 ## Completed
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| AUTH-020-transfer-opencode-package-ownership | Delegated the OpenCode CLI formula to dotfiles-ai while preserving the desktop cask and local wrapper precedence | 2026-08-27 | `080e64f`, `25bcdfa` |
 | AUTH-019-yazi-terminal-file-manager | Installed Yazi with portable cwd wrappers, pinned Fedora arm64 binaries, and locked Catppuccin Mocha on both Macs and both managed guests | 2026-08-26 | `5a4a345`, `9aa14a9` |
 | AUTH-018-marimo-theme-source-root | Made the Mac mini external checkout authoritative, preserved the retired home clone's unique work, and applied pinned Catppuccin Mocha to marimo | 2026-08-26 | `03ad052`, `65a8283`, `59b9066` |
 | AUTH-017-personal-source-root | Pinned the personal chezmoi source beneath each user's home independently of scoped XDG data | 2026-08-24 | `999d6f8` |

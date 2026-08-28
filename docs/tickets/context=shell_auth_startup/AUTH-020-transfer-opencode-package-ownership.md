@@ -5,7 +5,7 @@ slug: transfer-opencode-package-ownership
 context: shell_auth_startup
 title: Transfer OpenCode package ownership
 kind: story
-state: ready
+state: done
 priority: high
 points: 2
 depends_on: []
@@ -23,8 +23,10 @@ validation:
   - live OpenCode wrapper version check
 created: 2026-08-27
 updated: 2026-08-27
-completed: null
-commits: []
+completed: 2026-08-27
+commits:
+  - 080e64f3694cc82d7650d2f5ef5c26b57c47ffea
+  - 25bcdfa1a269df84468f972c4887617991be95ed
 jira_publications: []
 migration: null
 ---
@@ -59,8 +61,12 @@ application ownership.
 
 ## Evidence
 
-Record red-first wrapper evidence, terminal tests, rendered shell syntax, and a
-live version check.
+- Red-first wrapper evidence `ev-0e53573c29dc4aa598eb8b9f5e7ff83d` failed
+  before implementation; all 13 terminal tests pass afterward.
+- Rendered Bash and Zsh syntax checks pass. The Brewfile retains
+  `opencode-desktop` and contains no OpenCode CLI tap or formula.
+- The live shell resolves the managed local wrapper and reports the installed
+  OpenCode version without bypassing centralized state.
 
 ## Risks
 
@@ -69,4 +75,5 @@ Its absence falls back to normal command resolution.
 
 ## Review
 
-Confirm single package ownership, desktop retention, and argument safety.
+Single package ownership, desktop retention, argument forwarding, and fallback
+when the local wrapper is absent were reviewed.
