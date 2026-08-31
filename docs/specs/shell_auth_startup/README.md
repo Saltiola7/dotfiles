@@ -21,6 +21,12 @@ authentication, secrets, or services. No progressive module applies.
 Release and Operate are not applicable; Deploy, Maintain/Retire, and
 Review/Integrate are required.
 
+The approved Fedora Parallels Initiative adds a dependency-gated full workstation
+profile specified in
+[`features/fedora-workstation.md`](features/fedora-workstation.md). It does not
+change the delivered `lmsh` allowlist or existing macOS behavior until its exact
+Build slice is approved and deployed.
+
 ## Domain
 
 Bounded context: shell authentication startup for interactive panes, agents, and status-bar plugins.
