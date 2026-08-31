@@ -1,5 +1,14 @@
 # Shell Auth Startup Changelog
 
+## 2026-08-31
+
+- Captured the dependency-gated `fedora-workstation` personal profile contract,
+  including shell/desktop ownership, native external state, guest-local
+  1Password and Tailscale enrollment, isolated Atuin sync, manual updates, cache
+  reset, and cross-source target separation.
+- No managed target or live machine changed; implementation remains Initiative
+  receipt- and approval-gated.
+
 ## 2026-08-27
 
 - Removed duplicate ownership of the OpenCode tap and CLI formula after
