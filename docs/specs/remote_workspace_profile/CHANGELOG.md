@@ -1,5 +1,17 @@
 # Remote Workspace Profile Changelog
 
+## 2026-09-01 - Owner Yazi Overlay
+
+- Added explicit `machine_type=remote-workspace` rendering for only Yazi
+  package/theme configuration, the locked flavor, and checksum-pinned x86_64
+  Yazi, `ya`, fd, fzf, and 7-Zip installation.
+- Proved empty rendered and installed intersections with `dotfiles-ai` commit
+  `58833a2`, unchanged macOS and `lmsh` rendering, an empty second apply, and
+  rollback preservation in disposable CentOS Stream 10 x86_64.
+- Full repository pytest passed with 181 tests. No gate exception, release, or
+  live owner deployment occurred. Implementation Gate Commit: `d41c639`.
+  Intended delivery is a draft pull request to `Saltiola7/dotfiles` `main`.
+
 ## 2026-09-01 - Yazi-Only Ownership Readiness
 
 - Assigned Bash, Atuin, and Starship exclusively to the shared `dotfiles-ai`
