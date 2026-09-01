@@ -1,0 +1,57 @@
+#!/bin/sh
+# yazi: 26.8.15; fd: 10.5.0; fzf: 0.74.3; 7-Zip: 26.02
+set -eu
+
+{{ if ne .machine_type "remote-workspace" -}}
+exit 0
+{{ else -}}
+test "$(uname -s)" = Linux
+test "$(uname -m)" = x86_64
+
+bin="$HOME/.local/bin"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+mkdir -p "$bin"
+
+install_release() {
+    name=$1
+    url=$2
+    digest=$3
+    member=$4
+    archive="$tmp/$name.tar.gz"
+    curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors "$url" -o "$archive"
+    printf '%s  %s\n' "$digest" "$archive" | sha256sum -c -
+    tar -xzf "$archive" -C "$tmp" "$member"
+    install -m 0755 "$tmp/$member" "$bin/.$name.new"
+    mv -f "$bin/.$name.new" "$bin/$name"
+}
+
+yazi_archive="$tmp/yazi.zip"
+curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors \
+  https://github.com/sxyazi/yazi/releases/download/v26.8.15/yazi-x86_64-unknown-linux-musl.zip \
+  -o "$yazi_archive"
+printf '%s  %s\n' a6702034790afcdbb546b73b288c9b184a751fa3f2f17f0ad4d26fc302fb8d45 "$yazi_archive" | sha256sum -c -
+python3 -m zipfile -e "$yazi_archive" "$tmp"
+for name in yazi ya; do
+    install -m 0755 "$tmp/yazi-x86_64-unknown-linux-musl/$name" "$bin/.$name.new"
+    mv -f "$bin/.$name.new" "$bin/$name"
+done
+
+install_release fd \
+  https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-unknown-linux-gnu.tar.gz \
+  a1259cd129636efbc3fef123525c1b49e88fe5088c012630983c310e52fdfa95 \
+  fd-v10.5.0-x86_64-unknown-linux-gnu/fd
+install_release fzf \
+  https://github.com/junegunn/fzf/releases/download/v0.74.3/fzf-0.74.3-linux_amd64.tar.gz \
+  3501a595e4b5c40a6b047340a0e8f805c46fd4e61ef95ef8a136ba8c61cf6f22 \
+  fzf
+
+archive="$tmp/7zz.tar.xz"
+curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --retry-all-errors \
+  https://github.com/ip7z/7zip/releases/download/26.02/7z2602-linux-x64.tar.xz \
+  -o "$archive"
+printf '%s  %s\n' 41aaba7b1235304ab5aa0624530c67ae829496cd29e875925271efdccc28c03e "$archive" | sha256sum -c -
+tar -xJf "$archive" -C "$tmp" 7zz
+install -m 0755 "$tmp/7zz" "$bin/.7zz.new"
+mv -f "$bin/.7zz.new" "$bin/7zz"
+{{ end -}}

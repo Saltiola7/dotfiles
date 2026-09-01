@@ -1,6 +1,6 @@
 {{- $name := promptStringOnce . "name" "Your full name" "" -}}
 {{- $email := promptStringOnce . "email" "Your email address" "" -}}
-{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh)" "macbook" -}}
+{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
 sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}"{{ .chezmoi.homeDir }}/.local/share/chezmoi"{{ end }}

@@ -28,6 +28,17 @@ Library/LaunchAgents/dev.dotfiles.colima-atuin.plist
 !install-lmsh-terminal.sh
 !install-yazi-flavor.sh
 {{ end }}
+{{ if eq .machine_type "remote-workspace" }}
+*
+!.config/
+.config/*
+!.config/yazi/
+.config/yazi/flavors/
+!.config/yazi/package.toml
+!.config/yazi/theme.toml
+!install-remote-workspace-yazi.sh
+!install-yazi-flavor.sh
+{{ end }}
 docs/
 tests/
 pyproject.toml

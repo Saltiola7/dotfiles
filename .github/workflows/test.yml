@@ -23,9 +23,11 @@ on:
       - "private_dot_config/atuin/**"
       - "private_dot_config/atuin-server/**"
       - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "run_onchange_install-remote-workspace-yazi.sh.tmpl"
       - "run_onchange_after_install-yazi-flavor.sh.tmpl"
       - "private_dot_config/yazi/**"
       - "docs/specs/shell_auth_startup/**"
+      - "docs/specs/remote_workspace_profile/**"
   pull_request:
     paths:
       - ".github/workflows/test.yml"
@@ -46,9 +48,11 @@ on:
       - "private_dot_config/atuin/**"
       - "private_dot_config/atuin-server/**"
       - "run_onchange_install-lmsh-terminal.sh.tmpl"
+      - "run_onchange_install-remote-workspace-yazi.sh.tmpl"
       - "run_onchange_after_install-yazi-flavor.sh.tmpl"
       - "private_dot_config/yazi/**"
       - "docs/specs/shell_auth_startup/**"
+      - "docs/specs/remote_workspace_profile/**"
 
 jobs:
   test:
