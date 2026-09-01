@@ -1,0 +1,451 @@
+#!/bin/sh
+set -eu
+
+VM_NAME="fedora-parallels"
+EXT_MOUNT="${FEDORA_PARALLELS_EXT_MOUNT:-/Volumes/ext}"
+PARALLELS_VOLUME="${FEDORA_PARALLELS_VOLUME:-/Volumes/Parallels}"
+APFS_CONTAINER="disk9"
+EXT_VOLUME_UUID="65AF3638-96BB-4F56-8259-38EA49F3F7DF"
+APFS_CONTAINER_UUID="936D6900-611B-4CA7-9C85-CC3FCD0B90E0"
+VOLUME_QUOTA_BYTES="214748364800"
+
+FEDORA_RELEASE="44-1.7"
+FEDORA_ISO="Fedora-Workstation-Live-${FEDORA_RELEASE}.aarch64.iso"
+FEDORA_CHECKSUM="Fedora-Workstation-44-1.7-aarch64-CHECKSUM"
+FEDORA_SHA256="162ba3c552a2d241c7c63ec26777af0255ee1b5a135adc0be986ceed999933ef"
+FEDORA_FINGERPRINT="36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6"
+FEDORA_BASE_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/44/Workstation/aarch64/iso"
+FEDORA_KEYRING_URL="https://fedoraproject.org/fedora.gpg"
+
+DISKUTIL="${FEDORA_PARALLELS_DISKUTIL:-/usr/sbin/diskutil}"
+PLUTIL="${FEDORA_PARALLELS_PLUTIL:-/usr/bin/plutil}"
+PRLCTL="${FEDORA_PARALLELS_PRLCTL:-/Applications/Parallels Desktop.app/Contents/MacOS/prlctl}"
+PRLSRVCTL="${FEDORA_PARALLELS_PRLSRVCTL:-/Applications/Parallels Desktop.app/Contents/MacOS/prlsrvctl}"
+CURL="${FEDORA_PARALLELS_CURL:-/usr/bin/curl}"
+GPG="${FEDORA_PARALLELS_GPG:-/opt/homebrew/bin/gpg}"
+GPGV="${FEDORA_PARALLELS_GPGV:-/opt/homebrew/bin/gpgv}"
+SHASUM="${FEDORA_PARALLELS_SHASUM:-/usr/bin/shasum}"
+JQ="${FEDORA_PARALLELS_JQ:-/opt/homebrew/bin/jq}"
+DF="${FEDORA_PARALLELS_DF:-/bin/df}"
+
+die() {
+    printf 'fedora-parallels: %s\n' "$*" >&2
+    exit 1
+}
+
+need() {
+    [ -x "$1" ] || die "required command is unavailable: $1"
+}
+
+plist_field() {
+    "$DISKUTIL" info -plist "$1" | "$PLUTIL" -extract "$2" raw -o - - 2>/dev/null
+}
+
+verify_external_volume() {
+    need "$DISKUTIL"
+    need "$PLUTIL"
+    [ "$(plist_field "$EXT_MOUNT" VolumeUUID)" = "$EXT_VOLUME_UUID" ] ||
+        die "external volume identity does not match $EXT_VOLUME_UUID"
+    [ "$(plist_field "$EXT_MOUNT" APFSContainerReference)" = "$APFS_CONTAINER" ] ||
+        die "external volume is not in APFS container $APFS_CONTAINER"
+    [ "$(plist_field "$EXT_MOUNT" FilesystemType)" = "apfs" ] ||
+        die "external volume is not APFS"
+    [ "$(plist_field "$EXT_MOUNT" MountPoint)" = "$EXT_MOUNT" ] ||
+        die "external volume is not mounted at $EXT_MOUNT"
+    [ "$(plist_field "$EXT_MOUNT" VolumeName)" = "ext" ] ||
+        die "external volume name is not ext"
+    [ "$(plist_field "$EXT_MOUNT" Internal)" = "false" ] ||
+        die "external volume unexpectedly reports internal storage"
+    [ "$(plist_field "$EXT_MOUNT" Encryption)" = "false" ] ||
+        die "external volume encryption differs from the approved topology"
+}
+
+verify_container() {
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT HUP INT TERM
+    "$DISKUTIL" apfs list -plist "$APFS_CONTAINER" >"$tmp"
+    uuid="$("$PLUTIL" -extract Containers.0.APFSContainerUUID raw -o - "$tmp" 2>/dev/null)"
+    [ "$uuid" = "$APFS_CONTAINER_UUID" ] || die "APFS container identity does not match"
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+}
+
+verify_parallels_volume() {
+    [ "$(plist_field "$PARALLELS_VOLUME" APFSContainerReference)" = "$APFS_CONTAINER" ] ||
+        die "Parallels volume is not in APFS container $APFS_CONTAINER"
+    [ "$(plist_field "$PARALLELS_VOLUME" FilesystemType)" = "apfs" ] ||
+        die "Parallels volume is not APFS"
+    [ "$(plist_field "$PARALLELS_VOLUME" MountPoint)" = "$PARALLELS_VOLUME" ] ||
+        die "Parallels volume is not mounted at $PARALLELS_VOLUME"
+    [ "$(plist_field "$PARALLELS_VOLUME" VolumeName)" = "Parallels" ] ||
+        die "Parallels volume name differs"
+    [ "$(plist_field "$PARALLELS_VOLUME" Internal)" = "false" ] ||
+        die "Parallels volume unexpectedly reports internal storage"
+    [ "$(plist_field "$PARALLELS_VOLUME" Encryption)" = "false" ] ||
+        die "Parallels volume must be unencrypted"
+    PARALLELS_VOLUME_UUID="$(plist_field "$PARALLELS_VOLUME" VolumeUUID)"
+    [ -n "$PARALLELS_VOLUME_UUID" ] || die "Parallels volume UUID is unavailable"
+}
+
+verify_parallels_quota() {
+    need "$JQ"
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT HUP INT TERM
+    "$DISKUTIL" apfs list -plist "$APFS_CONTAINER" >"$tmp"
+    count="$("$PLUTIL" -extract Containers.0.Volumes json -o - "$tmp" | "$JQ" -er 'if type == "array" then length else error("Volumes is not an array") end')" ||
+        die "cannot count APFS volumes"
+    index=0
+    matched=false
+    while [ "$index" -lt "$count" ]; do
+        name="$("$PLUTIL" -extract "Containers.0.Volumes.${index}.Name" raw -o - "$tmp" 2>/dev/null)" ||
+            die "APFS volume $index has no name"
+        uuid="$("$PLUTIL" -extract "Containers.0.Volumes.${index}.APFSVolumeUUID" raw -o - "$tmp" 2>/dev/null)" ||
+            die "APFS volume $index has no UUID"
+        if [ "$name" = "Parallels" ] && [ "$uuid" != "$PARALLELS_VOLUME_UUID" ]; then
+            die "another Parallels volume exists in the approved container"
+        fi
+        if [ "$uuid" = "$PARALLELS_VOLUME_UUID" ]; then
+            [ "$name" = "Parallels" ] || die "mounted Parallels volume metadata name differs"
+            quota="$("$PLUTIL" -extract "Containers.0.Volumes.${index}.CapacityQuota" raw -o - "$tmp" 2>/dev/null)"
+            [ "$quota" = "$VOLUME_QUOTA_BYTES" ] || die "Parallels volume quota is not 200 GiB"
+            role_count="$("$PLUTIL" -extract "Containers.0.Volumes.${index}.Roles" json -o - "$tmp" | "$JQ" -r length)" ||
+                die "cannot read Parallels volume roles"
+            [ "$role_count" -eq 0 ] || die "Parallels volume must not have an APFS role"
+            matched=true
+        fi
+        index=$((index + 1))
+    done
+    [ "$matched" = "true" ] || die "mounted Parallels volume UUID is missing from APFS metadata"
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+}
+
+verify_creation_snapshot() {
+    need "$JQ"
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT HUP INT TERM
+    "$DISKUTIL" apfs list -plist "$APFS_CONTAINER" >"$tmp"
+    uuid="$("$PLUTIL" -extract Containers.0.APFSContainerUUID raw -o - "$tmp" 2>/dev/null)" ||
+        die "cannot read APFS container UUID"
+    [ "$uuid" = "$APFS_CONTAINER_UUID" ] || die "APFS container identity changed before creation"
+    free="$("$PLUTIL" -extract Containers.0.CapacityFree raw -o - "$tmp" 2>/dev/null)" ||
+        die "cannot read APFS container capacity"
+    [ "$free" -ge "$VOLUME_QUOTA_BYTES" ] || die "APFS container has less than 200 GiB free"
+    count="$("$PLUTIL" -extract Containers.0.Volumes json -o - "$tmp" | "$JQ" -er 'if type == "array" then length else error("Volumes is not an array") end')" ||
+        die "cannot count APFS volumes"
+    index=0
+    while [ "$index" -lt "$count" ]; do
+        name="$("$PLUTIL" -extract "Containers.0.Volumes.${index}.Name" raw -o - "$tmp" 2>/dev/null)" ||
+            die "APFS volume $index has no name"
+        "${PLUTIL}" -extract "Containers.0.Volumes.${index}.APFSVolumeUUID" raw -o - "$tmp" >/dev/null 2>&1 ||
+            die "APFS volume $index has no UUID"
+        [ "$name" != "Parallels" ] || die "a Parallels volume already exists but is not mounted at $PARALLELS_VOLUME"
+        index=$((index + 1))
+    done
+    rm -f "$tmp"
+    trap - EXIT HUP INT TERM
+}
+
+require_parallels() {
+    need "$PRLCTL"
+    need "$PRLSRVCTL"
+    version="$("$PRLCTL" --help 2>&1)" || die "cannot read Parallels version"
+    printf '%s\n' "$version" | grep -Fq 'prlctl version 27.' || die "Parallels major version is not 27"
+    license="$("$PRLSRVCTL" info --license --json 2>/dev/null)" || die "cannot read Parallels license"
+    license_field() {
+        printf '%s\n' "$license" | "$PLUTIL" -extract "$1" raw -o - - 2>/dev/null
+    }
+    [ "$(license_field status)" = "ACTIVE" ] || die "Parallels is not activated"
+    [ "$(license_field edition)" = "pro" ] || die "Parallels Pro is required"
+    [ "$(license_field cpu_total)" -ge 8 ] || die "Parallels license does not allow the heavy CPU profile"
+    [ "$(license_field max_memory)" -ge 20480 ] || die "Parallels license does not allow the heavy memory profile"
+}
+
+require_create_capabilities() {
+    create_help="$("$PRLCTL" create --help 2>&1)"
+    disk_help="$("$PRLCTL" set --device-add-hdd --help 2>&1)"
+    share_help="$("$PRLCTL" set shared_folders --help 2>&1)"
+    startup_help="$("$PRLCTL" set startup --help 2>&1)"
+    for option in --distribution --dst --no-hdd; do
+        printf '%s\n' "$create_help" | grep -Fq -- "$option" || die "installed prlctl lacks $option"
+    done
+    for option in --image --type --size; do
+        printf '%s\n' "$disk_help" | grep -Fq -- "$option" || die "installed prlctl lacks disk option $option"
+    done
+    for option in --shf-host-add --path --mode; do
+        printf '%s\n' "$share_help" | grep -Fq -- "$option" || die "installed prlctl lacks share option $option"
+    done
+    for option in --autostart --startup-view; do
+        printf '%s\n' "$startup_help" | grep -Fq -- "$option" || die "installed prlctl lacks startup option $option"
+    done
+}
+
+filesystem_device() {
+    "$DF" -P "$1" | awk 'END { print $1 }'
+}
+
+verify_vm_paths() {
+    vm_directory="$HOME/Parallels"
+    data_disk="$PARALLELS_VOLUME/${VM_NAME}-data.hdd"
+    [ ! -L "$vm_directory" ] || die "internal VM directory must not be a symlink"
+    [ ! -L "$vm_directory/${VM_NAME}.pvm" ] || die "VM bundle path must not be a symlink"
+    [ ! -L "$data_disk" ] || die "data disk path must not be a symlink"
+    [ ! -e "$vm_directory/${VM_NAME}.pvm" ] || die "VM bundle path already exists"
+    [ ! -e "$data_disk" ] || die "data disk path already exists"
+    mkdir -p "$vm_directory"
+    home_device="$(filesystem_device "$HOME")"
+    [ -n "$home_device" ] || die "cannot identify the home filesystem"
+    [ "$(filesystem_device "$vm_directory")" = "$home_device" ] ||
+        die "VM directory is not on the home filesystem"
+    [ "$(plist_field "$home_device" Internal)" = "true" ] ||
+        die "VM root directory is not on internal storage"
+    [ "$(filesystem_device "$EXT_MOUNT/git")" = "$(filesystem_device "$EXT_MOUNT")" ] ||
+        die "host Git share is a nested filesystem"
+}
+
+iso_path() {
+    printf '%s/ISO/%s\n' "$PARALLELS_VOLUME" "$FEDORA_ISO"
+}
+
+verify_iso() {
+    iso="$(iso_path)"
+    [ -f "$iso" ] || die "Fedora ISO is missing: run prepare-image"
+    actual="$("$SHASUM" -a 256 "$iso" | cut -d ' ' -f 1)"
+    [ "$actual" = "$FEDORA_SHA256" ] || die "Fedora ISO SHA-256 does not match"
+}
+
+prepare_storage() {
+    verify_external_volume
+    verify_container
+    if "$DISKUTIL" info -plist "$PARALLELS_VOLUME" >/dev/null 2>&1; then
+        verify_parallels_volume
+        verify_parallels_quota
+        printf 'Parallels volume already exists and is valid.\n'
+        return
+    fi
+    [ ! -e "$PARALLELS_VOLUME" ] || die "$PARALLELS_VOLUME exists but is not the expected mounted volume"
+    verify_creation_snapshot
+    "$DISKUTIL" apfs addVolume "$APFS_CONTAINER" APFS Parallels -quota "$VOLUME_QUOTA_BYTES"
+    verify_parallels_volume
+    verify_parallels_quota
+    printf 'Created and verified %s.\n' "$PARALLELS_VOLUME"
+}
+
+prepare_image() {
+    verify_container
+    verify_parallels_volume
+    verify_parallels_quota
+    for command in "$CURL" "$GPG" "$GPGV" "$SHASUM"; do need "$command"; done
+    directory="$PARALLELS_VOLUME/ISO"
+    mkdir -p "$directory"
+    tmp="$(mktemp -d "$directory/.verify.XXXXXX")"
+    trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+    "$CURL" --proto '=https' --tlsv1.2 -fL "$FEDORA_KEYRING_URL" -o "$tmp/fedora.gpg"
+    "$GPG" --batch --show-keys --with-colons "$tmp/fedora.gpg" |
+        awk -F: '$1 == "fpr" { print $10 }' |
+        grep -qx "$FEDORA_FINGERPRINT" || die "Fedora 44 signing key fingerprint is missing"
+    "$CURL" --proto '=https' --tlsv1.2 -fL "$FEDORA_BASE_URL/$FEDORA_CHECKSUM" -o "$tmp/$FEDORA_CHECKSUM"
+    "$GPGV" --status-fd 3 --keyring "$tmp/fedora.gpg" \
+        "$tmp/$FEDORA_CHECKSUM" 3>"$tmp/gpg-status"
+    grep -Fq "[GNUPG:] VALIDSIG $FEDORA_FINGERPRINT " "$tmp/gpg-status" ||
+        die "checksum signature is not from the pinned Fedora 44 key"
+    grep -Fxq "SHA256 ($FEDORA_ISO) = $FEDORA_SHA256" "$tmp/$FEDORA_CHECKSUM" ||
+        die "signed checksum does not contain the pinned Fedora image"
+
+    iso="$(iso_path)"
+    if [ -f "$iso" ]; then
+        verify_iso
+    else
+        "$CURL" --proto '=https' --tlsv1.2 -fL "$FEDORA_BASE_URL/$FEDORA_ISO" -o "$iso.part"
+        actual="$("$SHASUM" -a 256 "$iso.part" | cut -d ' ' -f 1)"
+        [ "$actual" = "$FEDORA_SHA256" ] || die "downloaded Fedora ISO SHA-256 does not match"
+        mv "$iso.part" "$iso"
+    fi
+    mv "$tmp/fedora.gpg" "$directory/fedora.gpg"
+    mv "$tmp/$FEDORA_CHECKSUM" "$directory/$FEDORA_CHECKSUM"
+    rm -rf "$tmp"
+    trap - EXIT HUP INT TERM
+    printf 'Verified %s.\n' "$iso"
+}
+
+create_vm() {
+    verify_external_volume
+    verify_parallels_volume
+    verify_parallels_quota
+    verify_iso
+    require_parallels
+    require_create_capabilities
+    [ -d "$EXT_MOUNT/git" ] || die "host Git share is missing: $EXT_MOUNT/git"
+    [ ! -L "$EXT_MOUNT/git" ] || die "host Git share must not be a symlink"
+    verify_vm_paths
+    inventory="$("$PRLCTL" list --all --output name,status --no-header)" ||
+        die "cannot query Parallels VM inventory"
+    printf '%s\n' "$inventory" | awk -v name="$VM_NAME" '$1 == name { found = 1 } END { exit !found }' &&
+        die "VM $VM_NAME already exists; refusing to replace it"
+
+    creation_in_progress=true
+    on_create_exit() {
+        result=$?
+        trap - EXIT
+        if [ "$creation_in_progress" = "true" ] && [ "$result" -ne 0 ]; then
+            printf 'fedora-parallels: VM creation stopped after a partial change; inspect the VM and disk paths manually. No cleanup was attempted.\n' >&2
+        fi
+        exit "$result"
+    }
+    trap on_create_exit EXIT
+    "$PRLCTL" create "$VM_NAME" --distribution fedora-core --no-hdd --dst "$vm_directory"
+    "$PRLCTL" set "$VM_NAME" --cpus 6 --memsize 12288
+    "$PRLCTL" set "$VM_NAME" --autostart off --startup-view fullscreen
+    "$PRLCTL" set "$VM_NAME" --device-add hdd --type expand --size 65536
+    "$PRLCTL" set "$VM_NAME" --device-add hdd --image "$data_disk" --type expand --size 163840
+    "$PRLCTL" set "$VM_NAME" --device-set net0 --type shared
+    "$PRLCTL" set "$VM_NAME" --device-set cdrom0 --image "$(iso_path)"
+    # Disable predefined home/disk shares before enabling only the custom entries.
+    "$PRLCTL" set "$VM_NAME" --shf-host-defined off
+    "$PRLCTL" set "$VM_NAME" --shf-host-add ext --path "$EXT_MOUNT" --mode ro
+    "$PRLCTL" set "$VM_NAME" --shf-host-add git --path "$EXT_MOUNT/git" --mode rw
+    "$PRLCTL" set "$VM_NAME" --shf-host on --shf-host-automount on
+    "$PRLCTL" set "$VM_NAME" --sh-app-host-to-guest off --sh-app-guest-to-host off
+    "$PRLCTL" set "$VM_NAME" --smart-mount off
+    "$PRLCTL" set "$VM_NAME" --shared-cloud off --shared-clipboard on
+    "$PRLCTL" set "$VM_NAME" --share-host-location off --sync-ssh-ids off
+    creation_in_progress=false
+    trap - EXIT
+    printf 'Created stopped VM %s. Review its configuration before starting it.\n' "$VM_NAME"
+}
+
+set_profile() {
+    [ "$#" -eq 1 ] || die "usage: fedora-parallels profile lean|daily|heavy"
+    verify_parallels_volume
+    require_parallels
+    inventory="$("$PRLCTL" list --all --output name,status --no-header)" ||
+        die "cannot query Parallels VM inventory"
+    state="$(printf '%s\n' "$inventory" | awk -v name="$VM_NAME" '$1 == name { print $2 }')"
+    [ -n "$state" ] || die "VM $VM_NAME does not exist"
+    [ "$state" = "stopped" ] || die "VM $VM_NAME must be stopped before changing resources"
+    case "$1" in
+        lean) "$PRLCTL" set "$VM_NAME" --cpus 4 --memsize 8192 ;;
+        daily) "$PRLCTL" set "$VM_NAME" --cpus 6 --memsize 12288 ;;
+        heavy) "$PRLCTL" set "$VM_NAME" --cpus 8 --memsize 20480 ;;
+        *) die "unknown profile: $1" ;;
+    esac
+}
+
+show_status() {
+    verify_external_volume
+    free="$(plist_field "$EXT_MOUNT" APFSContainerFree)"
+    printf 'External volume: valid (%s); container free bytes: %s\n' "$EXT_MOUNT" "$free"
+    if "$DISKUTIL" info -plist "$PARALLELS_VOLUME" >/dev/null 2>&1; then
+        verify_parallels_volume
+        verify_parallels_quota
+        printf 'Parallels volume: valid (%s)\n' "$PARALLELS_VOLUME"
+    else
+        printf 'Parallels volume: missing\n'
+    fi
+    if [ -x "$PRLCTL" ]; then
+        "$PRLCTL" status "$VM_NAME" 2>/dev/null || printf 'VM: missing\n'
+    else
+        printf 'Parallels Desktop: missing\n'
+    fi
+}
+
+doctor() {
+    [ "$(uname -s)" = "Darwin" ] || die "host must be macOS"
+    [ "$(uname -m)" = "arm64" ] || die "host must be Apple Silicon"
+    verify_external_volume
+    verify_container
+    verify_parallels_volume
+    verify_parallels_quota
+    require_parallels
+    verify_iso
+    printf 'Host foundation prerequisites are valid.\n'
+}
+
+verify_vm() {
+    doctor
+    need "$JQ"
+    config="$("$PRLCTL" list --info "$VM_NAME" --json)" || die "cannot read VM configuration"
+    root_disk="$HOME/Parallels/$VM_NAME.pvm/harddisk1.hdd"
+    data_disk="$PARALLELS_VOLUME/${VM_NAME}-data.hdd"
+    iso="$(iso_path)"
+    printf '%s\n' "$config" | "$JQ" -e \
+        --arg name "$VM_NAME" \
+        --arg root "$root_disk" \
+        --arg data "$data_disk" \
+        --arg iso "$iso" \
+        --arg ext "$EXT_MOUNT" '
+        length == 1 and
+        .[0].Name == $name and
+        .[0].OS == "fedora-core" and
+        .[0].["Startup and Shutdown"].Autostart == "off" and
+        .[0].["Startup and Shutdown"].["Startup view"] == "fullscreen" and
+        .[0].Hardware.cpu.type == "arm" and
+        (
+            ([.[0].Hardware.cpu.cpus, .[0].Hardware.memory.size] == [4, "8192Mb"]) or
+            ([.[0].Hardware.cpu.cpus, .[0].Hardware.memory.size] == [6, "12288Mb"]) or
+            ([.[0].Hardware.cpu.cpus, .[0].Hardware.memory.size] == [8, "20480Mb"])
+        ) and
+        .[0].Hardware.hdd0.enabled == true and
+        .[0].Hardware.hdd0.image == $root and
+        .[0].Hardware.hdd0.type == "expanded" and
+        .[0].Hardware.hdd0.size == "65536Mb" and
+        .[0].Hardware.hdd1.enabled == true and
+        .[0].Hardware.hdd1.image == $data and
+        .[0].Hardware.hdd1.type == "expanded" and
+        .[0].Hardware.hdd1.size == "163840Mb" and
+        .[0].Hardware.cdrom0.enabled == true and
+        .[0].Hardware.cdrom0.image == $iso and
+        .[0].Hardware.net0.enabled == true and
+        .[0].Hardware.net0.type == "shared" and
+        .[0].["Host defined sharing"] == "Off" and
+        .[0].["Host Shared Folders"].ext.enabled == true and
+        .[0].["Host Shared Folders"].ext.path == $ext and
+        .[0].["Host Shared Folders"].ext.mode == "ro" and
+        .[0].["Host Shared Folders"].git.enabled == true and
+        .[0].["Host Shared Folders"].git.path == ($ext + "/git") and
+        .[0].["Host Shared Folders"].git.mode == "rw" and
+        .[0].["Shared Applications"].["Host-to-guest apps sharing"] == "off" and
+        .[0].["Shared Applications"].["Guest-to-host apps sharing"] == "off" and
+        .[0].SmartMount.enabled == false and
+        .[0].["Miscellaneous Sharing"].["Shared clipboard mode"] == "on" and
+        .[0].["Miscellaneous Sharing"].["Shared cloud"] == "off" and
+        .[0].Advanced.["Public SSH keys synchronization"] == "off" and
+        .[0].Advanced.["Share host location"] == "off"
+    ' >/dev/null || {
+        printf '%s\n' "$config" >&2
+        die "VM configuration differs from the approved contract"
+    }
+    state="$(printf '%s\n' "$config" | "$JQ" -r '.[0].State')"
+    tools="$(printf '%s\n' "$config" | "$JQ" -r '.[0].GuestTools.state')"
+    printf 'VM configuration is valid; state=%s; Parallels Tools=%s.\n' "$state" "$tools"
+}
+
+usage() {
+    cat <<'EOF'
+Usage: fedora-parallels COMMAND
+
+Commands:
+  doctor                         verify all host prerequisites
+  prepare-storage                create/verify the approved APFS volume
+  prepare-image                  download and verify Fedora 44 ARM
+  create                         create the stopped VM without replacing state
+  profile lean|daily|heavy       change resources while the VM is stopped
+  status                         report storage, Parallels, and VM state
+  verify                         print verified VM configuration
+  help                           show this help
+EOF
+}
+
+command="${1:-help}"
+[ "$#" -eq 0 ] || shift
+case "$command" in
+    doctor) [ "$#" -eq 0 ] || die "doctor takes no arguments"; doctor ;;
+    prepare-storage) [ "$#" -eq 0 ] || die "prepare-storage takes no arguments"; prepare_storage ;;
+    prepare-image) [ "$#" -eq 0 ] || die "prepare-image takes no arguments"; prepare_image ;;
+    create) [ "$#" -eq 0 ] || die "create takes no arguments"; create_vm ;;
+    profile) set_profile "$@" ;;
+    status) [ "$#" -eq 0 ] || die "status takes no arguments"; show_status ;;
+    verify) [ "$#" -eq 0 ] || die "verify takes no arguments"; verify_vm ;;
+    help|-h|--help) usage ;;
+    *) die "unknown command: $command" ;;
+esac
