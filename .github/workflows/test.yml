@@ -66,6 +66,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Install chezmoi
+        run: |
+          curl -fsSL https://github.com/twpayne/chezmoi/releases/download/v2.69.4/chezmoi_2.69.4_linux_amd64.tar.gz -o /tmp/chezmoi.tgz
+          echo "5054cf09cb2993725f525c8bb6ec3ff8625489ecfc061e019c17e737e7c7057b  /tmp/chezmoi.tgz" | sha256sum -c -
+          tar -xzf /tmp/chezmoi.tgz -C /tmp chezmoi
+          sudo install -m 0755 /tmp/chezmoi /usr/local/bin/chezmoi
       - name: Install dependencies
         run: uv sync --python ${{ matrix.python-version }} --group test
       - name: Run tests
