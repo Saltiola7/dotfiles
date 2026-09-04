@@ -4,7 +4,13 @@
 
 | id | title | priority | depends_on |
 |---|---|---|---|
-| RWUE-003 | Add the explicit owner-only CentOS x86_64 Yazi overlay | P1 | RWUE-001 |
+| - | None | - | - |
+
+## Completed
+
+| id | outcome | evidence |
+|---|---|---|
+| RWUE-003 | Added the explicit owner-only CentOS x86_64 Yazi overlay | `d41c639`; full pytest and disposable CentOS proof |
 
 ## Deferred
 

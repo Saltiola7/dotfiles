@@ -101,8 +101,18 @@ installed target overlap.
   a second apply is empty.
 - Prove rollback preserves local history, keys, auth state, and unrelated files.
 
+## Implementation
+
+- `machine_type=remote-workspace` renders only Yazi `package.toml`, `theme.toml`,
+  the flavor installer, and the remote-workspace Yazi installer.
+- The installer places checksum-verified Yazi and `ya` 26.8.15, fd 10.5.0,
+  fzf 0.74.3, and 7-Zip 26.02 x86_64 binaries in `~/.local/bin` without root.
+- The official Catppuccin Mocha flavor remains revision- and hash-locked in
+  `package.toml`; Bash, Atuin, Starship, agents, authentication, Podman, and
+  bootstrap remain outside the overlay.
+
 ## Readiness
 
-The profile and ownership contracts are ready. RWUE-001 and RWUE-002 are
-delivered; implementation requires a fresh Initiative receipt and exact
-digest-bound approval.
+RWUE-003 source implementation is complete under the approved Initiative
+receipt. Applying it to an owner home remains explicit and requires the shared
+foundation to be ready first.
