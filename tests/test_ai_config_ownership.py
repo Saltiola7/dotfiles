@@ -55,6 +55,7 @@ def test_dual_source_apply_slice_is_ready_and_bounded() -> None:
     for phrase in (
         "run_after_apply-dotfiles-ai.sh.tmpl",
         "git -C <secondary> pull --ff-only",
+        "never clones or derives another source directory",
         "DOTFILES_AI_CHAINED_APPLY=1",
         "--include=files,symlinks,scripts",
         "Failure is visible",

@@ -26,13 +26,15 @@ The personal source owns exactly one Mac-mini-rendered
 3. Resolve primary source with plain `chezmoi source-path` and secondary source
    with `chezmoi --config ~/.config/dotfiles-ai/chezmoi.toml source-path`.
 4. Require two distinct absolute existing Git worktree roots.
+   The secondary must be the checkout already selected by the dedicated config;
+   the bridge never clones or derives another source directory.
 5. Require secondary `origin` to normalize exactly to
    `Saltiola7/dotfiles-ai` over supported HTTPS or SSH GitHub syntax.
 6. Compute both rendered managed sets with `--include=files,symlinks,scripts` and
    fail before pull when their sorted leaf intersection is nonempty.
 7. Require the current secondary branch to have an upstream and run exactly
    `git -C <secondary> pull --ff-only`. Never reset, clean, stash, switch, merge,
-   rebase, force, or auto-pull the personal source.
+   rebase, force, clone, or auto-pull the personal source.
 8. Recompute both rendered managed sets after the fast-forward and fail before
    secondary apply if the pulled source introduced any leaf intersection.
 9. Set `DOTFILES_AI_CHAINED_APPLY=1` and run exactly
@@ -85,7 +87,8 @@ source retains its own expected rolling-update marker.
 - Given the bridge environment guard is already set, when the script is reached,
   then it exits without resolving, pulling, or applying either source.
 - Given a target collision, unexpected origin, missing upstream, divergent branch,
-  unavailable network, or secondary apply failure, when the bridge runs, then it
+  unavailable network, pull blocked by local work, or secondary apply failure,
+  when the bridge runs, then it
   exits nonzero without destructive Git recovery or a success claim.
 - Given a non-Mac-mini render or a targeted/dry-run operation, when chezmoi runs,
   then no secondary source is applied.
