@@ -1,5 +1,12 @@
 # Shell Auth Startup Changelog
 
+## 2026-09-05 - Dual-Source Force Boundary
+
+- Reopened bridge readiness after live deployment found a source-owned AI target
+  that required an interactive chezmoi overwrite prompt.
+- Authorized `--force` only for the validated, disjoint `dotfiles-ai` secondary
+  apply. Personal or overlapping targets remain outside force authority.
+
 ## 2026-09-05 - Dual-Source Apply Readiness
 
 - Added a one-cycle Initiative for a Mac-mini-only personal `run_after` bridge

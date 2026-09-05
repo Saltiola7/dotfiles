@@ -12,14 +12,15 @@
     {"id":"INT-005","kind":"constraint","text":"A dotfiles-ai pull or apply failure makes the outer apply fail visibly; already-applied personal targets are not falsely rolled back and a later retry converges.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
     {"id":"INT-006","kind":"constraint","text":"A bounded environment guard prevents recursive source chaining; dotfiles-ai never invokes the personal source.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
     {"id":"INT-007","kind":"non-goal","text":"Do not chain targeted apply, dry-run, status, diff, edit, update, or non-Mac-mini personal-source operations.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
-    {"id":"INT-008","kind":"risk","text":"Two independently managed sources share one destination; any future leaf-target overlap blocks chaining until ownership is reconciled.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]}
+    {"id":"INT-008","kind":"risk","text":"Two independently managed sources share one destination; any future leaf-target overlap blocks chaining until ownership is reconciled.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-009","kind":"decision","text":"After ownership and source validation, apply dotfiles-ai with --force so its source-authoritative managed targets converge without an interactive TTY; never force personal or overlapping targets.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]}
   ],
   "contexts": [
     {"id":"shell_auth_startup","repository":"Saltiola7/dotfiles","status":"ready","depends_on":["dotfiles_ai_distribution"]},
     {"id":"dotfiles_ai_distribution","repository":"Saltiola7/dotfiles-ai","status":"delivered","depends_on":[]}
   ],
   "slices": [
-    {"id":"dual-source-apply-bridge","context":"shell_auth_startup","state":"ready","requirements":["INT-001","INT-002","INT-003","INT-004","INT-005","INT-006","INT-007","INT-008"],"depends_on":[],"artifacts":["docs/specs/shell_auth_startup/DUAL-SOURCE-APPLY.plan.json","docs/specs/shell_auth_startup/README.md","docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"],"release_group":"dual-source-apply","execution_owner":"build"}
+    {"id":"dual-source-apply-bridge","context":"shell_auth_startup","state":"ready","requirements":["INT-001","INT-002","INT-003","INT-004","INT-005","INT-006","INT-007","INT-008","INT-009"],"depends_on":[],"artifacts":["docs/specs/shell_auth_startup/DUAL-SOURCE-APPLY.plan.json","docs/specs/shell_auth_startup/README.md","docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"],"release_group":"dual-source-apply","execution_owner":"build"}
   ],
   "release_groups": [
     {"id":"dual-source-apply","members":["dual-source-apply-bridge"],"state":"planning"}
