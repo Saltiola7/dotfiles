@@ -27,6 +27,12 @@ profile specified in
 change the delivered `lmsh` allowlist or existing macOS behavior until its exact
 Build slice is approved and deployed.
 
+The approved Dual-Source Chezmoi Apply Initiative adds one Mac-mini-only,
+dependency-gated bridge specified in
+[`features/dual-source-chezmoi-apply.md`](features/dual-source-chezmoi-apply.md).
+It preserves personal target ownership while chaining the independently managed
+`dotfiles-ai` source after a normal full personal apply.
+
 ## Domain
 
 Bounded context: shell authentication startup for interactive panes, agents, and status-bar plugins.

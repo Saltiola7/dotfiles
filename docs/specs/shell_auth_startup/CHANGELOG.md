@@ -1,5 +1,15 @@
 # Shell Auth Startup Changelog
 
+## 2026-09-05 - Dual-Source Apply Readiness
+
+- Added a one-cycle Initiative for a Mac-mini-only personal `run_after` bridge
+  that validates and fast-forwards the independent `dotfiles-ai` source before
+  applying it once under a recursion guard.
+- Verified current personal and AI managed file/symlink/script leaf sets are
+  disjoint. Shared parent directories remain allowed; future leaf overlap blocks.
+- Personal source is never auto-pulled. Secondary pull/apply failure propagates,
+  and no cross-source rollback is claimed. Implementation/deployment remain gated.
+
 ## 2026-08-31
 
 - Captured the dependency-gated `fedora-workstation` personal profile contract,

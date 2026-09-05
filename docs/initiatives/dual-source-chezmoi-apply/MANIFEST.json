@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "dual-source-chezmoi-apply",
+  "title": "One personal apply across personal and AI sources",
+  "state": "ready",
+  "coordinator_repository": "Saltiola7/dotfiles",
+  "statements": [
+    {"id":"INT-001","kind":"requirement","text":"A normal full plain chezmoi apply on the Mac mini applies the personal source and then the independently configured dotfiles-ai source.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-002","kind":"decision","text":"The personal source owns one native always-run bridge; dotfiles-ai remains the exclusive owner of AI targets and is not modified by this slice.","disposition":"ready","artifacts":["docs/initiatives/dual-source-chezmoi-apply/README.md","docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-003","kind":"constraint","text":"Before secondary apply, require distinct source roots, the expected dotfiles-ai GitHub origin, and an empty managed leaf-target intersection.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-004","kind":"decision","text":"Fast-forward only the current tracked dotfiles-ai branch with git pull --ff-only; never auto-pull the personal source or reset, stash, clean, switch, merge, or overwrite either working tree.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-005","kind":"constraint","text":"A dotfiles-ai pull or apply failure makes the outer apply fail visibly; already-applied personal targets are not falsely rolled back and a later retry converges.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-006","kind":"constraint","text":"A bounded environment guard prevents recursive source chaining; dotfiles-ai never invokes the personal source.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-007","kind":"non-goal","text":"Do not chain targeted apply, dry-run, status, diff, edit, update, or non-Mac-mini personal-source operations.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]},
+    {"id":"INT-008","kind":"risk","text":"Two independently managed sources share one destination; any future leaf-target overlap blocks chaining until ownership is reconciled.","disposition":"ready","artifacts":["docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"]}
+  ],
+  "contexts": [
+    {"id":"shell_auth_startup","repository":"Saltiola7/dotfiles","status":"ready","depends_on":["dotfiles_ai_distribution"]},
+    {"id":"dotfiles_ai_distribution","repository":"Saltiola7/dotfiles-ai","status":"delivered","depends_on":[]}
+  ],
+  "slices": [
+    {"id":"dual-source-apply-bridge","context":"shell_auth_startup","state":"ready","requirements":["INT-001","INT-002","INT-003","INT-004","INT-005","INT-006","INT-007","INT-008"],"depends_on":[],"artifacts":["docs/specs/shell_auth_startup/DUAL-SOURCE-APPLY.plan.json","docs/specs/shell_auth_startup/README.md","docs/specs/shell_auth_startup/features/dual-source-chezmoi-apply.md"],"release_group":"dual-source-apply","execution_owner":"build"}
+  ],
+  "release_groups": [
+    {"id":"dual-source-apply","members":["dual-source-apply-bridge"],"state":"planning"}
+  ]
+}
