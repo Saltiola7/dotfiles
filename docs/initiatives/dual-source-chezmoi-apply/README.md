@@ -43,3 +43,7 @@ personal full apply
 The flow is intentionally not a distributed transaction. If the secondary step
 fails, the outer command fails and preserves truthful partial completion; a retry
 converges from idempotent source behavior.
+
+After source/origin and pre/post-pull ownership checks pass, the secondary apply
+uses `--force` only within `dotfiles-ai` ownership. This avoids TTY prompts for
+modified managed AI targets; personal and overlapping targets are never forced.

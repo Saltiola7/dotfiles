@@ -38,7 +38,9 @@ The personal source owns exactly one Mac-mini-rendered
 8. Recompute both rendered managed sets after the fast-forward and fail before
    secondary apply if the pulled source introduced any leaf intersection.
 9. Set `DOTFILES_AI_CHAINED_APPLY=1` and run exactly
-   `chezmoi --config ~/.config/dotfiles-ai/chezmoi.toml apply`.
+   `chezmoi --config ~/.config/dotfiles-ai/chezmoi.toml apply --force`.
+   Force authority begins only after both leaf-intersection checks and applies
+   only to targets rendered by the validated `dotfiles-ai` source.
 10. Propagate any validation, pull, or secondary apply failure as the outer
    apply's nonzero result. Output contains no config content, Git URL credentials,
    source diff, environment, or managed target list.
@@ -72,6 +74,9 @@ transaction. Neither source removes the other's targets.
   fast-forward, and then retries secondary apply.
 - Offline GitHub access therefore fails the combined command, matching the
   operator-selected fail-visible policy.
+- Existing modified `dotfiles-ai`-owned targets converge noninteractively from
+  source after overlap validation. Personal targets are never force-applied by
+  the bridge.
 - Concurrent full applies are unsupported; native source/persistent-state locks
   remain authoritative and a collision must fail rather than run a third apply.
 
@@ -97,7 +102,8 @@ source retains its own expected rolling-update marker.
 
 - Fake `chezmoi`/`git` tests prove exact ordering, fixed config, recursion guard,
   origin normalization, distinct roots, pre/post-pull target intersection
-  failure, fast-forward only, no personal pull, and secondary failure propagation.
+  failure, fast-forward only, secondary force isolation, no personal pull, and
+  secondary failure propagation.
 - Render tests prove the bridge exists only for `machine_type=mac-mini` and uses
   no machine-specific source path in Git.
 - A real read-only managed-set check proves zero current leaf intersections.
