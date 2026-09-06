@@ -2,6 +2,33 @@
 .aerospace.toml
 Library/LaunchAgents/com.mgm.aws-sso-login.plist
 .local/bin/aws-sso-refresh
+.local/bin/fedora-parallels
+{{ end }}
+{{ if ne .machine_type "fedora-workstation" }}
+.config/sway/
+.config/waybar/
+.config/fedora-workstation/
+.config/kitty/catppuccin-mocha.conf
+{{ end }}
+{{ if eq .machine_type "fedora-workstation" }}
+*
+!.config/
+.config/*
+!.config/sway/
+.config/sway/*
+!.config/sway/config.d/
+.config/sway/config.d/*
+!.config/sway/config.d/95-fedora-personal.conf
+!.config/fedora-workstation/
+.config/fedora-workstation/*
+!.config/fedora-workstation/dnf-packages.txt
+!.config/waybar/
+.config/waybar/*
+!.config/waybar/config.jsonc
+!.config/waybar/style.css
+!.config/kitty/
+.config/kitty/*
+!.config/kitty/catppuccin-mocha.conf
 {{ end }}
 {{ if ne .machine_type "mac-mini" }}
 .config/atuin-server/

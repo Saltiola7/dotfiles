@@ -1,0 +1,231 @@
+#!/bin/sh
+set -eu
+
+VM_NAME="fedora-parallels"
+EXT_MOUNT="${FEDORA_PARALLELS_EXT_MOUNT:-/Volumes/ext}"
+PARALLELS_VOLUME="${FEDORA_PARALLELS_VOLUME:-/Volumes/Parallels}"
+EXT_VOLUME_UUID="65AF3638-96BB-4F56-8259-38EA49F3F7DF"
+APFS_CONTAINER_UUID="936D6900-611B-4CA7-9C85-CC3FCD0B90E0"
+PARALLELS_VOLUME_UUID="D4A50898-0879-4A6C-BAE2-4C48D31CC59B"
+VOLUME_QUOTA_BYTES="214748364800"
+
+DISKUTIL="${FEDORA_PARALLELS_DISKUTIL:-/usr/sbin/diskutil}"
+PLUTIL="${FEDORA_PARALLELS_PLUTIL:-/usr/bin/plutil}"
+PRLCTL="${FEDORA_PARALLELS_PRLCTL:-/Applications/Parallels Desktop.app/Contents/MacOS/prlctl}"
+PRLSRVCTL="${FEDORA_PARALLELS_PRLSRVCTL:-/Applications/Parallels Desktop.app/Contents/MacOS/prlsrvctl}"
+JQ="${FEDORA_PARALLELS_JQ:-/opt/homebrew/bin/jq}"
+DF="${FEDORA_PARALLELS_DF:-/bin/df}"
+
+die() {
+    printf 'fedora-parallels: %s\n' "$*" >&2
+    exit 1
+}
+
+need() {
+    [ -x "$1" ] || die "required command is unavailable: $1"
+}
+
+plist_field() {
+    "$DISKUTIL" info -plist "$1" | "$PLUTIL" -extract "$2" raw -o - - 2>/dev/null
+}
+
+verify_storage() {
+    for command in "$DISKUTIL" "$PLUTIL" "$JQ"; do need "$command"; done
+    [ "$(plist_field "$EXT_MOUNT" VolumeUUID)" = "$EXT_VOLUME_UUID" ] ||
+        die "external volume identity does not match $EXT_VOLUME_UUID"
+    APFS_CONTAINER="$(plist_field "$EXT_MOUNT" APFSContainerReference)" ||
+        die "cannot resolve APFS container"
+    [ -n "$APFS_CONTAINER" ] || die "APFS container is missing"
+    for mount in "$EXT_MOUNT" "$PARALLELS_VOLUME"; do
+        [ ! -L "$mount" ] || die "volume mount must not be a symlink: $mount"
+        [ "$(plist_field "$mount" MountPoint)" = "$mount" ] || die "volume is not mounted at $mount"
+        [ "$(plist_field "$mount" FilesystemType)" = "apfs" ] || die "volume is not APFS: $mount"
+        [ "$(plist_field "$mount" Internal)" = "false" ] || die "volume must be external: $mount"
+        [ "$(plist_field "$mount" Encryption)" = "false" ] || die "volume encryption differs: $mount"
+        [ "$(plist_field "$mount" APFSContainerReference)" = "$APFS_CONTAINER" ] ||
+            die "volumes are not in the same APFS container"
+    done
+    [ "$(plist_field "$EXT_MOUNT" VolumeName)" = "ext" ] || die "external volume name differs"
+    [ "$(plist_field "$PARALLELS_VOLUME" VolumeName)" = "Parallels" ] || die "Parallels volume name differs"
+    [ "$(plist_field "$PARALLELS_VOLUME" VolumeUUID)" = "$PARALLELS_VOLUME_UUID" ] ||
+        die "Parallels volume identity does not match $PARALLELS_VOLUME_UUID"
+    snapshot="$("$DISKUTIL" apfs list -plist "$APFS_CONTAINER" | "$PLUTIL" -convert json -o - -)" ||
+        die "cannot read APFS container metadata"
+    printf '%s\n' "$snapshot" | "$JQ" -e \
+        --arg container "$APFS_CONTAINER_UUID" --arg volume "$PARALLELS_VOLUME_UUID" \
+        --argjson quota "$VOLUME_QUOTA_BYTES" '
+        .Containers | length == 1 and
+        .[0].APFSContainerUUID == $container and
+        ([.[0].Volumes[] | select(.Name == "Parallels" or .APFSVolumeUUID == $volume)] |
+         length == 1 and .[0].Name == "Parallels" and .[0].APFSVolumeUUID == $volume and
+         .[0].CapacityQuota == $quota and .[0].Roles == [])
+    ' >/dev/null || die "APFS container identity, volume uniqueness or quota differs"
+    free="$(printf '%s\n' "$snapshot" | "$JQ" -er '.Containers[0].CapacityFree')"
+    printf 'Adopted storage valid; container free bytes: %s. No storage created.\n' "$free"
+}
+
+require_parallels() {
+    need "$PRLCTL"
+    need "$PRLSRVCTL"
+    version="$("$PRLCTL" --version 2>&1)" || die "cannot read Parallels version"
+    case "$version" in 'prlctl version 27.'*) ;; *) die "Parallels major version is not 27" ;; esac
+    license="$("$PRLSRVCTL" info --license --json 2>/dev/null)" || die "cannot read Parallels license"
+    printf '%s\n' "$license" | "$JQ" -e '
+        .status == "ACTIVE" and .edition == "pro" and .cpu_total >= 8 and .max_memory >= 20480
+    ' >/dev/null || die "active Parallels Pro with heavy-profile capacity is required"
+}
+
+filesystem_device() {
+    "$DF" -P "$1" | awk 'END { print $1 }'
+}
+
+verify_vm_config() {
+    config="$("$PRLCTL" list --info "$VM_NAME" --json)" || die "cannot read VM configuration"
+    printf '%s\n' "$config" | "$JQ" -e \
+        --arg name "$VM_NAME" --arg data "$PARALLELS_VOLUME/${VM_NAME}-data.hdd" --arg ext "$EXT_MOUNT" '
+        length == 1 and .[0].Name == $name and .[0].OS == "fedora-core" and
+        .[0].Template == "no" and
+        .[0].GuestTools.state == "installed" and
+        (.[0].GuestTools.version | type == "string" and startswith("27.")) and
+        .[0].["Startup and Shutdown"].Autostart == "off" and
+        .[0].["Startup and Shutdown"].["Startup view"] == "fullscreen" and
+        .[0].["Smart Guard"].enabled == false and
+        .[0].Hardware.cpu.type == "arm" and
+        ([.[0].Hardware.cpu.cpus, .[0].Hardware.memory.size] as $p |
+         [[4, "8192Mb"], [6, "12288Mb"], [8, "20480Mb"]] | any(. == $p)) and
+        .[0].Hardware.hdd0.enabled == true and .[0].Hardware.hdd0.type == "expanded" and
+        .[0].Hardware.hdd0.size == "65536Mb" and
+        (.[0].Hardware.hdd0.image | type == "string" and startswith("/")) and
+        .[0].Hardware.hdd1.enabled == true and .[0].Hardware.hdd1.image == $data and
+        .[0].Hardware.hdd1.type == "expanded" and .[0].Hardware.hdd1.size == "163840Mb" and
+        .[0].Hardware.net0.enabled == true and .[0].Hardware.net0.type == "shared" and
+        .[0].["Host defined sharing"] == "Off" and .[0].["Shared Profile"].enabled == false and
+        .[0].["Host Shared Folders"].ext.enabled == true and
+        .[0].["Host Shared Folders"].ext.path == $ext and .[0].["Host Shared Folders"].ext.mode == "ro" and
+        .[0].["Host Shared Folders"].git.enabled == true and
+        .[0].["Host Shared Folders"].git.path == ($ext + "/git") and .[0].["Host Shared Folders"].git.mode == "rw" and
+        ([.[0].["Host Shared Folders"] | to_entries[] | select(.value | type == "object") | .key] | sort) == ["ext", "git"] and
+        .[0].["Shared Applications"].["Host-to-guest apps sharing"] == "off" and
+        .[0].["Shared Applications"].["Guest-to-host apps sharing"] == "off" and
+        .[0].SmartMount.enabled == false and
+        .[0].["Miscellaneous Sharing"].["Shared clipboard mode"] == "on" and
+        .[0].["Miscellaneous Sharing"].["Shared cloud"] == "off" and
+        .[0].Advanced.["Public SSH keys synchronization"] == "off" and
+        .[0].Advanced.["Share host location"] == "off"
+    ' >/dev/null || die "VM configuration differs from the adopted contract"
+    bundle="$(printf '%s\n' "$config" | "$JQ" -er '.[0].Home')"
+    root_disk="$(printf '%s\n' "$config" | "$JQ" -er '.[0].Hardware.hdd0.image')"
+    data_disk="$PARALLELS_VOLUME/${VM_NAME}-data.hdd"
+    for path in "${bundle%/}" "$root_disk" "$data_disk"; do
+        [ -d "$path" ] && [ ! -L "$path" ] || die "disk/bundle missing or symlink: $path"
+        [ "$(realpath "$path")" = "$path" ] || die "disk/bundle has a symlink ancestor: $path"
+    done
+    case "$root_disk" in "${bundle%/}/"*) ;; *) die "root disk is outside the inventoried VM bundle" ;; esac
+    need "$DF"
+    root_device="$(filesystem_device "$root_disk")"
+    [ -n "$root_device" ] && [ "$(plist_field "$root_device" Internal)" = "true" ] ||
+        die "root disk is not on internal storage"
+    [ "$(filesystem_device "$bundle")" = "$root_device" ] || die "bundle/root filesystems differ"
+    [ "$(filesystem_device "$data_disk")" = "$(filesystem_device "$PARALLELS_VOLUME")" ] ||
+        die "data disk is on a substituted filesystem"
+    state="$(printf '%s\n' "$config" | "$JQ" -er '.[0].State')"
+    printf 'Adopted VM configuration valid; state=%s.\n' "$state"
+}
+
+doctor() {
+    [ "$(uname -s)" = "Darwin" ] && [ "$(uname -m)" = "arm64" ] || die "host must be Apple Silicon macOS"
+    verify_storage
+    require_parallels
+    verify_vm_config
+}
+
+verify_guest() {
+    [ "$state" = "running" ] || die "guest verification requires a running VM; start it explicitly in Parallels"
+    # prlctl forwards through a guest shell. One quoted Python argument, no credentials.
+    guest_code='
+import errno, grp, json, os, pathlib, platform, pwd, socket, stat, subprocess, tempfile
+def require(ok, message):
+    if not ok:
+        raise SystemExit(message)
+def output(*args):
+    return subprocess.check_output(args, text=True).strip()
+require(os.getuid() == 0, "verification must execute as root")
+release = platform.freedesktop_os_release()
+require(release.get("ID") == "fedora" and release.get("VERSION_ID") == "44" and release.get("VARIANT_ID") == "server", "guest edition differs")
+require(platform.machine() == "aarch64" and socket.gethostname() == "fedora-parallels", "guest architecture/hostname differs")
+user = pwd.getpwnam("parallels")
+require((user.pw_uid, user.pw_gid, user.pw_dir, user.pw_shell) == (1000, 1000, "/home/parallels", "/bin/bash"), "guest account differs")
+require("parallels" in grp.getgrnam("wheel").gr_mem, "wheel membership missing")
+output("rpm", "-q", "fedora-release-server", "gnome-shell", "gdm")
+for target, fstype, uuid in [("/", "xfs", "f1f0eac8-aaa4-4be7-b1b7-415fe4881056"), ("/mnt/data", "ext4", "e9b0b509-89d3-4dd4-868a-45d45c0e52be")]:
+    mount = json.loads(output("findmnt", "--json", "--mountpoint", target, "-o", "TARGET,FSTYPE,UUID"))["filesystems"]
+    require(len(mount) == 1 and mount[0] == {"target": target, "fstype": fstype, "uuid": uuid}, "filesystem identity differs: " + target)
+for name in ("", "/git", "/state", "/downloads", "/containers", "/.fedora-parallels-data"):
+    path = pathlib.Path("/mnt/data" + name)
+    info = path.lstat()
+    expected_type = stat.S_ISREG if name == "/.fedora-parallels-data" else stat.S_ISDIR
+    require(expected_type(info.st_mode) and info.st_uid == 1000 and info.st_gid == 1000 and not info.st_mode & 0o022, "unsafe data path: " + str(path))
+for target, source in [("/media/psf/ext", "ext"), ("/media/psf/git", "git")]:
+    mount = json.loads(output("findmnt", "--json", "--mountpoint", target, "-o", "TARGET,SOURCE,FSTYPE"))["filesystems"]
+    require(len(mount) == 1 and mount[0] == {"target": target, "source": source, "fstype": "fuse.prl_fsd"}, "share mount differs: " + target)
+probe_code = """
+import errno, os, sys, tempfile
+uid, directory, mode = int(sys.argv[1]), sys.argv[2], sys.argv[3]
+if os.getuid() != uid:
+    raise SystemExit("probe execution identity differs")
+try:
+    with tempfile.NamedTemporaryFile(dir=directory, prefix=".fedora-share-probe-") as probe:
+        probe.write(b"probe\\n")
+        probe.flush()
+except OSError as error:
+    if mode != "deny" or error.errno not in (errno.EPERM, errno.EACCES, errno.EROFS):
+        raise
+    print("DENIED", uid)
+else:
+    if mode == "deny":
+        raise SystemExit("READ_ONLY_BOUNDARY_FAILED: write succeeded; probe removed")
+    print("WRITABLE", uid)
+"""
+for uid, directory, mode, expected in [(1000, "/media/psf/ext/git", "deny", "DENIED 1000"), (0, "/media/psf/ext/git", "deny", "DENIED 0"), (1000, "/media/psf/git", "write", "WRITABLE 1000")]:
+    args = ["python3", "-c", probe_code, str(uid), directory, mode]
+    if uid:
+        args = ["runuser", "-u", "parallels", "--"] + args
+    require(output(*args) == expected, "ambiguous share probe")
+print("FEDORA_ADOPTION_VERIFIED")
+'
+    guest_result="$("$PRLCTL" exec "$VM_NAME" /usr/bin/python3 -c "'$guest_code'")" || die "guest verification failed"
+    [ "$guest_result" = "FEDORA_ADOPTION_VERIFIED" ] || die "guest verification failed or returned ambiguous output"
+    printf 'Server/GNOME, account, data ownership, filesystem UUIDs and user/root share probes passed.\n'
+    printf 'Graphics, clipboard, key forwarding and interactive resizing still require operator verification.\n'
+}
+
+set_profile() {
+    [ "$#" -eq 1 ] || die "usage: fedora-parallels profile lean|daily|heavy"
+    case "$1" in lean) cpus=4; memory=8192 ;; daily) cpus=6; memory=12288 ;; heavy) cpus=8; memory=20480 ;; *) die "unknown profile: $1" ;; esac
+    doctor
+    [ "$state" = "stopped" ] || die "VM $VM_NAME must be stopped before changing resources"
+    "$PRLCTL" set "$VM_NAME" --cpus "$cpus" --memsize "$memory"
+}
+
+usage() {
+    printf '%s\n' 'Usage: fedora-parallels COMMAND' \
+        '  doctor                       verify existing host storage and VM configuration' \
+        '  prepare-storage              verify adopted storage only; never create or format' \
+        '  profile lean|daily|heavy      change resources only while stopped' \
+        '  status                       report verified storage and VM configuration' \
+        '  verify                       verify running guest, including disposable share probes' \
+        '  help                         show this help' \
+        'Installation and rebuild use the Parallels GUI under separate approval.'
+}
+
+command="${1:-help}"
+[ "$#" -eq 0 ] || shift
+case "$command" in
+    create|prepare-image) die "Use the Parallels GUI for installation/rebuild under separate approval; existing VM, data and ISO are preserved" ;;
+    doctor|status) [ "$#" -eq 0 ] || die "$command takes no arguments"; doctor ;;
+    prepare-storage) [ "$#" -eq 0 ] || die "$command takes no arguments"; verify_storage ;;
+    profile) set_profile "$@" ;;
+    verify) [ "$#" -eq 0 ] || die "$command takes no arguments"; doctor; verify_guest ;;
+    help|-h|--help) usage ;;
+    *) die "unknown command: $command" ;;
+esac
