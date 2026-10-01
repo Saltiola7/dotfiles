@@ -13,6 +13,7 @@ tap "shopify/shopify"
 brew "openssl@3"
 brew "libssh"
 brew "ansible"
+brew "age"
 brew "jpeg-xl"
 brew "aom"
 brew "apr-util"
@@ -144,6 +145,7 @@ cask "shortcat"
 cask "signal"
 cask "speedify"
 cask "tailscale-app"
+cask "zed"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
 mas "Amphetamine", id: 937984704

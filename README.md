@@ -12,11 +12,26 @@ This repository is not meant to be cloned or applied directly. It's published as
 
 - Shell configuration (bash/zsh)
 - Terminal emulator (kitty)
-- Editor (neovim/AstroNvim)
+- Editors (neovim/AstroNvim, Zed)
 - Window manager (AeroSpace)
 - Keyboard remapping (Karabiner)
 - Tmux, starship prompt, atuin, direnv, git, ssh
 - Homebrew dependencies (Brewfile)
+
+## Zed
+
+Zed stable is installed by the Brewfile (`brew install --cask zed`). Chezmoi
+manages `~/.config/zed/settings.json` from `private_dot_config/zed/settings.json`.
+Automatic update checks are disabled so Homebrew owns application updates;
+run `brew upgrade --cask zed` to update it. Launch it with `zed .`.
+
+To deploy only Zed settings after installing the cask:
+
+```bash
+chezmoi apply --exclude=scripts ~/.config/zed
+```
+
+The Brewfile also includes `age`, required to decrypt existing managed SSH files.
 
 ## Tests
 
