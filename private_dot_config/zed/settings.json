@@ -1,3 +1,22 @@
 {
-  "auto_update": false
+  "auto_update": false,
+  "theme": "Catppuccin Mocha",
+  "icon_theme": "Catppuccin Mocha",
+  "auto_install_extensions": {
+    "catppuccin": true,
+    "catppuccin-icons": true,
+    "markdown-oxide": true
+  },
+  "outline_panel": {
+    "dock": "left",
+    "button": true
+  },
+  "languages": {
+    "Markdown": {
+      "language_servers": ["markdown-oxide"],
+      "soft_wrap": "preferred_line_length",
+      "preferred_line_length": 100,
+      "format_on_save": "off"
+    }
+  }
 }
