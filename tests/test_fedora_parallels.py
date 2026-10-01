@@ -2,6 +2,7 @@ import ast
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -79,7 +80,8 @@ def host(tmp_path):
                         "from pathlib import Path\n"
                         "data = json.loads(Path(os.environ['FIXTURE']).read_text())\n"
                         "args = sys.argv[1:]\n"
-                        f"with open(os.environ['CALL_LOG'], 'a') as log: log.write(json.dumps([{name!r}, *args]) + '\\n')\n"
+                        + (f"with open(os.environ['CALL_LOG'], 'a') as log: log.write(json.dumps([{name!r}, *args]) + '\\n')\n"
+                           if name not in {"uname", "plutil"} else "")
                         + body)
         path.chmod(0o755)
         env["FEDORA_PARALLELS_" + name.upper()] = str(path)
@@ -114,6 +116,22 @@ device = '/dev/external' if args[1].startswith(os.environ['FEDORA_PARALLELS_VOLU
 print('Filesystem 512-blocks Used Available Capacity Mounted on')
 print(device, '100 1 99 1% /fixture')
 """)
+    # Model the macOS host as well as Parallels so these fixtures run on Linux CI.
+    tool("uname", "print({'-s': 'Darwin', '-m': 'arm64'}[args[0]])\n")
+    tool("plutil", """
+value = plistlib.loads(sys.stdin.buffer.read())
+if args[:1] == ['-extract']:
+    value = value[args[1]]
+    print(str(value).lower() if isinstance(value, bool) else value)
+elif args[:2] == ['-convert', 'json']:
+    print(json.dumps(value))
+else:
+    raise SystemExit('unexpected plutil operation')
+""")
+    env["PATH"] = str(tmp_path) + os.pathsep + os.environ["PATH"]
+    jq = shutil.which("jq")
+    assert jq is not None, "jq is required for the Parallels contract tests"
+    env["FEDORA_PARALLELS_JQ"] = jq
     return env, fixture, fixture_path, log
 
 
