@@ -1,0 +1,61 @@
+#!/bin/sh
+# Homebrew's before-stage bundle supplies the declared Python 3.12 prerequisite.
+set -eu
+case "$(uname -s):$(uname -m)" in
+    Darwin:arm64) ;;
+    *) exit 0 ;;
+esac
+
+sdk="$HOME/google-cloud-sdk"
+if [ -e "$sdk" ] || [ -L "$sdk" ]; then
+    [ -x "$sdk/bin/gcloud" ] || {
+        echo "Existing Google SDK is incomplete; preserving $sdk" >&2
+        exit 1
+    }
+    probe=$(mktemp -d "$HOME/.gcloud-check.XXXXXX")
+    if env -i HOME="$probe" PATH="$PATH" CLOUDSDK_CONFIG="$probe/config" \
+        CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true \
+        CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true \
+        "$sdk/bin/gcloud" version >"$probe/version.log" 2>&1; then
+        rm -r "$probe"
+        exit 0
+    fi
+    echo "Existing Google SDK failed its check; retained evidence: $probe" >&2
+    exit 1
+fi
+
+python=$(command -v python3.12) || {
+    echo "Install the Brewfile's python@3.12 prerequisite before Google SDK bootstrap." >&2
+    exit 1
+}
+stage=$(mktemp -d "$HOME/.gcloud-bootstrap.XXXXXX")
+echo "Google SDK bootstrap evidence: $stage" >&2
+curl -q --fail --location --silent --show-error --output "$stage/sdk.tar.gz" \
+    https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-588.0.0-darwin-arm.tar.gz
+expected=0f580f1323d0465b11d1d7c506e701c27729e9c5ea0e1d0f855a4dc3e665db89
+actual=$(shasum -a 256 "$stage/sdk.tar.gz")
+[ "${actual%% *}" = "$expected" ] || {
+    echo "Google SDK archive checksum mismatch; retained $stage" >&2
+    exit 1
+}
+tar -xzf "$stage/sdk.tar.gz" -C "$stage"
+mkdir -p "$stage/home"
+isolated() {
+    env -i HOME="$stage/home" PATH="$(dirname "$python"):/usr/bin:/bin" \
+        CLOUDSDK_CONFIG="$stage/config" CLOUDSDK_PYTHON="$python" \
+        CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=true \
+        CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true "$@"
+}
+isolated "$stage/google-cloud-sdk/install.sh" --quiet --usage-reporting=false \
+    --path-update=false --command-completion=false --install-python=false >"$stage/install.log" 2>&1
+isolated "$stage/google-cloud-sdk/bin/gcloud" version >"$stage/version.log" 2>&1
+if [ -e "$sdk" ] || [ -L "$sdk" ]; then
+    echo "Google SDK destination appeared during bootstrap; preserving both installations." >&2
+    exit 1
+fi
+mv -n "$stage/google-cloud-sdk" "$HOME/"
+[ ! -d "$stage/google-cloud-sdk" ] || {
+    echo "Google SDK publication refused; retained $stage" >&2
+    exit 1
+}
+# Retain installer logs and the verified archive for recovery; never touch live credentials.
