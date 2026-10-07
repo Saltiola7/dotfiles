@@ -1,5 +1,20 @@
 # Host maintenance changelog
 
+## 2026-10-07 — SSD-HOST-RETIRED-SOURCES
+
+- Removed obsolete Colima launcher, LaunchAgent, bootstrap hook and ignore entries.
+  Retired five Colima/Docker formula declarations and Loop/Shortcat casks, matching
+  the preserved primary maintenance intent. No uninstall or data purge performed.
+- Replaced obsolete service-start expectations with a non-reintroduction regression.
+  Affected terminal, AI ownership, uv and SDK tests passed; Brewfile syntax passed.
+- Verified live service and targets remain absent; retained source preimages before
+  scoped primary reconciliation. Both source inventories exclude the retired
+  targets. Archives, VM state, preferences, rollback variables, optional SSH
+  includes and unrelated dirty source changes remain preserved.
+- Implementation Gate Commit: `73679e7`. No exceptions; package release not
+  applicable. Intended Final Push: feature branch and draft PR into main; actual
+  delivery result is retained in the Cycle Record.
+
 ## 2026-10-07 — SSD-HOST-UV-SHELL
 
 - Shared mac-mini shell fragment selects already-installed mise uv/uvx in Bash

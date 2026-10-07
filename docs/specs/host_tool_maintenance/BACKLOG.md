@@ -4,5 +4,6 @@
 - SSD-HOST-SDK-BOOTSTRAP: implemented and host-qualified; Homebrew duplicate
   ownership retired without zap, installation backups retained.
 - SSD-HOST-UV-SHELL: installed mise uv/uvx selected consistently and host-qualified.
-- Remaining Initiative lanes: retired Colima source
-  reconciliation; classified upgrades.
+- SSD-HOST-RETIRED-SOURCES: retired startup and package declarations reconciled;
+  configured source inventory no longer includes Colima startup targets.
+- Remaining Initiative lanes: classified upgrades and runtime migration.
