@@ -9,7 +9,6 @@
 # Note: Most installers are now automated via chezmoi run_once scripts:
 #   - Homebrew: run_onchange_before_brew-bundle.sh.tmpl
 #   - uv:      run_once_before_install-uv.sh
-#   - aider:   run_once_install-aider.sh
 #   - xonsh:   run_once_install-xonsh.sh
 #   - graphify: run_once_install-graphify.sh
 #   - skills:  run_once_install-skills.sh

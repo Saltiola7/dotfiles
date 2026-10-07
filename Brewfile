@@ -157,7 +157,6 @@ mas "The Unarchiver", id: 425424353
 mas "WhatsApp", id: 310633997
 go "golang.org/x/tools/gopls"
 go "honnef.co/go/tools/cmd/staticcheck"
-uv "aider-chat", with: ["pip"]
 uv "graphifyy"
 uv "specify-cli"
 uv "xonsh[full]", with: ["xontrib-kitty"]
