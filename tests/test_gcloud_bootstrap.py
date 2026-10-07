@@ -28,7 +28,7 @@ def test_bootstrap_boundaries(tmp_path, scenario):
     home.mkdir()
     tools = tmp_path / "tools"
     tools.mkdir()
-    for name in ["env", "mktemp", "mkdir", "shasum", "tar", "mv", "rm", "dirname", "cat"]:
+    for name in ["env", "mktemp", "mkdir", "shasum", "tar", "gzip", "mv", "rm", "dirname", "cat"]:
         (tools / name).symlink_to(shutil.which(name))
     executable(tools / "uname", 'case "$1" in -s) echo Darwin;; *) echo ' +
                ("x86_64" if scenario == "unsupported" else "arm64") + ';; esac\n')
