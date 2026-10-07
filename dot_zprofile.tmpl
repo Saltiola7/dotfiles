@@ -27,3 +27,5 @@ export PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"
 if [ -x "$HOME/google-cloud-sdk/bin/gcloud" ]; then
     export PATH="$HOME/google-cloud-sdk/bin:$PATH"
 fi
+
+{{ includeTemplate "uv-path.sh" . }}

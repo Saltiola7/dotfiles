@@ -214,3 +214,5 @@ secret() { . "$HOME/.local/bin/secret"; }
 # Shell startup must stay auth-free. `secret` is intentionally manual so Herdr
 # restore storms cannot fan out into many concurrent 1Password prompts.
 {{ end -}}
+
+{{ includeTemplate "uv-path.sh" . }}
