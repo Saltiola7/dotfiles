@@ -1,0 +1,16 @@
+{
+  "profile": "docs/specs/host_tool_maintenance/PROFILE.md",
+  "gates": {
+    "domain": {"applicability": "required"},
+    "behavior": {"applicability": "required"},
+    "spec": {"applicability": "required"},
+    "contract": {"applicability": "required"},
+    "test_driven_implementation": {"applicability": "required"},
+    "refactor": {"applicability": "required"},
+    "review_integrate": {"applicability": "required"},
+    "release": {"applicability": "not_applicable", "reason": "Managed shell configuration; no published package."},
+    "deploy": {"applicability": "required"},
+    "operate": {"applicability": "required"},
+    "maintain_retire": {"applicability": "required"}
+  }
+}
