@@ -22,3 +22,8 @@ source ~/.orbstack/shell/init.zsh 2>/dev/null || :
 
 # Added by Obsidian
 export PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"
+
+# Google Cloud SDK (login shells also need it when .zshrc is not loaded)
+if [ -x "$HOME/google-cloud-sdk/bin/gcloud" ]; then
+    export PATH="$HOME/google-cloud-sdk/bin:$PATH"
+fi
