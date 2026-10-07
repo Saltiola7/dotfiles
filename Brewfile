@@ -67,7 +67,6 @@ brew "neovim"
 brew "nowplaying-cli"
 brew "netcat"
 brew "netpbm"
-brew "nginx", restart_service: :changed
 brew "nmap"
 brew "node@20"
 brew "ollama"
