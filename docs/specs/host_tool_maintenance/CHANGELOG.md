@@ -1,5 +1,22 @@
 # Host maintenance changelog
 
+## 2026-10-07 — SSD-HOST-UV-SHELL
+
+- Shared mac-mini shell fragment selects already-installed mise uv/uvx in Bash
+  and Zsh login modes. No startup install, config rewrite or broad shim activation.
+  External mise selection is marker-gated; missing tools/lookups retain selection.
+- Promoted the existing external MISE_DATA_DIR setting into tracked configuration;
+  exactly matching stale state is unset when the marker is absent. Retained local
+  binaries, project pins and unrelated primary changes.
+- Validation: failing regression before implementation; 40 scoped tests passed,
+  rendered Bash/Zsh syntax passed. All four live login modes select uv 0.12.23
+  and uvx from the same installation with a minimal inherited PATH. Python, Node,
+  Codex and SDK resolution match each mode's pre-deployment baseline. Repeated
+  targeted apply has no drift. Source/target preimages retained privately.
+- Implementation Gate Commit: `22fe571`. No exceptions; package release not
+  applicable. Intended delivery: feature branch and draft PR into main; actual
+  Final Push result is recorded by the Cycle Record.
+
 ## 2026-10-07 — SSD-HOST-SDK-BOOTSTRAP
 
 - Added macOS ARM64 standalone SDK bootstrap after Homebrew's before-stage
