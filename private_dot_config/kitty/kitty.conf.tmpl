@@ -1,5 +1,7 @@
 include mocha.conf
+{{ if eq .chezmoi.os "darwin" -}}
 macos_titlebar_color background
+{{ end -}}
 notify_on_cmd_finish never
 
 allow_remote_control socket-only
@@ -49,3 +51,12 @@ map cmd+alt+shift+t detach_window new-tab
 
 map cmd+alt+. layout_action rotate
 map cmd+alt+, layout_action rotate 180
+
+{{ if eq .machine_type "omarchy" -}}
+# Mac muscle memory when using the Mac keyboard through Waynergy.
+map super+t new_tab_with_cwd
+map super+n new_os_window_with_cwd
+# Match Omarchy's app-aware Cmd+C/V injection in terminal windows.
+map ctrl+insert copy_to_clipboard
+map shift+insert paste_from_clipboard
+{{ end -}}

@@ -7,6 +7,7 @@
 .config/omarchy/shell.json
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
+.config/xdg-terminals.list
 apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
 .local/bin/omarchy-rustdesk-setup
@@ -23,6 +24,15 @@ apply-omarchy-theme.sh
 !.config/hypr/input.lua
 !.config/hypr/bindings.lua
 !.config/hypr/hyprland.lua
+!.config/xdg-terminals.list
+!.config/kitty/
+.config/kitty/*
+!.config/kitty/kitty.conf
+!.config/kitty/mocha.conf
+!.config/kitty/save-workspace.py
+!.config/kitty/load-snapshot.py
+!.config/kitty/kitty-query.py
+!create-kitty-socket-dir.sh
 !.config/samba/
 .config/samba/*
 !.config/samba/smb.conf

@@ -24,3 +24,6 @@ replace("ALT + EQUAL", "AeroSpace: grow window", hl.dsp.window.resize({ x = 50, 
 replace("SUPER + SPACE", "Application launcher", "omarchy-menu toggle apps")
 -- Cmd+W is already close-window; Cmd+Q is an alias.
 replace("SUPER + Q", "Close window", hl.dsp.window.close())
+-- Cmd+T belongs to Kitty tabs; keep the desktop action on Ctrl+Cmd+T.
+hl.unbind("SUPER + T")
+replace("SUPER + CTRL + T", "Toggle window floating/tiling", hl.dsp.window.float({ action = "toggle" }))

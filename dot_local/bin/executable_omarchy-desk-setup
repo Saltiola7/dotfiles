@@ -2,8 +2,8 @@
 # Explicit setup for the Omarchy desk; no privileged work during chezmoi apply.
 set -euo pipefail
 
-if [[ ${1:-} != "smb" && ${1:-} != "input" && ${1:-} != "tailscale" ]]; then
-  echo "Usage: omarchy-desk-setup {smb|input|tailscale}" >&2
+if [[ ${1:-} != "smb" && ${1:-} != "input" && ${1:-} != "tailscale" && ${1:-} != "terminal" ]]; then
+  echo "Usage: omarchy-desk-setup {smb|input|tailscale|terminal}" >&2
   exit 2
 fi
 if [[ ! -t 0 ]]; then
@@ -15,6 +15,13 @@ if [[ $1 == "tailscale" ]]; then
   omarchy pkg add tailscale
   sudo systemctl enable --now tailscaled.service
   sudo tailscale up
+  exit 0
+fi
+
+if [[ $1 == "terminal" ]]; then
+  omarchy pkg add kitty ttf-monofur-nerd
+  mkdir -p "$HOME/.local/share/kitty"
+  omarchy default terminal kitty
   exit 0
 fi
 

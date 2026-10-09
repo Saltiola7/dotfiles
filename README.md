@@ -184,7 +184,8 @@ does not overwrite this machine’s managed preset.
    Linux client before starting `systemctl --user start omarchy-waynergy`.
 4. Run `omarchy-desk-setup tailscale`, enroll in the tailnet, then
    `omarchy-rustdesk-setup`. Configure clients with its printed public key.
-5. Run `omarchy-desk-setup smb` and `omarchy-zen-setup`. Import Dark Reader’s
+5. Run `omarchy-desk-setup terminal`, `omarchy-desk-setup smb`, and
+   `omarchy-zen-setup`. Import Dark Reader’s
    managed preset once.
 6. Copy the AI repository’s Omarchy example config, substitute home and username
    paths, apply it, then run `dotfiles-ai-omarchy-setup`. Authenticate each AI
@@ -197,3 +198,24 @@ before starting its services. Otherwise it generates a new key and clients
 need updating. Likewise, back up Synergy’s paired private certificate and
 Waynergy trust hashes securely, or pair again. Never place these secrets,
 Tailscale enrollment state, provider credentials or Samba passwords in Git.
+
+### Kitty terminal
+
+Run `omarchy-desk-setup terminal` to install Arch’s Kitty package and
+`ttf-monofur-nerd`, then select Kitty through Omarchy’s default-terminal command.
+Chezmoi owns `~/.config/xdg-terminals.list`, the shared Kitty configuration,
+Mocha palette, and portable snapshot scripts. macOS titlebar configuration
+is rendered only on macOS; the Linux profile adds Cmd/Super+T for a new tab
+and Cmd/Super+N for a new OS window.
+
+Open Kitty with Cmd+Enter from the Mac or Super+Enter on the built-in keyboard,
+or choose Kitty from the Cmd+Space app launcher. Cmd+C/V use Omarchy’s
+terminal-aware copy/paste dispatch and Kitty’s explicit Insert mappings.
+Ctrl+Shift+C/V remain available as direct terminal shortcuts. Drag to select
+text before copying. Ctrl+Cmd+T now toggles floating/tiling; Cmd+T passes
+through to the application instead.
+
+Fonts use the Mac configuration’s Monofur Nerd Font at 14pt. The existing
+macOS workspace session files contain project-specific paths and are not
+deployed to this new laptop. The optional xonsh shortcut still requires
+xonsh to be installed separately.
