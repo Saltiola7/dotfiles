@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Permit Tailscale RustDesk traffic through Omarchy's UFW container guard.
+set -euo pipefail
+[[ -t 0 ]] || { echo "Run in a terminal for sudo prompts." >&2; exit 1; }
+if ! command -v ufw >/dev/null; then
+  echo "UFW is not installed; no UFW rules required."
+  exit 0
+fi
+# Discover the current rootful Podman bridge instead of freezing container IPs.
+network=$(sudo podman network inspect podman)
+read -r bridge subnet < <(python3 -c '
+import ipaddress,json,re,sys
+network=json.load(sys.stdin)[0]
+bridge=network["network_interface"]
+if not re.fullmatch(r"[A-Za-z0-9_.-]+",bridge): raise SystemExit("Invalid bridge name")
+subnets=[ipaddress.ip_network(s["subnet"]) for s in network["subnets"]]
+subnet=next(s for s in subnets if s.version==4)
+print(bridge,subnet)
+' <<< "$network")
+[[ -n $bridge && -n $subnet ]] || exit 1
+sudo ufw route allow in on tailscale0 out on "$bridge" proto tcp from 100.64.0.0/10 to "$subnet" port 21115:21117 comment 'RustDesk Tailscale TCP'
+sudo ufw route allow in on tailscale0 out on "$bridge" proto udp from 100.64.0.0/10 to "$subnet" port 21116 comment 'RustDesk Tailscale UDP'
+sudo ufw status verbose

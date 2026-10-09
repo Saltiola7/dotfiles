@@ -11,6 +11,7 @@
 apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
 .local/bin/omarchy-rustdesk-setup
+.local/bin/omarchy-rustdesk-firewall
 .local/bin/omarchy-desk-setup
 .local/bin/omarchy-waynergy-test
 .config/waynergy/
@@ -60,6 +61,7 @@ apply-omarchy-theme.sh
 .local/bin/*
 !.local/bin/omarchy-desk-setup
 !.local/bin/omarchy-rustdesk-setup
+!.local/bin/omarchy-rustdesk-firewall
 !.local/bin/omarchy-zen-setup
 !.local/bin/omarchy-waynergy-test
 {{ end }}

@@ -38,6 +38,7 @@ sudo systemctl daemon-reload
 if ! sudo systemctl restart rustdesk-hbbr.service rustdesk-hbbs.service; then rollback; exit 1; fi
 sleep 2
 if ! systemctl is-active --quiet rustdesk-hbbs.service rustdesk-hbbr.service; then rollback; exit 1; fi
+"$HOME/.local/bin/omarchy-rustdesk-firewall"
 # Do not disable a runtime with unrelated workloads.
 if systemctl is-active --quiet docker.service; then
   remaining=$(sudo docker ps -q)

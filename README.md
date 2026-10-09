@@ -142,6 +142,13 @@ only after migration preparation; server data is reused and Docker is disabled
 only when no other workloads are running. The official OSS image is pinned to the 1.1.16 registry digest. Private keys and
 database remain in `/var/lib/rustdesk-server`; never commit that directory.
 The laptop must be awake for registration and relaying. No guest VMs are used.
+The setup also runs `omarchy-rustdesk-firewall`, which adds persistent UFW
+forwarding rules limited to Tailscale ingress, the discovered Podman bridge
+and IPv4 subnet, and RustDesk TCP 21115–21117 / UDP 21116. This is required
+when Omarchy’s existing Docker guard rejects traffic to container subnets
+before Tailscale’s forwarding rule. To repair an already installed server,
+run `omarchy-rustdesk-firewall` in a terminal. A local port check does not
+exercise this forwarded path: verify connectivity from another tailnet peer.
 
 ### Mac-primary keyboard navigation
 
