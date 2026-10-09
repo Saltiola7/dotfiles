@@ -1,0 +1,17 @@
+[Unit]
+Description=Private RustDesk connection and relay server
+Requires=docker.service tailscaled.service
+After=docker.service tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/etc/rustdesk-server
+ExecStartPre=/usr/bin/bash -c 'for i in {1..60}; do /usr/bin/tailscale ip -4 | /usr/bin/grep -q "^100[.]" && exit 0; sleep 2; done; exit 1'
+ExecStart=/usr/bin/docker compose --env-file server.env -f compose.yaml up -d
+ExecStop=/usr/bin/docker compose --env-file server.env -f compose.yaml down
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target

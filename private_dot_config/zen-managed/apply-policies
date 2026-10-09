@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Root helper called by setup and by the pacman hook after Zen package updates.
+set -euo pipefail
+source=/etc/zen-managed/policies.json
+target=/opt/zen-browser-bin/distribution/policies.json
+[[ -f $source && -d /opt/zen-browser-bin ]] || exit 0
+python3 - "$source" "$target" <<'PY'
+import json,sys
+from pathlib import Path
+source,target=map(Path,sys.argv[1:])
+existing=json.loads(target.read_text()) if target.exists() else {'policies':{}}
+managed=json.loads(source.read_text())['policies']
+policies=existing.setdefault('policies',{})
+for key,value in managed.items():
+    if key == 'ExtensionSettings': policies.setdefault(key,{}).update(value)
+    else: policies[key]=value
+# Preserve packaged policies and unrelated extension policies.
+target.parent.mkdir(parents=True,exist_ok=True)
+target.write_text(json.dumps(existing,indent=2)+'\n')
+target.chmod(0o644)
+PY

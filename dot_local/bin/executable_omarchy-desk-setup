@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Explicit setup for the Omarchy desk; no privileged work during chezmoi apply.
+set -euo pipefail
+
+if [[ ${1:-} != "smb" && ${1:-} != "input" && ${1:-} != "tailscale" ]]; then
+  echo "Usage: omarchy-desk-setup {smb|input|tailscale}" >&2
+  exit 2
+fi
+if [[ ! -t 0 ]]; then
+  echo "Run this command in a terminal for sudo and SMB password prompts." >&2
+  exit 1
+fi
+
+if [[ $1 == "tailscale" ]]; then
+  omarchy pkg add tailscale
+  sudo systemctl enable --now tailscaled.service
+  sudo tailscale up
+  exit 0
+fi
+
+if [[ $1 == "input" ]]; then
+  omarchy pkg add wl-clipboard
+  omarchy pkg aur add synergy3-bin waynergy
+  pacman -Q synergy3-bin waynergy wl-clipboard
+  systemctl --user daemon-reload
+  systemctl --user enable omarchy-waynergy.service
+  echo "Input-sharing packages installed. Configure Synergy 3 before starting it."
+  echo "Run only one input-sharing client at a time."
+  exit 0
+fi
+
+omarchy pkg add samba
+share_config="${XDG_CONFIG_HOME:-$HOME/.config}/samba/smb.conf"
+testparm -s "$share_config" >/dev/null
+mkdir -p "$HOME/Shared"
+
+# Preserve any existing system configuration before deploying the managed one.
+if sudo test -f /etc/samba/smb.conf; then
+  if ! sudo cmp -s "$share_config" /etc/samba/smb.conf; then
+    sudo cp -a /etc/samba/smb.conf "/etc/samba/smb.conf.backup.$(date +%Y%m%d%H%M%S)"
+  fi
+fi
+sudo install -Dm644 "$share_config" /etc/samba/smb.conf
+
+share_user="$(id -un)"
+if ! sudo pdbedit -L -u "$share_user" | cut -d: -f1 | rg -Fxq "$share_user"; then
+  echo "Choose an SMB password for $share_user (never stored in the dotfiles)."
+  sudo smbpasswd -a "$share_user"
+fi
+sudo systemctl enable --now smb.service
+sudo systemctl restart smb.service
+echo "In Finder: Go > Connect to Server > smb://<this-laptop-IP>/Shared"
+echo "Use username $share_user and the SMB password you chose."

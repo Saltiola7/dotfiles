@@ -1,0 +1,234 @@
+# Mac-primary experiment. Supply the Mac address to omarchy-waynergy-test.
+name = {{ default "omarchy" (get . "waynergy_client_name") }}
+port = 24800
+backend = wlr
+restart_on_fatal = false
+# Translate Mac wire codes to Linux positions to prevent desktop shortcut collisions.
+xkb_key_offset = 7
+
+[raw-keymap]
+offset_on_explicit = false
+# AC01
+1 = 38
+# AC02
+2 = 39
+# AC03
+3 = 40
+# AC04
+4 = 41
+# AC06
+5 = 43
+# AC05
+6 = 42
+# AB01
+7 = 52
+# AB02
+8 = 53
+# AB03
+9 = 54
+# AB04
+10 = 55
+# LSGT
+11 = 94
+# AB05
+12 = 56
+# AD01
+13 = 24
+# AD02
+14 = 25
+# AD03
+15 = 26
+# AD04
+16 = 27
+# AD06
+17 = 29
+# AD05
+18 = 28
+# AE01
+19 = 10
+# AE02
+20 = 11
+# AE03
+21 = 12
+# AE04
+22 = 13
+# AE06
+23 = 15
+# AE05
+24 = 14
+# AE12
+25 = 21
+# AE09
+26 = 18
+# AE07
+27 = 16
+# AE11
+28 = 20
+# AE08
+29 = 17
+# AE10
+30 = 19
+# AD12
+31 = 35
+# AD09
+32 = 32
+# AD07
+33 = 30
+# AD11
+34 = 34
+# AD08
+35 = 31
+# AD10
+36 = 33
+# RTRN
+37 = 36
+# AC09
+38 = 46
+# AC07
+39 = 44
+# AC11
+40 = 48
+# AC08
+41 = 45
+# AC10
+42 = 47
+# BKSL
+43 = 51
+# AB08
+44 = 59
+# AB10
+45 = 61
+# AB06
+46 = 57
+# AB07
+47 = 58
+# AB09
+48 = 60
+# TAB
+49 = 23
+# SPCE
+50 = 65
+# TLDE
+51 = 49
+# BKSP
+52 = 22
+# ESC
+54 = 9
+# RWIN
+55 = 134
+# LWIN
+56 = 133
+# LFSH
+57 = 50
+# CAPS
+58 = 66
+# LALT
+59 = 64
+# LCTL
+60 = 37
+# RTSH
+61 = 62
+# RALT
+62 = 108
+# RCTL
+63 = 105
+# KPDL
+66 = 91
+# KPMU
+68 = 63
+# KPAD
+70 = 86
+# NMLK
+72 = 77
+# KPDV
+76 = 106
+# KPEN
+77 = 104
+# KPSU
+79 = 82
+# KP0
+83 = 90
+# KP1
+84 = 87
+# KP2
+85 = 88
+# KP3
+86 = 89
+# KP4
+87 = 83
+# KP5
+88 = 84
+# KP6
+89 = 85
+# KP7
+90 = 79
+# KP8
+92 = 80
+# KP9
+93 = 81
+# FK05
+97 = 71
+# FK06
+98 = 72
+# FK07
+99 = 73
+# FK03
+100 = 69
+# FK08
+101 = 74
+# FK09
+102 = 75
+# FK11
+104 = 95
+# PRSC
+106 = 107
+# SCLK
+108 = 78
+# FK10
+110 = 76
+# MENU
+111 = 135
+# FK12
+112 = 96
+# PAUS
+114 = 127
+# INS
+115 = 118
+# HOME
+116 = 110
+# PGUP
+117 = 112
+# DELE
+118 = 119
+# FK04
+119 = 70
+# END
+120 = 115
+# FK02
+121 = 68
+# PGDN
+122 = 117
+# FK01
+123 = 67
+# LEFT
+124 = 113
+# RGHT
+125 = 114
+# DOWN
+126 = 116
+# UP
+127 = 111
+
+[id-keymap]
+97 = 38
+65 = 38
+
+[tls]
+enable = true
+tofu = true
+
+[idle-inhibit]
+enable = false
+
+[log]
+level = info

@@ -1,9 +1,9 @@
 {{- $name := promptStringOnce . "name" "Your full name" "" -}}
 {{- $email := promptStringOnce . "email" "Your email address" "" -}}
-{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace)" "macbook" -}}
+{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
-sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}"{{ .chezmoi.homeDir }}/.local/share/chezmoi"{{ end }}
+sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}{{ .chezmoi.sourceDir | quote }}{{ end }}
 encryption = "age"
 [edit]
     hardlink = {{ if eq $machineType "mac-mini" }}false{{ else }}true{{ end }}
@@ -15,4 +15,7 @@ encryption = "age"
     name = {{ $name | quote }}
     email = {{ $email | quote }}
     machine_type = {{ $machineType | quote }}
+{{ if eq $machineType "omarchy" }}
+    waynergy_client_name = {{ default "omarchy" (get . "waynergy_client_name") | quote }}
+{{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}

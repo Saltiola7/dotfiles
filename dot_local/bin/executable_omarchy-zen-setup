@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ -t 0 ]] || { echo "Run in a terminal for package installation." >&2; exit 1; }
+omarchy pkg aur add zen-browser-bin
+if [[ ! -f ${XDG_CONFIG_HOME:-$HOME/.config}/zen/profiles.ini && ! -f $HOME/.zen/profiles.ini ]]; then
+  zen-browser --headless -CreateProfile "omarchy $HOME/.zen/omarchy"
+fi
+source_dir=$(chezmoi execute-template '{{ .chezmoi.sourceDir }}')
+python3 - "$source_dir" <<'PYTHEME'
+import subprocess,sys
+from pathlib import Path
+source = Path(sys.argv[1]) / 'run_onchange_install-zen-catppuccin.sh.tmpl'
+script = subprocess.check_output(['chezmoi', 'execute-template', source.read_text()], text=True)
+subprocess.run(['bash'], input=script, text=True, check=True)
+PYTHEME
+zen-browser --version
+policy_dir="${XDG_CONFIG_HOME:-$HOME/.config}/zen-managed"
+sudo install -Dm644 "$policy_dir/policies.json" /etc/zen-managed/policies.json
+sudo install -Dm755 "$policy_dir/apply-policies" /usr/local/libexec/omarchy-zen-policies
+sudo install -Dm644 "$policy_dir/zen-policies.hook" /etc/pacman.d/hooks/zen-managed-policies.hook
+sudo /usr/local/libexec/omarchy-zen-policies
+printf 'Zen installed with Catppuccin Mocha. Restart existing Zen windows to apply.\n'
+printf 'Dark Reader: Settings > Advanced > Import settings: %s/darkreader-mocha.json\n' "$policy_dir"

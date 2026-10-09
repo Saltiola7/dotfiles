@@ -1,3 +1,58 @@
+{{ if ne .machine_type "omarchy" }}
+.config/hypr/input.lua
+.config/hypr/bindings.lua
+.config/hypr/hyprland.lua
+.config/samba/smb.conf
+.config/rustdesk-server/
+.config/omarchy/shell.json
+.config/zen-managed/
+.config/systemd/user/omarchy-waynergy.service
+apply-omarchy-theme.sh
+.local/bin/omarchy-zen-setup
+.local/bin/omarchy-rustdesk-setup
+.local/bin/omarchy-desk-setup
+.local/bin/omarchy-waynergy-test
+.config/waynergy/
+{{ end }}
+{{ if eq .machine_type "omarchy" }}
+*
+!.config/
+.config/*
+!.config/hypr/
+.config/hypr/*
+!.config/hypr/input.lua
+!.config/hypr/bindings.lua
+!.config/hypr/hyprland.lua
+!.config/samba/
+.config/samba/*
+!.config/samba/smb.conf
+!.config/rustdesk-server/
+!.config/rustdesk-server/**
+!.config/omarchy/
+.config/omarchy/*
+!.config/omarchy/shell.json
+!.config/zen-managed/
+!.config/zen-managed/**
+!.config/systemd/
+.config/systemd/*
+!.config/systemd/user/
+.config/systemd/user/*
+!.config/systemd/user/omarchy-waynergy.service
+!apply-omarchy-theme.sh
+!install-zen-catppuccin.sh
+!.config/waynergy/
+.config/waynergy/*
+!.config/waynergy/config.ini
+!.config/waynergy/xkb_keymap
+!.local/
+.local/*
+!.local/bin/
+.local/bin/*
+!.local/bin/omarchy-desk-setup
+!.local/bin/omarchy-rustdesk-setup
+!.local/bin/omarchy-zen-setup
+!.local/bin/omarchy-waynergy-test
+{{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
 Library/LaunchAgents/com.mgm.aws-sso-login.plist
