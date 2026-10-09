@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Register the existing desktop profile without replacing browser data.
+set -euo pipefail
+if pgrep -x 'zen|zen-bin|zen-browser' >/dev/null; then
+  echo 'Zen is running; keeping the active profile registry unchanged.'
+  exit 0
+fi
+python3 - <<'PY'
+import configparser
+import os
+from pathlib import Path
+import shutil
+import tempfile
+import time
+from io import StringIO
+
+home = Path.home()
+profile = home / '.zen/omarchy'
+profile.mkdir(parents=True, exist_ok=True, mode=0o700)
+roots = [home / '.zen']
+xdg = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) / 'zen'
+if (xdg / 'profiles.ini').exists() and xdg not in roots:
+    roots.append(xdg)
+backup = home / '.local/state/omarchy-zen' / str(time.time_ns())
+
+def load(path):
+    config = configparser.ConfigParser(interpolation=None)
+    config.optionxform = str
+    if path.exists():
+        config.read(path)
+    return config
+
+def save(path, config, label):
+    stream = StringIO()
+    config.write(stream)
+    text = stream.getvalue()
+    if path.exists() and path.read_text() == text:
+        return
+    if path.exists():
+        backup.mkdir(parents=True, exist_ok=True, mode=0o700)
+        shutil.copy2(path, backup / label)
+    with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as f:
+        f.write(text)
+        temporary = f.name
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, path)
+
+for index, root in enumerate(roots):
+    registry = root / 'profiles.ini'
+    config = load(registry)
+    if not config.has_section('General'):
+        config.add_section('General')
+    config['General']['StartWithLastProfile'] = '1'
+    config['General'].setdefault('Version', '2')
+    selected = None
+    for section in config.sections():
+        if not section.startswith('Profile') or not config.has_option(section, 'Path'):
+            continue
+        candidate = Path(config[section]['Path'])
+        if config[section].get('IsRelative', '1') == '1':
+            candidate = root / candidate
+        if candidate.resolve() == profile.resolve():
+            selected = section
+        config[section].pop('Default', None)
+    if selected is None:
+        number = 0
+        while config.has_section(f'Profile{number}'):
+            number += 1
+        selected = f'Profile{number}'
+        config.add_section(selected)
+    relative = root == profile.parent
+    target = profile.name if relative else str(profile)
+    config[selected].update(Name='omarchy', IsRelative='1' if relative else '0',
+                            Path=target, Default='1')
+    for section in config.sections():
+        if section.startswith('Install'):
+            config[section].update(Default=target, Locked='1')
+    save(registry, config, f'{index}-profiles.ini')
+    installs_path = root / 'installs.ini'
+    if installs_path.exists():
+        installs = load(installs_path)
+        for section in installs.sections():
+            installs[section].update(Default=target, Locked='1')
+        save(installs_path, installs, f'{index}-installs.ini')
+print('Zen default profile:', profile)
+PY

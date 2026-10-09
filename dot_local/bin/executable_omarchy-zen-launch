@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+"$HOME/.local/bin/omarchy-zen-profile"
+exec zen-browser --profile "$HOME/.zen/omarchy" "$@"

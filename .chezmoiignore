@@ -13,6 +13,8 @@
 .config/xdg-terminals.list
 apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
+.local/bin/omarchy-zen-profile
+.local/bin/omarchy-zen-launch
 .local/bin/omarchy-rustdesk-setup
 .local/bin/omarchy-rustdesk-firewall
 .local/bin/omarchy-rustdesk-client-setup
@@ -77,6 +79,8 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-rustdesk-firewall
 !.local/bin/omarchy-rustdesk-client-setup
 !.local/bin/omarchy-zen-setup
+!.local/bin/omarchy-zen-profile
+!.local/bin/omarchy-zen-launch
 !.local/bin/omarchy-waynergy-test
 !.local/bin/omarchy-recovery-backup
 !.local/bin/omarchy-espanso-setup
