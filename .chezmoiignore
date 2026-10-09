@@ -4,6 +4,7 @@
 .config/hypr/hyprland.lua
 .config/samba/smb.conf
 .config/rustdesk-server/
+.config/rustdesk-client/
 .config/omarchy/shell.json
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
@@ -12,6 +13,7 @@ apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
 .local/bin/omarchy-rustdesk-setup
 .local/bin/omarchy-rustdesk-firewall
+.local/bin/omarchy-rustdesk-client-setup
 .local/bin/omarchy-desk-setup
 .local/bin/omarchy-waynergy-test
 .config/waynergy/
@@ -39,6 +41,8 @@ apply-omarchy-theme.sh
 !.config/samba/smb.conf
 !.config/rustdesk-server/
 !.config/rustdesk-server/**
+!.config/rustdesk-client/
+!.config/rustdesk-client/**
 !.config/omarchy/
 .config/omarchy/*
 !.config/omarchy/shell.json
@@ -62,6 +66,7 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-desk-setup
 !.local/bin/omarchy-rustdesk-setup
 !.local/bin/omarchy-rustdesk-firewall
+!.local/bin/omarchy-rustdesk-client-setup
 !.local/bin/omarchy-zen-setup
 !.local/bin/omarchy-waynergy-test
 {{ end }}

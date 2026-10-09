@@ -226,3 +226,26 @@ Fonts use the Mac configuration’s Monofur Nerd Font at 14pt. The existing
 macOS workspace session files contain project-specific paths and are not
 deployed to this new laptop. The optional xonsh shortcut still requires
 xonsh to be installed separately.
+
+### Controlling this Omarchy desktop with RustDesk
+
+Run `omarchy-rustdesk-client-setup` in a terminal. It installs `rustdesk-bin`
+through Omarchy’s AUR workflow, enables the packaged `rustdesk.service` at boot,
+and applies the managed private-server settings through RustDesk’s CLI.
+It reads the local server’s current public key and Tailscale address when
+available, so rebuilding that server does not leave this client pointed at
+a stale key. The fallback routing preset is in
+`~/.config/rustdesk-client/server.json`.
+
+The client’s device identity and access credentials are runtime state and
+stay outside Git. Open RustDesk from the app launcher, enter its displayed ID
+on the Mac/iPhone, approve the incoming connection, and select the screen
+when the Wayland portal asks. Set a permanent access password through
+RustDesk’s Security settings if needed; never commit it.
+
+The server’s boot readiness and the desktop client’s availability differ:
+the standard RustDesk client has experimental Wayland support, and this
+Hyprland profile does not provide remote login-screen access. Screen capture
+and remote input must be verified in an active, logged-in desktop session.
+The packaged root service handles input injection; do not make `/dev/uinput`
+world-writable as a workaround.

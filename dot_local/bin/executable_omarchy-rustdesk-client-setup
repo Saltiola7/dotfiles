@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Native RustDesk client; server routing lives in chezmoi, credentials do not.
+set -euo pipefail
+[[ -t 0 ]] || { echo "Run in a terminal for installation and sudo prompts." >&2; exit 1; }
+omarchy pkg aur add rustdesk-bin
+sudo systemctl enable --now rustdesk.service
+config="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk-client/server.json"
+key_file="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk-server/server-key.pub"
+mapfile -t settings < <(python3 - "$config" "$key_file" <<'PY'
+import base64,json,subprocess,sys
+from pathlib import Path
+config=json.loads(Path(sys.argv[1]).read_text())
+key=Path(sys.argv[2])
+# A rebuilt local server can have a new tailnet IP/key: use its actual values.
+if key.exists():
+    config['public_key']=key.read_text().strip()
+    config['id_server']=subprocess.check_output(['tailscale','ip','-4'],text=True).strip()
+    config['relay_server']=config['id_server']+':21117'
+if len(base64.b64decode(config['public_key'],validate=True)) != 32:
+    raise SystemExit('Invalid RustDesk server public key')
+for name in ('id_server','relay_server','api_server','public_key'):
+    value=config[name]
+    if '\n' in value or '\r' in value: raise SystemExit('Invalid server setting')
+    print(value)
+PY
+)
+[[ ${#settings[@]} == 4 ]] || { echo "Invalid managed server settings." >&2; exit 1; }
+# CLI setting updates go through RustDesk's installed service/IPC.
+for i in {1..10}; do
+  if [[ -n $(sudo rustdesk --get-id 2>/dev/null) ]]; then break; fi
+  sleep 1
+done
+sudo rustdesk --option custom-rendezvous-server "${settings[0]}"
+sudo rustdesk --option relay-server "${settings[1]}"
+sudo rustdesk --option api-server "${settings[2]}"
+sudo rustdesk --option key "${settings[3]}"
+for field in custom-rendezvous-server relay-server api-server key; do
+  printf '%s: ' "$field"
+  sudo rustdesk --option "$field"
+done
+printf '\nOmarchy RustDesk ID: '
+sudo rustdesk --get-id
+printf '\nConnect from the Mac/iPhone and approve the connection and screen-sharing prompt here.\n'
+printf 'Set a permanent access password in RustDesk Security if desired; keep it outside Git.\n'
