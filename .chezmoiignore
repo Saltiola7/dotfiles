@@ -9,6 +9,7 @@
 .config/omarchy-host/
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
+.config/systemd/user/espanso.service
 .config/xdg-terminals.list
 apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
@@ -18,6 +19,7 @@ apply-omarchy-theme.sh
 .local/bin/omarchy-desk-setup
 .local/bin/omarchy-waynergy-test
 .local/bin/omarchy-recovery-backup
+.local/bin/omarchy-espanso-setup
 .local/share/applications/zen.desktop
 .config/waynergy/
 {{ end }}
@@ -59,6 +61,7 @@ apply-omarchy-theme.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-waynergy.service
+!.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
 !install-zen-catppuccin.sh
 !.config/waynergy/
@@ -76,6 +79,7 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-zen-setup
 !.local/bin/omarchy-waynergy-test
 !.local/bin/omarchy-recovery-backup
+!.local/bin/omarchy-espanso-setup
 !.local/share/
 .local/share/*
 !.local/share/applications/
@@ -149,6 +153,8 @@ Library/LaunchAgents/dev.dotfiles.runtime-state.plist
 !install-yazi-flavor.sh
 {{ end }}
 docs/
+.config/espanso/
+.config/espanso/**
 tests/
 pyproject.toml
 uv.lock

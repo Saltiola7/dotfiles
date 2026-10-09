@@ -18,6 +18,8 @@ for path in /var/lib/rustdesk-server /var/lib/samba/private /root/.config/rustde
   "$HOME/.config/Synergy" "$HOME/.config/waynergy/tls" "$HOME/.config/rustdesk" \
   "$HOME/.config/chezmoi/chezmoi.toml" "$HOME/.config/chezmoi/key.txt" \
   "$HOME/.config/dotfiles-ai/chezmoi.toml" \
+  "$HOME/.config/espanso" "$HOME/.config/chezmoi-private" \
+  "$HOME/.local/share/chezmoi-private" \
   "/var/lib/dotfiles-ai/$(id -un)/codex/auth.json" \
   "/var/lib/dotfiles-ai/$(id -un)/xdg/data/opencode/auth.json"; do
   if sudo test -e "$path"; then items+=("${path#/}"); fi

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Installs the Wayland build. Personal snippets belong to a separate private source.
+set -euo pipefail
+if ! pacman -Q espanso-wayland-bin >/dev/null 2>&1; then
+  [[ -t 0 ]] || { echo 'Run in Kitty for package installation prompts.' >&2; exit 1; }
+  omarchy pkg aur add espanso-wayland-bin
+fi
+espanso --version
+systemctl --user stop espanso.service 2>/dev/null || true
+# The Debian prebuilt wizard crashes with Arch's wxWidgets library. Skip its
+# onboarding UI; the launcher still initializes and runs the ordinary daemon.
+python3 - <<'PY'
+from pathlib import Path
+import os
+
+home = Path.home()
+runtime = Path(os.environ.get('XDG_CACHE_HOME', home / '.cache')) / 'espanso/kvs'
+runtime.mkdir(parents=True, exist_ok=True)
+for name in ('has_completed_wizard', 'has_displayed_welcome'):
+    (runtime / name).write_text('true')
+root = home / '.config/espanso'
+(root / 'config').mkdir(parents=True, exist_ok=True)
+(root / 'match').mkdir(exist_ok=True)
+default = root / 'config/default.yml'
+if not default.exists() and not default.with_suffix('.yaml').exists():
+    default.write_text('keyboard_layout:\n  layout: us\n  variant: colemak_dh_ortho\ntoggle_key: OFF\n')
+os.chmod(root, 0o700)
+source = home / '.local/share/chezmoi-private/espanso'
+source.mkdir(parents=True, exist_ok=True)
+os.chmod(source, 0o700)
+config = home / '.config/chezmoi-private'
+config.mkdir(parents=True, exist_ok=True)
+os.chmod(config, 0o700)
+settings = config / 'espanso.toml'
+if not settings.exists():
+    settings.write_text(f'sourceDir = "{source}"\ndestDir = "{root}"\n')
+    os.chmod(settings, 0o600)
+PY
+chezmoi --config "$HOME/.config/chezmoi-private/espanso.toml" add "$HOME/.config/espanso/config"
+if [[ ! -f "$HOME/.config/systemd/user/espanso.service" ]]; then
+  espanso service register
+fi
+systemctl --user daemon-reload
+systemctl --user reset-failed espanso.service
+systemctl --user enable --now espanso.service
+sleep 1
+systemctl --user is-active --quiet espanso.service || {
+  echo 'Espanso did not stay running; inspect journalctl --user -u espanso.' >&2
+  exit 1
+}
+chezmoi --config "$HOME/.config/chezmoi-private/espanso.toml" add \
+  "$HOME/.config/espanso/config" "$HOME/.config/espanso/match"
+echo 'Espanso installed and registered for desktop startup.'
+echo 'Personal snippets are not copied into the public dotfiles repository.'
+echo 'Mac/Waynergy input and the Colemak keyboard still need expansion tests.'
