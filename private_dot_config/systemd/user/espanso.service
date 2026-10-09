@@ -1,0 +1,16 @@
+[Unit]
+Description=Private Espanso text expansion
+After=graphical-session.target
+PartOf=graphical-session.target
+ConditionPathIsExecutable=/usr/bin/espanso
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+ExecStart=/usr/bin/espanso launcher
+Restart=on-failure
+RestartSec=5
+LimitCORE=0
+
+[Install]
+WantedBy=graphical-session.target

@@ -11,3 +11,7 @@ uv.lock
 .opencode/package.json
 .opencode/package-lock.json
 graphify-out/
+# Personal Espanso content is owned by a separate private chezmoi source.
+/private_dot_config/espanso/
+/dot_config/espanso/
+/espanso-private/

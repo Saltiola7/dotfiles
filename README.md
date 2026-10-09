@@ -118,6 +118,9 @@ and `waynergy_client_name` to match the Mac screen name.
 Verify screen-edge switching, Finnish symbols and modifiers on both keyboards.
 Waynergy supports text clipboard; image clipboard is not available through this
 client. Images and files can use SMB/LocalSend.
+The Mac's `@` symbol is routed to a dedicated virtual key whose XKB type consumes
+its symbol-producing Option/Shift modifiers. This prevents an Option+2 firmware
+chord from activating a browser shortcut while keeping Option+letter navigation.
 
 ## Tests
 
@@ -201,6 +204,10 @@ does not overwrite this machine’s managed preset.
 6. Copy the AI repository’s Omarchy example config, substitute home and username
    paths, apply it, then run `dotfiles-ai-omarchy-setup`. Authenticate each AI
    provider separately.
+7. Run `omarchy-espanso-setup`, restore the private Espanso source from the
+   encrypted backup, and apply it using its separate chezmoi config. Test on
+   both built-in and remote keyboards. See `~/.config/omarchy-host/next-steps.md`
+   for the interactive sign-ins, transfer, theme import, and access checks.
 
 Configuration and installation are reproducible; authentication is interactive.
 To preserve the RustDesk server’s identity across a wipe, securely back up
@@ -302,3 +309,30 @@ No disk-unlock or desktop-login security settings are changed by this helper.
 For long-lived server availability, review this device's key expiry in the
 Tailscale admin console and disable expiry there if that matches your policy.
 Enrollment and expiry are tailnet state, not settings chezmoi can recreate.
+
+### Private Espanso configuration
+
+`omarchy-espanso-setup` installs the prebuilt Wayland release through AUR and
+enables its managed desktop service. It skips the first-run wxWidgets wizard,
+which crashes with the prebuilt Debian executable on this Arch installation.
+Search/forms still use that GUI library and need separate verification. The
+service limits repeated restarts and core dumps. The helper initializes the
+built-in keyboard as `us(colemak_dh_ortho)` and disables the double-Alt toggle.
+Personal Espanso files must remain in a separate
+private chezmoi source; this public source does not manage `~/.config/espanso`
+and ignores accidental Espanso source directories in Git. Never add snippet
+contents or a configuration archive to this public repository.
+
+Transfer the Mac configuration through the private Samba share for initial
+import. The recovery helper includes live Espanso configuration and the local
+private source in its encrypted archive. Recreate and verify the off-machine
+backup after changing those files. Wayland Espanso reads kernel input devices;
+expansions from Waynergy's compositor-level virtual keyboard require separate
+verification and are not guaranteed by installing Espanso.
+
+The local private source is `~/.local/share/chezmoi-private/espanso`, configured
+by `~/.config/chezmoi-private/espanso.toml`; it has no public Git remote. Manage it
+with `chezmoi --config ~/.config/chezmoi-private/espanso.toml ...`. After editing
+the live configuration, use that command with `add ~/.config/espanso` to save it,
+then refresh the encrypted recovery backup. A private Git remote can be added
+later; never push this source to the public dotfiles repository.
