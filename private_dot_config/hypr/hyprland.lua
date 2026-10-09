@@ -27,3 +27,7 @@ require("default.hypr.toggles")
 
 -- Add any other personal Hyprland configuration below.
 -- o.window("qemu", { workspace = "5" })
+
+-- Keep ChatGPT subtly transparent, matching Omarchy's default window opacity.
+-- A per-window transparency toggle can override this until cleared or reopened.
+o.window("^chatgpt$", { opaque = false, opacity = "0.985 0.96" })

@@ -109,6 +109,32 @@ enrollment, access rules, and expiry are external state, not chezmoi files.
 
 ## Recovery before wiping
 
+### Current snapshot and backup coverage
+
+Omarchy's Snapper root configuration captures system rollback snapshots before
+Omarchy updates and retains five numbered snapshots. Timeline snapshots are
+disabled; the cleanup timer is enabled. Root snapshots exclude the separate
+`/home`, package-cache and log subvolumes. Limine snapshot integration is
+installed. Run `sudo snapper -c root list` to verify actual retained snapshots;
+the October 9 audit could read the configuration but could not list snapshots
+without a password. Use `omarchy-snapshot create` for a manual system snapshot.
+
+These snapshots remain on the same physical disk. They do not protect against
+disk loss or a machine wipe. The existing encrypted recovery archive is also
+on this disk; an independent copy and a successful decryption test are pending.
+The recovery helper covers service identities, credentials and private Espanso
+state, but does not currently include Zen's personal profile, all home files,
+or a complete bootable system image.
+
+For the next backup setup, choose an off-machine destination and cover the
+personal Zen profile, private configuration and AI state, Shared files, and
+service databases/identities. Keep public reproducible configuration in the
+two dotfiles repositories. Back up private Git state and any unpushed work as
+well. Verify the encryption identity is available independently, perform a
+restore test into an isolated directory, and document reinstall and recovery.
+Choose whether full disk-image recovery is also needed before implementing
+that additional layer. No scheduled independent backup is configured yet.
+
 In Omarchy Kitty run `omarchy-recovery-backup` and enter the Linux password.
 This briefly stops and restarts RustDesk/Samba to copy their databases safely.
 Copy the newest `Shared/Recovery/*.tar.gz.age` archive to your Mac afterward.
