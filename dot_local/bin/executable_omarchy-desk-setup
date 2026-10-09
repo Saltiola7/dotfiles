@@ -56,5 +56,22 @@ if ! sudo pdbedit -L -u "$share_user" | cut -d: -f1 | rg -Fxq "$share_user"; the
 fi
 sudo systemctl enable --now smb.service
 sudo systemctl restart smb.service
+if command -v ufw >/dev/null; then
+  # Permit the current private LAN only, plus the authenticated tailnet.
+  read -r lan_interface lan_subnet < <(python3 - <<'PYLAN'
+import ipaddress,json,subprocess
+routes=json.loads(subprocess.check_output(['ip','-j','-4','route','show','default']))
+device=next(r['dev'] for r in routes if r.get('dev') != 'tailscale0')
+addresses=json.loads(subprocess.check_output(['ip','-j','-4','addr','show','dev',device]))
+address=next(a for d in addresses for a in d['addr_info'] if a.get('scope')=='global')
+subnet=ipaddress.ip_network(f"{address['local']}/{address['prefixlen']}",strict=False)
+if not subnet.is_private: raise SystemExit('LAN is not private; configure access explicitly')
+print(device,subnet)
+PYLAN
+  )
+  [[ -n $lan_interface && -n $lan_subnet ]] || exit 1
+  sudo ufw allow in on "$lan_interface" proto tcp from "$lan_subnet" to any port 445 comment 'Shared folder private LAN'
+  sudo ufw allow in on tailscale0 proto tcp from 100.64.0.0/10 to any port 445 comment 'Shared folder Tailscale'
+fi
 echo "In Finder: Go > Connect to Server > smb://<this-laptop-IP>/Shared"
 echo "Use username $share_user and the SMB password you chose."

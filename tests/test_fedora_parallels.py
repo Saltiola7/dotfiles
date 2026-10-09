@@ -300,7 +300,7 @@ def test_out_of_band_guest_state_is_reconciled():
     assert "background              #1E1E2E" in theme
     # The live guest kitty.conf stays a stand-in; the personal profile owns the
     # final template, and macOS kitty.conf keeps its existing mocha.conf include.
-    assert (ROOT / "private_dot_config/kitty/kitty.conf").read_text().startswith("include mocha.conf\n")
+    assert (ROOT / "private_dot_config/kitty/kitty.conf.tmpl").read_text().startswith("include mocha.conf\n")
     for path in ROOT.rglob("*bar-mocha*"):
         raise AssertionError(f"retired bar-mocha artifact reappeared: {path}")
 

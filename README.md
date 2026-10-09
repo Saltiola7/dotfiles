@@ -89,8 +89,8 @@ omarchy-desk-setup smb
 The SMB command installs Samba, validates the configuration, backs up any changed
 system configuration, creates `~/Shared`, asks for an SMB password if needed, and
 enables the service. Connect from Finder using `smb://<laptop-IP>/Shared` and your
-Linux username. Network access to TCP port 445 is required; firewall rules remain
-an explicit machine-specific step.
+Linux username. When UFW is installed, setup permits TCP port 445 on the
+current private LAN interface/subnet and on Tailscale. Rerun setup if the LAN changes.
 
 The built-in keyboard uses `us(colemak_dh_ortho)` for an unshifted Z X C D V
 bottom row. A ZSA already mapping keys in hardware
@@ -249,3 +249,25 @@ Hyprland profile does not provide remote login-screen access. Screen capture
 and remote input must be verified in an active, logged-in desktop session.
 The packaged root service handles input injection; do not make `/dev/uinput`
 world-writable as a workaround.
+
+### Encrypted recovery archive
+
+Run `omarchy-recovery-backup` in Kitty after setup and copy the resulting
+`~/Shared/Recovery/*.tar.gz.age` off this laptop. The helper briefly stops
+active RustDesk and Samba services to copy their databases consistently,
+encrypts directly with your configured chezmoi age recipient, and restarts
+the services. It includes RustDesk identities, Samba password hashes,
+Synergy certificates, Waynergy trust, local chezmoi configuration and available
+Codex/OpenCode authentication. It never writes a plaintext archive.
+
+Keep the matching age private identity safely on another device. Verify the
+archive there before wiping, for example with
+`chezmoi decrypt omarchy-YYYYMMDD-HHMMSS.tar.gz.age | tar -tzf -`.
+To restore on a rebuilt machine with the same username, decrypt and extract
+the archive into `/` while RustDesk and Samba are stopped, then rerun the
+managed setup commands. Local configurations contain the original home and
+state paths; update them if the username changes. Enroll Tailscale again.
+The archive contains credentials: keep it encrypted and outside Git.
+
+Zen's user desktop entry opens `~/.zen/omarchy` explicitly, so launching it
+from the app menu or a link uses the managed profile instead of a profile picker.

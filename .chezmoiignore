@@ -16,6 +16,8 @@ apply-omarchy-theme.sh
 .local/bin/omarchy-rustdesk-client-setup
 .local/bin/omarchy-desk-setup
 .local/bin/omarchy-waynergy-test
+.local/bin/omarchy-recovery-backup
+.local/share/applications/zen.desktop
 .config/waynergy/
 {{ end }}
 {{ if eq .machine_type "omarchy" }}
@@ -69,6 +71,12 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-rustdesk-client-setup
 !.local/bin/omarchy-zen-setup
 !.local/bin/omarchy-waynergy-test
+!.local/bin/omarchy-recovery-backup
+!.local/share/
+.local/share/*
+!.local/share/applications/
+.local/share/applications/*
+!.local/share/applications/zen.desktop
 {{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
