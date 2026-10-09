@@ -2,13 +2,32 @@
 # Explicit setup for the Omarchy desk; no privileged work during chezmoi apply.
 set -euo pipefail
 
-if [[ ${1:-} != "smb" && ${1:-} != "input" && ${1:-} != "tailscale" && ${1:-} != "terminal" ]]; then
-  echo "Usage: omarchy-desk-setup {smb|input|tailscale|terminal}" >&2
+if [[ ${1:-} != "smb" && ${1:-} != "input" && ${1:-} != "tailscale" && ${1:-} != "terminal" && ${1:-} != "always-on" ]]; then
+  echo "Usage: omarchy-desk-setup {smb|input|tailscale|terminal|always-on}" >&2
   exit 2
 fi
 if [[ ! -t 0 ]]; then
   echo "Run this command in a terminal for sudo and SMB password prompts." >&2
   exit 1
+fi
+
+if [[ $1 == "always-on" ]]; then
+  omarchy pkg add tailscale
+  source_config="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-host/logind.conf"
+  target_config=/etc/systemd/logind.conf.d/60-omarchy-desk.conf
+  if sudo test -f "$target_config" && ! sudo cmp -s "$source_config" "$target_config"; then
+    sudo cp -a "$target_config" "$target_config.backup.$(date +%Y%m%d%H%M%S)"
+  fi
+  sudo install -Dm644 "$source_config" "$target_config"
+  sudo systemctl reload systemd-logind.service
+  sudo systemctl enable --now tailscaled.service
+  sudo tailscale set --ssh
+  echo 'On AC: closing the lid no longer suspends the machine. Idle does not suspend it.'
+  echo 'Desktop auto-lock remains enabled; it does not stop the relay server or SSH.'
+  printf 'From the Mac on Tailscale: ssh %s@%s\n' "$(id -un)" "$(tailscale ip -4)"
+  echo 'SSH access follows your tailnet policy and may request browser verification.'
+  echo 'After a reboot, the encrypted disk must be unlocked before services can start.'
+  exit 0
 fi
 
 if [[ $1 == "tailscale" ]]; then

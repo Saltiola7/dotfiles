@@ -6,6 +6,7 @@
 .config/rustdesk-server/
 .config/rustdesk-client/
 .config/omarchy/shell.json
+.config/omarchy-host/
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
 .config/xdg-terminals.list
@@ -49,6 +50,8 @@ apply-omarchy-theme.sh
 !.config/omarchy/
 .config/omarchy/*
 !.config/omarchy/shell.json
+!.config/omarchy-host/
+!.config/omarchy-host/**
 !.config/zen-managed/
 !.config/zen-managed/**
 !.config/systemd/
