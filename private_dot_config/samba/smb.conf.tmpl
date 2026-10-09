@@ -1,0 +1,20 @@
+[global]
+    server role = standalone server
+    security = user
+    map to guest = Never
+    server min protocol = SMB2
+    smb ports = 445
+    disable netbios = yes
+    load printers = no
+    printing = bsd
+    printcap name = /dev/null
+    disable spoolss = yes
+
+[Shared]
+    path = {{ .chezmoi.homeDir }}/Shared
+    browseable = yes
+    read only = no
+    guest ok = no
+    valid users = {{ .chezmoi.username }}
+    create mask = 0600
+    directory mask = 0700

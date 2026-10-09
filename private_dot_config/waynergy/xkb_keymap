@@ -1,0 +1,7 @@
+// The ZSA performs Colemak DH in hardware. config.ini translates Mac wire codes.
+xkb_keymap {
+ xkb_keycodes { include "evdev+aliases(qwerty)" };
+ xkb_types { include "complete" };
+ xkb_compatibility { include "complete" };
+ xkb_symbols { include "pc+fi(mac)" };
+};

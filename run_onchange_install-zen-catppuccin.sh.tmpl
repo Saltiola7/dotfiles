@@ -34,6 +34,49 @@ else
     echo "Catppuccin Mocha Lavender installed to $found profile(s)."
     echo "Restart Zen Browser to apply the theme."
 fi
+{{ else if eq .machine_type "omarchy" -}}
+set -euo pipefail
+export ZEN_THEME_DIR="{{ joinPath .chezmoi.sourceDir "zen-catppuccin-mocha" }}"
+python3 - <<'PYZEN'
+import configparser, os, shutil, time
+from pathlib import Path
+root = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'zen'
+registry = root / 'profiles.ini'
+if not registry.exists():
+    root = Path.home() / '.zen'
+    registry = root / 'profiles.ini'
+if not registry.exists():
+    print('Launch Zen or run omarchy-zen-setup to create its profile first.')
+    raise SystemExit(0)
+config = configparser.ConfigParser()
+config.read(registry)
+for section in config.sections():
+    if not section.startswith('Profile') or not config.has_option(section, 'Path'): continue
+    profile = Path(config[section]['Path'])
+    if config[section].get('IsRelative', '1') == '1': profile = root / profile
+    if not profile.is_dir(): continue
+    chrome = profile / 'chrome'
+    chrome.mkdir(exist_ok=True)
+    for name in ['userChrome.css', 'userContent.css', 'zen-logo-mocha.svg']:
+        source = Path(os.environ['ZEN_THEME_DIR']) / name
+        target = chrome / name
+        if target.exists() and target.read_bytes() != source.read_bytes():
+            shutil.copy2(target, target.with_name(name + '.backup.' + str(int(time.time()))))
+        shutil.copy2(source, target)
+    prefs = profile / 'user.js'
+    text = prefs.read_text() if prefs.exists() else ''
+    start, end = '// BEGIN chezmoi Zen Mocha', '// END chezmoi Zen Mocha'
+    if start in text and end in text:
+        before, remainder = text.split(start, 1)
+        text = before + remainder.split(end, 1)[1].lstrip('\n')
+    block = '\n'.join([start,
+        'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);',
+        'user_pref("layout.css.prefers-color-scheme.content-override", 0);',
+        'user_pref("browser.theme.content-theme", 0);',
+        'user_pref("browser.theme.toolbar-theme", 0);', end, ''])
+    prefs.write_text(text.rstrip() + '\n' + block)
+    print('Catppuccin Mocha installed:', profile.name)
+PYZEN
 {{ else -}}
-echo "Zen Browser theme installation is only supported on macOS. Skipping."
+echo "Zen theme setup is supported on macOS and Omarchy."
 {{ end -}}

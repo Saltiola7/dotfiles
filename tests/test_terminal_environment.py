@@ -26,12 +26,12 @@ def text(path):
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
     config = text(".chezmoi.toml.tmpl")
-    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace)" "macbook"' in config
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy)" "macbook"' in config
     assert "macbook/mac-mini/lmsh" in config
     assert "atuin_sync_address" in config
     assert '{{ if eq $machineType "mac-mini" }}' in config
     assert '"/Volumes/ext/git/Personal/dotfiles"' in config
-    assert '"{{ .chezmoi.homeDir }}/.local/share/chezmoi"' in config
+    assert '{{ .chezmoi.sourceDir | quote }}' in config
     assert 'hardlink = {{ if eq $machineType "mac-mini" }}false{{ else }}true{{ end }}' in config
     ignored = text(".chezmoiignore")
     assert '{{ if eq .machine_type "lmsh" }}' in ignored

@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Native daemonless Podman/systemd setup; preserves existing Docker server data.
+set -euo pipefail
+[[ -t 0 ]] || { echo "Run in a terminal for sudo prompts." >&2; exit 1; }
+omarchy pkg add tailscale podman
+sudo systemctl enable --now tailscaled.service
+ip=$(tailscale ip -4 2>/dev/null) || { echo "First enroll with sudo tailscale up." >&2; exit 1; }
+[[ $ip =~ ^100\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+config="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk-server"
+stage=$(mktemp -d)
+trap 'rm -rf "$stage"' EXIT
+for name in hbbs hbbr; do
+  sed "s/@TAILSCALE_IP@/$ip/g" "$config/rustdesk-$name.container" > "$stage/rustdesk-$name.container"
+done
+QUADLET_UNIT_DIRS="$stage" /usr/lib/systemd/system-generators/podman-system-generator --dryrun > "$stage/generated-units"
+image=$(sed -n 's/^Image=//p' "$stage/rustdesk-hbbs.container")
+sudo podman pull "$image"
+sudo install -d -m 0700 /var/lib/rustdesk-server
+sudo install -d -m 0755 /etc/containers/systemd
+was_docker=false
+systemctl is-active --quiet rustdesk-server.service && was_docker=true
+if [[ $was_docker == true ]]; then sudo systemctl disable --now rustdesk-server.service; fi
+rollback() {
+  echo "Podman startup failed; restoring the previous server." >&2
+  sudo systemctl stop rustdesk-hbbs.service rustdesk-hbbr.service || true
+  for name in hbbs hbbr; do sudo rm -f "/etc/containers/systemd/rustdesk-$name.container"; done
+  sudo systemctl daemon-reload
+  if [[ $was_docker == true ]]; then sudo systemctl enable --now rustdesk-server.service; fi
+}
+for name in hbbs hbbr; do
+  target="/etc/containers/systemd/rustdesk-$name.container"
+  if sudo test -f "$target" && ! sudo cmp -s "$stage/rustdesk-$name.container" "$target"; then
+    sudo cp -a "$target" "$target.backup.$(date +%Y%m%d%H%M%S)"
+  fi
+  sudo install -m 0644 "$stage/rustdesk-$name.container" "$target"
+done
+sudo systemctl daemon-reload
+if ! sudo systemctl restart rustdesk-hbbr.service rustdesk-hbbs.service; then rollback; exit 1; fi
+sleep 2
+if ! systemctl is-active --quiet rustdesk-hbbs.service rustdesk-hbbr.service; then rollback; exit 1; fi
+"$HOME/.local/bin/omarchy-rustdesk-firewall"
+# Do not disable a runtime with unrelated workloads.
+if systemctl is-active --quiet docker.service; then
+  remaining=$(sudo docker ps -q)
+  if [[ -z $remaining ]]; then
+    sudo systemctl disable --now docker.service docker.socket
+    has_tasks=false
+    while IFS= read -r namespace; do
+      [[ -n $namespace ]] || continue
+      [[ -z $(sudo ctr -n "$namespace" tasks list -q) ]] || has_tasks=true
+    done < <(sudo ctr namespaces list -q)
+    if [[ $has_tasks == false ]]; then sudo systemctl disable --now containerd.service; fi
+  else
+    echo "Other Docker workloads are running; Docker left enabled."
+  fi
+fi
+sudo cat /var/lib/rustdesk-server/id_ed25519.pub | tee "$config/server-key.pub"
+printf '\nID server: %s\nRelay: %s:21117\nPublic key saved to %s/server-key.pub\n' "$ip" "$ip" "$config"
+sudo podman ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'

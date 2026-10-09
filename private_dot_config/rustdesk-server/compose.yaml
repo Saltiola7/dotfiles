@@ -1,0 +1,29 @@
+# Official RustDesk Server OSS 1.1.16, pinned by registry digest.
+name: omarchy-rustdesk
+services:
+  hbbs:
+    image: rustdesk/rustdesk-server@sha256:8ecdab65deb7c84652a626380e31d11a8f1fbafd97916d57f95c20628f943c00
+    command: ["hbbs", "-r", "${TAILSCALE_IP:?Tailscale enrollment required}:21117", "-k", "_"]
+    ports:
+      - "${TAILSCALE_IP}:21115:21115/tcp"
+      - "${TAILSCALE_IP}:21116:21116/tcp"
+      - "${TAILSCALE_IP}:21116:21116/udp"
+    volumes:
+      - /var/lib/rustdesk-server:/root
+    depends_on:
+      - hbbr
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+  hbbr:
+    image: rustdesk/rustdesk-server@sha256:8ecdab65deb7c84652a626380e31d11a8f1fbafd97916d57f95c20628f943c00
+    command: ["hbbr", "-k", "_"]
+    ports:
+      - "${TAILSCALE_IP}:21117:21117/tcp"
+    volumes:
+      - /var/lib/rustdesk-server:/root
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}

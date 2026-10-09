@@ -1,0 +1,20 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Zen Browser
+Comment=Browse with the managed Omarchy profile
+Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" %u
+Icon=zen-browser
+Terminal=false
+Categories=Network;WebBrowser;
+StartupWMClass=zen
+MimeType=text/html;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+Actions=new-window;new-private-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" --new-window
+
+[Desktop Action new-private-window]
+Name=New Private Window
+Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" --private-window

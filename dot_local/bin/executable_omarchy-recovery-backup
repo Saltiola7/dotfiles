@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Encrypt runtime identities without writing a plaintext archive to disk.
+set -euo pipefail
+umask 077
+[[ -t 0 ]] || { echo 'Run in a terminal for the sudo password prompt.' >&2; exit 1; }
+output=${1:-"$HOME/Shared/Recovery/omarchy-$(date +%Y%m%d-%H%M%S).tar.gz.age"}
+[[ $output == /* && ! -e $output && ! -e $output.partial ]] || {
+  echo 'Choose a new absolute output filename.' >&2; exit 1;
+}
+recipient=$(chezmoi dump-config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["age"]["recipient"])')
+[[ $recipient == age1* ]] || { echo 'Configure the recovery age recipient first.' >&2; exit 1; }
+sudo -v
+mkdir -p "$(dirname "$output")"
+chmod 700 "$(dirname "$output")"
+
+items=()
+for path in /var/lib/rustdesk-server /var/lib/samba/private /root/.config/rustdesk \
+  "$HOME/.config/Synergy" "$HOME/.config/waynergy/tls" "$HOME/.config/rustdesk" \
+  "$HOME/.config/chezmoi/chezmoi.toml" "$HOME/.config/chezmoi/key.txt" \
+  "$HOME/.config/dotfiles-ai/chezmoi.toml" \
+  "/var/lib/dotfiles-ai/$(id -un)/codex/auth.json" \
+  "/var/lib/dotfiles-ai/$(id -un)/xdg/data/opencode/auth.json"; do
+  if sudo test -e "$path"; then items+=("${path#/}"); fi
+done
+[[ ${#items[@]} -gt 0 ]] || { echo 'No recovery state found.' >&2; exit 1; }
+
+# Stop services briefly for a consistent copy of their databases.
+active=()
+for service in rustdesk-hbbs.service rustdesk-hbbr.service rustdesk.service smb.service; do
+  if systemctl is-active --quiet "$service"; then active+=("$service"); fi
+done
+cleanup() {
+  status=$?
+  if [[ ${#active[@]} -gt 0 ]]; then sudo systemctl start "${active[@]}" || status=1; fi
+  rm -f "$output.partial"
+  exit "$status"
+}
+trap cleanup EXIT
+if [[ ${#active[@]} -gt 0 ]]; then sudo systemctl stop "${active[@]}"; fi
+sudo tar --create --gzip --file=- --directory=/ -- "${items[@]}" \
+  | chezmoi encrypt --age-recipient "$recipient" --output "$output.partial"
+[[ -s $output.partial ]] || { echo 'Encryption produced no archive.' >&2; exit 1; }
+chmod 600 "$output.partial"
+mv "$output.partial" "$output"
+printf 'Encrypted backup: %s\nCopy it off this laptop and verify decryption with your age identity before wiping.\n' "$output"

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ $# != 1 ]]; then
+  echo "Usage: omarchy-waynergy-test <Mac-IP-or-hostname>" >&2
+  exit 2
+fi
+if ! command -v waynergy >/dev/null; then
+  echo "First run omarchy-desk-setup input." >&2
+  exit 1
+fi
+echo "Ensure Synergy is sharing the Mac keyboard/mouse and the configured client name matches."
+echo "Stop the Linux Synergy client before this test. Press Ctrl+C to stop Waynergy."
+cert_dir="${XDG_CONFIG_HOME:-$HOME/.config}/waynergy/tls"
+paired_cert="${XDG_CONFIG_HOME:-$HOME/.config}/Synergy/synergyCert.pem"
+if [[ -f "$paired_cert" && ! -e "$cert_dir/cert" ]]; then
+  mkdir -p "$cert_dir"
+  ln -s "$paired_cert" "$cert_dir/cert"
+fi
+exec waynergy --host "$1" --backend wlr --enable-crypto --enable-tofu --loglevel info

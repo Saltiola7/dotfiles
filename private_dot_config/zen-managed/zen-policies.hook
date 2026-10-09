@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = zen-browser-bin
+
+[Action]
+Description = Apply managed Zen extension policies
+When = PostTransaction
+Exec = /usr/local/libexec/omarchy-zen-policies
