@@ -118,9 +118,10 @@ and `waynergy_client_name` to match the Mac screen name.
 Verify screen-edge switching, Finnish symbols and modifiers on both keyboards.
 Waynergy supports text clipboard; image clipboard is not available through this
 client. Images and files can use SMB/LocalSend.
-The Mac's `@` symbol is routed to a dedicated virtual key whose XKB type consumes
-its symbol-producing Option/Shift modifiers. This prevents an Option+2 firmware
-chord from activating a browser shortcut while keeping Option+letter navigation.
+The Finnish Mac/ZSA `@` macro sends left Option+2 over Synergy. Hyprland intercepts
+that chord and inserts `@` through `wtype` instead of forwarding an application
+shortcut. Option+letter navigation and Ctrl+Shift+Option+2 workspace selection
+retain their existing bindings.
 
 ## Tests
 

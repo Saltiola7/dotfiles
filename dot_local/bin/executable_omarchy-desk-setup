@@ -45,9 +45,9 @@ if [[ $1 == "terminal" ]]; then
 fi
 
 if [[ $1 == "input" ]]; then
-  omarchy pkg add wl-clipboard
+  omarchy pkg add wl-clipboard wtype
   omarchy pkg aur add synergy3-bin waynergy
-  pacman -Q synergy3-bin waynergy wl-clipboard
+  pacman -Q synergy3-bin waynergy wl-clipboard wtype
   systemctl --user daemon-reload
   systemctl --user enable omarchy-waynergy.service
   echo "Input-sharing packages installed. Configure Synergy 3 before starting it."
