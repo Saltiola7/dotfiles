@@ -197,6 +197,7 @@ does not overwrite this machine’s managed preset.
 5. Run `omarchy-desk-setup terminal`, `omarchy-desk-setup smb`, and
    `omarchy-zen-setup`. Import Dark Reader’s
    managed preset once.
+   For an always-on desk host, run `omarchy-desk-setup always-on` as well.
 6. Copy the AI repository’s Omarchy example config, substitute home and username
    paths, apply it, then run `dotfiles-ai-omarchy-setup`. Authenticate each AI
    provider separately.
@@ -274,3 +275,30 @@ The archive contains credentials: keep it encrypted and outside Git.
 
 Zen's user desktop entry opens `~/.zen/omarchy` explicitly, so launching it
 from the app menu or a link uses the managed profile instead of a profile picker.
+
+### Always-on access
+
+Run `omarchy-desk-setup always-on` in Kitty to install the managed logind
+drop-in and enable Tailscale SSH. On external power, closing the lid does not
+suspend the laptop; battery lid behavior remains unchanged. Automatic idle
+suspension is disabled. Explicit sleep/shutdown and power loss still stop
+network access. The existing five-minute desktop lock is retained and does
+not stop the system services. RustDesk registration/relay, Samba and Tailscale
+run at boot independently of the desktop session.
+
+From another authenticated tailnet device, use `ssh tis@100.86.125.94` (substitute
+the rebuilt host's username/IP). Tailscale supplies SSH authentication and
+authorization, so no separate SSH daemon or public SSH port is required.
+The tailnet policy must permit both network and SSH access; its default rule
+allows access to your own devices and may require browser reauthentication.
+
+RustDesk's current Wayland client does not guarantee access to the login screen
+after logout. Screen capture and unlocking an idle-locked Hyprland session must
+be tested from the actual remote client. Omarchy's existing desktop autologin
+starts the session after boot, but the encrypted root disk must first unlock;
+neither RustDesk nor ordinary SSH is available at that early disk prompt.
+No disk-unlock or desktop-login security settings are changed by this helper.
+
+For long-lived server availability, review this device's key expiry in the
+Tailscale admin console and disable expiry there if that matches your policy.
+Enrollment and expiry are tailnet state, not settings chezmoi can recreate.
