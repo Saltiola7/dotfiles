@@ -186,6 +186,13 @@ Dark Reader through a browser policy. A pacman hook preserves that policy
 after Zen upgrades while retaining packaged and unrelated policies. Restart
 Zen after configuration changes.
 
+The launcher pins `~/.zen/omarchy`. `omarchy-zen-profile` also registers that
+existing directory as the default in Zen's profile registries, including
+per-install defaults, so a plain `zen-browser` launch uses the same settings.
+It preserves alternative profiles and backs up changed registry files under
+`~/.local/state/omarchy-zen/`. It skips registry edits while Zen is running.
+No bookmarks, sessions, preferences, or extension data are copied into Git.
+
 Dark Reader does not consume managed theme settings. Its supported import
 file lives at `~/.config/zen-managed/darkreader-mocha.json`: in the extension,
 open Settings → Advanced → Import settings and select that file. It uses

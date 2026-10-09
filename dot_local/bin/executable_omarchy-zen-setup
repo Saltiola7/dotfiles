@@ -5,6 +5,7 @@ omarchy pkg aur add zen-browser-bin
 if [[ ! -f ${XDG_CONFIG_HOME:-$HOME/.config}/zen/profiles.ini && ! -f $HOME/.zen/profiles.ini ]]; then
   zen-browser --headless -CreateProfile "omarchy $HOME/.zen/omarchy"
 fi
+"$HOME/.local/bin/omarchy-zen-profile"
 source_dir=$(chezmoi execute-template '{{ .chezmoi.sourceDir }}')
 python3 - "$source_dir" <<'PYTHEME'
 import subprocess,sys

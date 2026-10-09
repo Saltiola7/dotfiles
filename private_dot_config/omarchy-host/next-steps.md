@@ -23,7 +23,8 @@ On the built-in keyboard, the Windows/Super key corresponds to Cmd.
 
 ## AI sign-ins
 
-In Kitty on Omarchy, run:
+First check `codex login status` and `opencode auth list`. If already signed in,
+skip the login steps and test a harmless prompt. Otherwise, in Kitty run:
 
 ```sh
 codex login --device-auth
@@ -38,8 +39,8 @@ Next run `opencode auth login`, select OpenAI, then the ChatGPT/headless login
 method. Follow its fresh URL/code and check with `opencode auth list`.
 Credentials live in this machine's private AI runtime state, outside Git.
 Finally open Codex and OpenCode and send a harmless test prompt in each. Open
-Herdr from Kitty to verify a real multiplexer session; provider behavior has
-not yet been tested because both tools are unauthenticated.
+Herdr from Kitty to verify a real multiplexer session; sign-in status alone
+does not verify a real provider request or a multiplexer session.
 
 Official Codex guidance: https://learn.chatgpt.com/docs/auth
 
@@ -75,6 +76,11 @@ This private source has no remote. The encrypted recovery backup includes it.
 A private Git repository can be added later if you prefer.
 
 ## Dark Reader Mocha
+
+Zen's launcher and its ordinary default both select `~/.zen/omarchy`. If a
+different profile appears after restarting, close Zen and run
+`omarchy-zen-profile`, then reopen using the app launcher. Alternate profiles
+are preserved, with changed registries backed up in `~/.local/state/omarchy-zen`.
 
 In Zen, open Dark Reader's settings, then Advanced → Import settings. Select
 `~/.config/zen-managed/darkreader-mocha.json` (Ctrl+L in the file picker accepts

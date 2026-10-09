@@ -3,7 +3,7 @@ Version=1.0
 Type=Application
 Name=Zen Browser
 Comment=Browse with the managed Omarchy profile
-Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" %u
+Exec="{{ .chezmoi.homeDir }}/.local/bin/omarchy-zen-launch" %u
 Icon=zen-browser
 Terminal=false
 Categories=Network;WebBrowser;
@@ -13,8 +13,8 @@ Actions=new-window;new-private-window;
 
 [Desktop Action new-window]
 Name=New Window
-Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" --new-window
+Exec="{{ .chezmoi.homeDir }}/.local/bin/omarchy-zen-launch" --new-window
 
 [Desktop Action new-private-window]
 Name=New Private Window
-Exec=zen-browser --profile "{{ .chezmoi.homeDir }}/.zen/omarchy" --private-window
+Exec="{{ .chezmoi.homeDir }}/.local/bin/omarchy-zen-launch" --private-window
