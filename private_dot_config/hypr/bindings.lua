@@ -1,9 +1,9 @@
 -- Mac-primary desk, mirrored from this repository's AeroSpace configuration.
 -- Semantic keys support both software and hardware Colemak.
 -- Omarchy's app-aware Cmd/Super+C/V clipboard bindings remain enabled.
-local function replace(chord, description, action)
+local function replace(chord, description, action, options)
   hl.unbind(chord)
-  o.bind(chord, description, action)
+  o.bind(chord, description, action, options)
 end
 -- Previously window cycling; AeroSpace uses workspace back-and-forth.
 replace("ALT + TAB", "AeroSpace: previous workspace", hl.dsp.focus({ workspace = "previous" }))
@@ -24,9 +24,9 @@ replace("ALT + EQUAL", "AeroSpace: grow window", hl.dsp.window.resize({ x = 50, 
 replace("SUPER + SPACE", "Application launcher", "omarchy-menu toggle apps")
 -- The Finnish Mac/ZSA @ macro sends left Option+2 over Synergy.
 -- Insert the character directly instead of forwarding an application shortcut.
-replace("ALT + 2", "Insert @ (Finnish Mac keyboard)", "sleep 0.1; wtype -- @")
+replace("ALT + 2", "Insert @ (Finnish Mac keyboard)", "wtype -m alt -- @", { release = true })
 -- Also cover an already-running Waynergy client with the previous @ ID map.
-replace("ALT + at", "Insert @ (Mac symbol event)", "sleep 0.1; wtype -- @")
+replace("ALT + at", "Insert @ (Mac symbol event)", "wtype -m alt -- @", { release = true })
 -- Cmd+W is already close-window; Cmd+Q is an alias.
 replace("SUPER + Q", "Close window", hl.dsp.window.close())
 -- Cmd+T belongs to Kitty tabs; keep the desktop action on Ctrl+Cmd+T.
