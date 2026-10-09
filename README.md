@@ -101,6 +101,9 @@ Synergy licenses, activation state, Samba passwords, and runtime credentials sta
 outside Git. `dotfiles-ai` remains an independent source and must not own the same
 live files. Use its opt-in `linux_workstation` profile and `config.omarchy.example.toml`;
 leave sandbox and guest VMs disabled.
+The Omarchy `.bashrc` preserves the packaged shell integrations and routes
+Codex, OpenCode, Herdr and Worktrunk to their user-local managed commands,
+including after Mise updates PATH. Open a new terminal after applying it.
 
 ### Input-sharing experiment
 

@@ -1,3 +1,23 @@
+{{ if eq .machine_type "omarchy" -}}
+# Keep Omarchy's shell integrations, then select the chezmoi-managed agents.
+[[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
+export PATH="$HOME/.local/bin:$PATH"
+for agent in codex opencode herdr wt; do
+    if [[ -x "$HOME/.local/bin/$agent" ]]; then
+        case "$agent" in
+            codex) codex() { "$HOME/.local/bin/codex" "$@"; } ;;
+            opencode) opencode() { "$HOME/.local/bin/opencode" "$@"; } ;;
+            herdr) herdr() { "$HOME/.local/bin/herdr" "$@"; } ;;
+            wt) wt() { "$HOME/.local/bin/wt" "$@"; } ;;
+        esac
+    fi
+done
+unset agent
+[[ $- != *i* ]] && return
+source "$OMARCHY_PATH/default/bash/rc"
+# Mise changes PATH on each prompt; the functions above keep agent ownership stable.
+export PATH="$HOME/.local/bin:$PATH"
+{{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then
     . "$HOME/.common_profile"
@@ -87,4 +107,5 @@ bind '"\e[A": "\eOA"'
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ]; then
     [[ ${BLE_VERSION-} ]] && ble-attach
 fi
+{{ end -}}
 {{ end -}}
