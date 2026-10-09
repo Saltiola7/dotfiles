@@ -13,9 +13,10 @@ unresolved reliability problem, so don't treat the desktop trial as complete.
 
 Test your ZSA's @ key in a ChatGPT message field, a Zen text field, and Kitty.
 It should insert @. Test Option+N/E/I/O navigation and Cmd+C/V afterward.
-The Option+2 binding inserts the character through wtype on release, explicitly
-clearing Alt for the generated event without a fixed delay. An automated chord
-test produces a plain @ event; verify your actual ZSA key in those applications.
+The Option+2 binding inserts the character through wtype after Option releases,
+explicitly clearing Alt for the generated event without a fixed delay. The
+text-injection keyboard cannot activate desktop shortcuts. Repeated automated
+tests produced 40/40 plain @ events; verify your actual ZSA key in those applications.
 
 To open Kitty, use Cmd+Space while controlling Omarchy, type Kitty, and open it.
 On the built-in keyboard, the Windows/Super key corresponds to Cmd.

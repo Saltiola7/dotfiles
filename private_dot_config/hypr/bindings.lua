@@ -24,9 +24,19 @@ replace("ALT + EQUAL", "AeroSpace: grow window", hl.dsp.window.resize({ x = 50, 
 replace("SUPER + SPACE", "Application launcher", "omarchy-menu toggle apps")
 -- The Finnish Mac/ZSA @ macro sends left Option+2 over Synergy.
 -- Insert the character directly instead of forwarding an application shortcut.
-replace("ALT + 2", "Insert @ (Finnish Mac keyboard)", "wtype -m alt -- @", { release = true })
+local pending_at = false
+local function arm_at() pending_at = true end
+replace("ALT + 2", "Prepare @ (Finnish Mac keyboard)", arm_at)
 -- Also cover an already-running Waynergy client with the previous @ ID map.
-replace("ALT + at", "Insert @ (Mac symbol event)", "wtype -m alt -- @", { release = true })
+replace("ALT + at", "Prepare @ (Mac symbol event)", arm_at)
+-- Wait for the macro's Option release, not just the character-key release.
+-- Keep ordinary Option releases visible to applications and navigation.
+replace("Alt_L", "Insert prepared @ after Option release", function()
+  if pending_at then
+    pending_at = false
+    hl.exec_cmd("wtype -m alt -- @")
+  end
+end, { release = true, ignore_mods = true, non_consuming = true, transparent = true })
 -- Cmd+W is already close-window; Cmd+Q is an alias.
 replace("SUPER + Q", "Close window", hl.dsp.window.close())
 -- Cmd+T belongs to Kitty tabs; keep the desktop action on Ctrl+Cmd+T.

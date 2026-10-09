@@ -8,3 +8,5 @@ hl.device({
   kb_layout = "us",
   kb_variant = "colemak_dh_ortho",
 })
+-- Literal text injection must not invoke the desktop's shortcut bindings.
+hl.device({ name = "hl-virtual-keyboard-wtype", keybinds = false })

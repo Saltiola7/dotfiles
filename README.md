@@ -119,8 +119,11 @@ Verify screen-edge switching, Finnish symbols and modifiers on both keyboards.
 Waynergy supports text clipboard; image clipboard is not available through this
 client. Images and files can use SMB/LocalSend.
 The Finnish Mac/ZSA `@` macro sends left Option+2 over Synergy. Hyprland intercepts
-that chord and inserts `@` through `wtype` on key release, explicitly clearing
-Alt in the generated event. There is no fixed sleep before insertion.
+that chord, then inserts `@` through `wtype` when left Option is released,
+explicitly clearing Alt in the generated event. The release listener remains
+active after the chord and does not consume ordinary Option releases. The
+wtype virtual keyboard cannot trigger desktop shortcuts. There is no fixed
+sleep before insertion.
 Option+letter navigation and Ctrl+Shift+Option+2 workspace selection
 retain their existing bindings.
 
