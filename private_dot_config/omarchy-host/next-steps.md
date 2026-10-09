@@ -64,10 +64,10 @@ Private config: `~/.config/chezmoi-private/espanso.toml`
 After intentional edits, save them locally with:
 
 ```sh
-chezmoi --config ~/.config/chezmoi-private/espanso.toml add ~/.config/espanso
+chezmoi --config ~/.config/chezmoi-private/espanso.toml add ~/.config/espanso/config ~/.config/espanso/match
 ```
 
-To restore from that source, use the same command with `apply` instead of `add`.
+To restore from that source, run `chezmoi --config ~/.config/chezmoi-private/espanso.toml apply`.
 This private source has no remote. The encrypted recovery backup includes it.
 A private Git repository can be added later if you prefer.
 

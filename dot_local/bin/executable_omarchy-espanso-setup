@@ -48,7 +48,8 @@ systemctl --user is-active --quiet espanso.service || {
   echo 'Espanso did not stay running; inspect journalctl --user -u espanso.' >&2
   exit 1
 }
-chezmoi --config "$HOME/.config/chezmoi-private/espanso.toml" add "$HOME/.config/espanso"
+chezmoi --config "$HOME/.config/chezmoi-private/espanso.toml" add \
+  "$HOME/.config/espanso/config" "$HOME/.config/espanso/match"
 echo 'Espanso installed and registered for desktop startup.'
 echo 'Personal snippets are not copied into the public dotfiles repository.'
 echo 'Mac/Waynergy input and the Colemak keyboard still need expansion tests.'

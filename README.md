@@ -333,6 +333,7 @@ verification and are not guaranteed by installing Espanso.
 The local private source is `~/.local/share/chezmoi-private/espanso`, configured
 by `~/.config/chezmoi-private/espanso.toml`; it has no public Git remote. Manage it
 with `chezmoi --config ~/.config/chezmoi-private/espanso.toml ...`. After editing
-the live configuration, use that command with `add ~/.config/espanso` to save it,
+the live configuration, use that command with
+`add ~/.config/espanso/config ~/.config/espanso/match` to save it,
 then refresh the encrypted recovery backup. A private Git remote can be added
 later; never push this source to the public dotfiles repository.
