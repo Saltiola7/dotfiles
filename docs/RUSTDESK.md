@@ -1,4 +1,4 @@
-# RustDesk startup
+# RustDesk and Tailscale startup
 
 Chezmoi manages desktop startup for the Mac mini, MacBook, and Omarchy. Existing
 RustDesk credentials, access permissions, and server routing remain machine-local.
@@ -58,3 +58,38 @@ is excluded on non-macOS hosts; terminal-only and Fedora allowlists remain uncha
 References: [RustDesk macOS setup](https://rustdesk.com/docs/en/client/mac/),
 [native macOS service installation](https://github.com/rustdesk/rustdesk/blob/master/src/platform/privileges_scripts/install.scpt),
 [native Linux service](https://github.com/rustdesk/rustdesk/blob/master/res/rustdesk.service).
+
+## Tailscale
+
+On macOS, the managed `dev.dotfiles.tailscale-connect` LaunchAgent invokes the
+installed application's CLI with `up` at graphical login. `TAILSCALE_BE_CLI=1`
+ensures launchd starts the CLI rather than the GUI. Existing tailnet identity,
+exit-node, DNS, and route preferences are preserved. A failed invocation retries
+with a 60-second throttle; a successful connection exits normally without polling
+or overriding a later deliberate disconnect. Initial enrollment still requires
+the user's authentication. This provides login startup, not access before login.
+
+```bash
+chezmoi apply --exclude=scripts ~/Library/LaunchAgents/dev.dotfiles.tailscale-connect.plist
+launchctl bootstrap "gui/$(id -u)" ~/Library/LaunchAgents/dev.dotfiles.tailscale-connect.plist
+/Applications/Tailscale.app/Contents/MacOS/Tailscale status
+```
+
+On Omarchy, the existing managed `omarchy-desk-setup tailscale` setup enables
+`tailscaled.service` at boot and connects the device. For an already installed and
+enrolled client, verify and restore the native daemon directly:
+
+```bash
+sudo systemctl enable --now tailscaled.service
+sudo tailscale up
+systemctl is-enabled tailscaled.service
+systemctl is-active tailscaled.service
+tailscale status
+```
+
+An online peer proves current connectivity, but remote access is still required
+to verify its local daemon's boot enablement. An offline MacBook cannot be checked
+or configured until it becomes reachable.
+
+References: [Tailscale CLI](https://tailscale.com/docs/reference/tailscale-cli),
+[unattended operation](https://tailscale.com/docs/how-to/run-unattended).
