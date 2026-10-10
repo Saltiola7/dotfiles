@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Reject an absent, wrong, or substituted backup mount before Borg can write."""
+import json
+import subprocess
+import sys
+
+def check(expected_uuid, mountpoint):
+    result = subprocess.run(
+        ["findmnt", "--json", "--mountpoint", mountpoint,
+         "--output", "TARGET,UUID,FSTYPE"], capture_output=True, text=True)
+    if result.returncode:
+        return False
+    try:
+        filesystems = json.loads(result.stdout)["filesystems"]
+        return len(filesystems) == 1 and filesystems[0] == {
+            "target": mountpoint, "uuid": expected_uuid, "fstype": "ext4"}
+    except (ValueError, KeyError, TypeError):
+        return False
+
+if __name__ == "__main__":
+    sys.exit(0 if len(sys.argv) == 3 and check(sys.argv[1], sys.argv[2]) else 1)

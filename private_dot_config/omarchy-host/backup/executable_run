@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+source /etc/omarchy-backup/drive.env
+# Exact UUID and mountpoint: never silently back up onto the internal disk.
+check_drive() {
+  [[ -b /dev/disk/by-uuid/$BACKUP_UUID ]] || { echo 'Backup USB absent; skipped.'; return 1; }
+  if ! mountpoint -q /mnt/omarchy-backup; then mount /mnt/omarchy-backup || return 1; fi
+  /usr/local/libexec/omarchy-backup-check-mount "$BACKUP_UUID" /mnt/omarchy-backup
+}
+check_drive
+[[ ${1:-} == check-drive ]] && exit 0
+exec 9>/run/omarchy-backup.lock
+flock -n 9 || { echo 'Another backup is running.'; exit 1; }
+mkdir -p /var/lib/omarchy-backup/inventory
+pacman -Qqe > /var/lib/omarchy-backup/inventory/packages-explicit.txt
+pacman -Qqm > /var/lib/omarchy-backup/inventory/packages-foreign.txt
+lsblk -f > /var/lib/omarchy-backup/inventory/filesystems.txt
+systemctl list-unit-files --state=enabled > /var/lib/omarchy-backup/inventory/enabled-units.txt
+borgmatic --config /etc/borgmatic/omarchy.yaml create --stats
+borgmatic --config /etc/borgmatic/omarchy.yaml prune compact check
+printf 'Backup and scheduled checks completed: %s\n' "$(date --iso-8601=seconds)"

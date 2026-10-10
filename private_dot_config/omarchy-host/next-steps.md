@@ -107,6 +107,62 @@ In the Tailscale admin console, consider disabling this machine's device-key
 expiry for a long-lived server. Its current expiry is April 6, 2027. Tailnet
 enrollment, access rules, and expiry are external state, not chezmoi files.
 
+## External Borg backups
+
+Borg/borgmatic configuration is managed under `~/.config/omarchy-host/backup`.
+Formatting and privileged installation are explicit steps, never chezmoi apply.
+`omarchy-backup-setup` installs the Arch packages and reconfigures an existing
+registered drive without formatting. Initial disk preparation needs the explicit
+`backup/setup initialize-drive` command with the verified USB by-id path.
+
+The daily timer is scheduled at 03:00 America/Mexico_City with up to 15 minutes
+of randomized delay and catches up after downtime. Retention is 7 daily,
+4 weekly and 6 monthly archives. An exact filesystem UUID/mount check prevents
+writing to the internal disk when the external drive is absent or substituted.
+The mount uses `nofail`, so a disconnected drive does not block boot.
+
+The encrypted file backup covers the home directory (including Zen, private
+Espanso and unpushed work), `/etc`, `/boot`, `/root`, private service identities,
+AI runtime state and package inventories. Caches, virtual environments,
+node_modules, old recovery archives and mounted network drives are excluded.
+Network-drive data needs its own backup arrangement. Borgmatic uses native
+Btrfs snapshots for stable file copies; these provide crash consistency, not
+an application-specific transactional guarantee. `/boot` is copied separately.
+This is file recovery after reinstall, not a directly bootable disk clone.
+
+The root-readable password lives at `/etc/omarchy-backup/passphrase`. Setup
+creates a private `~/Shared/Backup-Recovery` folder with the password and an
+export of the encrypted repository key. Copy that folder to the Mac and save
+it in 1Password or another independent secure location. It is excluded from
+public Git and the backup archive. Do not store the only recovery password on
+the same laptop or the backup thumbdrive.
+
+To inspect or run the configured job:
+
+```sh
+systemctl list-timers omarchy-backup.timer
+sudo systemctl start omarchy-backup.service
+sudo journalctl -u omarchy-backup.service -n 40
+sudo borgmatic --config /etc/borgmatic/omarchy.yaml repo-list
+```
+
+After losing the machine, install Borg, set `BORG_PASSCOMMAND` to read the
+saved password, and access the existing repository. Extract into an isolated
+directory first; never overwrite the new system blindly. For example:
+
+```sh
+export BORG_PASSCOMMAND='cat /secure/path/passphrase'
+borg list /mnt/omarchy-backup/borg
+mkdir ~/restore-test
+cd ~/restore-test
+borg extract /mnt/omarchy-backup/borg::ARCHIVE home/tis/.config/hypr/hyprland.lua
+```
+
+For unattended backups on a rebuilt machine, securely restore the password to
+`/etc/omarchy-backup/passphrase` (root, mode 0600), restore the managed drive UUID
+through chezmoi, then run `omarchy-backup-setup`. Do not initialize the drive.
+The setup refuses to invent a password for an existing repository.
+
 ## Recovery before wiping
 
 ### Current snapshot and backup coverage

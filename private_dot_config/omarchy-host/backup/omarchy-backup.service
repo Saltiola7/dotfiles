@@ -1,0 +1,12 @@
+[Unit]
+Description=Encrypted Omarchy backup to the registered USB drive
+After=local-fs.target
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/local/libexec/omarchy-backup-run check-drive
+ExecStart=/usr/local/libexec/omarchy-backup-run
+Nice=15
+IOSchedulingClass=idle
+UMask=0077
+TimeoutStartSec=6h
