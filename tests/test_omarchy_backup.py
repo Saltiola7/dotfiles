@@ -32,3 +32,15 @@ def test_backup_rejects_absent_or_substituted_mount(monkeypatch, filesystems, re
 def test_backup_rejects_malformed_mount_metadata(monkeypatch):
     monkeypatch.setattr(module.subprocess, "run", lambda *a, **kw: SimpleNamespace(returncode=0, stdout="not json"))
     assert not module.check("expected", "/mnt/backup")
+
+VERIFY = ROOT / "private_dot_config/omarchy-host/backup/executable_verify_archive.py"
+verify_spec = importlib.util.spec_from_loader("backup_verify", importlib.machinery.SourceFileLoader("backup_verify", str(VERIFY)))
+verify_module = importlib.util.module_from_spec(verify_spec)
+verify_spec.loader.exec_module(verify_module)
+
+def test_valid_archive_missing_home_is_rejected():
+    expected = {"home/tis/.config/hypr/hyprland.lua", "home/tis/.zen/omarchy/prefs.js"}
+    assert verify_module.missing_paths(expected, ["boot/vmlinuz-linux"]) == expected
+
+def test_expected_archive_paths_allow_borg_relative_prefix():
+    assert not verify_module.missing_paths({"home/tis/config"}, ["./home/tis/config"])

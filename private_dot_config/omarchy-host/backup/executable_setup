@@ -50,6 +50,8 @@ fi
 install -d -m700 /etc/borgmatic
 install -m600 "$assets/config.yaml" /etc/borgmatic/omarchy.yaml
 install -Dm755 "$assets/check_mount.py" /usr/local/libexec/omarchy-backup-check-mount
+install -m600 "$assets/required-files.txt" /etc/omarchy-backup/required-files.txt
+install -Dm755 "$assets/verify_archive.py" /usr/local/libexec/omarchy-backup-verify
 install -Dm755 "$assets/run" /usr/local/libexec/omarchy-backup-run
 install -m644 "$assets/omarchy-backup.service" /etc/systemd/system/omarchy-backup.service
 install -m644 "$assets/omarchy-backup.timer" /etc/systemd/system/omarchy-backup.timer

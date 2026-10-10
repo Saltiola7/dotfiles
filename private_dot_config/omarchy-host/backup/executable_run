@@ -18,5 +18,7 @@ pacman -Qqm > /var/lib/omarchy-backup/inventory/packages-foreign.txt
 lsblk -f > /var/lib/omarchy-backup/inventory/filesystems.txt
 systemctl list-unit-files --state=enabled > /var/lib/omarchy-backup/inventory/enabled-units.txt
 borgmatic --config /etc/borgmatic/omarchy.yaml create --stats
+export BORG_PASSCOMMAND='/usr/bin/cat /etc/omarchy-backup/passphrase'
+/usr/local/libexec/omarchy-backup-verify
 borgmatic --config /etc/borgmatic/omarchy.yaml prune compact check
 printf 'Backup and scheduled checks completed: %s\n' "$(date --iso-8601=seconds)"

@@ -126,7 +126,9 @@ Espanso and unpushed work), `/etc`, `/boot`, `/root`, private service identities
 AI runtime state and package inventories. Caches, virtual environments,
 node_modules, old recovery archives and mounted network drives are excluded.
 Network-drive data needs its own backup arrangement. Borgmatic uses native
-Btrfs snapshots for stable file copies; these provide crash consistency, not
+Btrfs snapshots for stable file copies. Every job verifies that existing
+critical configuration, Zen and service/AI identity files appear in the archive
+before pruning older backups. These snapshots provide crash consistency, not
 an application-specific transactional guarantee. `/boot` is copied separately.
 This is file recovery after reinstall, not a directly bootable disk clone.
 
@@ -189,7 +191,8 @@ two dotfiles repositories. Back up private Git state and any unpushed work as
 well. Verify the encryption identity is available independently, perform a
 restore test into an isolated directory, and document reinstall and recovery.
 Choose whether full disk-image recovery is also needed before implementing
-that additional layer. No scheduled independent backup is configured yet.
+that additional layer. The external Borg setup above adds the daily backup
+layer; verify its first archive and recovery credentials before relying on it.
 
 In Omarchy Kitty run `omarchy-recovery-backup` and enter the Linux password.
 This briefly stops and restarts RustDesk/Samba to copy their databases safely.
