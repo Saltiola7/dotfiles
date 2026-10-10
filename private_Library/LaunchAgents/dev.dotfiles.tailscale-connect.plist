@@ -6,8 +6,9 @@
     <string>dev.dotfiles.tailscale-connect</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/Tailscale.app/Contents/MacOS/Tailscale</string>
-        <string>up</string>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>/Applications/Tailscale.app/Contents/MacOS/Tailscale up; exit $?</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
