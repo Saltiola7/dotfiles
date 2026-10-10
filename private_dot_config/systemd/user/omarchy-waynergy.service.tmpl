@@ -2,11 +2,13 @@
 Description=Mac keyboard and mouse through Waynergy
 After=graphical-session.target
 PartOf=graphical-session.target
+StartLimitIntervalSec=0
 
 [Service]
 ExecStart=%h/.local/bin/omarchy-waynergy-test {{ default "192.168.100.95" (get . "waynergy_server") }}
-Restart=on-failure
+Restart=always
 RestartSec=5
+TimeoutStopSec=5
 
 [Install]
 WantedBy=graphical-session.target
