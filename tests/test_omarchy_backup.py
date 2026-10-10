@@ -17,6 +17,9 @@ spec.loader.exec_module(module)
     ([{"target": "/mnt/backup", "uuid": "wrong", "fstype": "ext4"}], 0, False),
     ([{"target": "/", "uuid": "expected", "fstype": "ext4"}], 0, False),
     ([{"target": "/mnt/backup", "uuid": "expected", "fstype": "btrfs"}], 0, False),
+    ([{"target": "/mnt/backup", "uuid": "expected", "fstype": "ext4"}] * 2, 0, True),
+    ([{"target": "/mnt/backup", "uuid": "expected", "fstype": "ext4"},
+      {"target": "/mnt/backup", "uuid": "wrong", "fstype": "ext4"}], 0, False),
     ([], 1, False),
 ])
 def test_backup_rejects_absent_or_substituted_mount(monkeypatch, filesystems, returncode, allowed):

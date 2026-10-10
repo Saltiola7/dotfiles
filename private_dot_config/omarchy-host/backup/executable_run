@@ -5,7 +5,7 @@ source /etc/omarchy-backup/drive.env
 # Exact UUID and mountpoint: never silently back up onto the internal disk.
 check_drive() {
   [[ -b /dev/disk/by-uuid/$BACKUP_UUID ]] || { echo 'Backup USB absent; skipped.'; return 1; }
-  if ! mountpoint -q /mnt/omarchy-backup; then mount /mnt/omarchy-backup || return 1; fi
+  if ! mountpoint -q /mnt/omarchy-backup; then systemctl start "$(systemd-escape --path --suffix=mount /mnt/omarchy-backup)" || return 1; fi
   /usr/local/libexec/omarchy-backup-check-mount "$BACKUP_UUID" /mnt/omarchy-backup
 }
 check_drive

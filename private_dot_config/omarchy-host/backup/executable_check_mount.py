@@ -12,8 +12,8 @@ def check(expected_uuid, mountpoint):
         return False
     try:
         filesystems = json.loads(result.stdout)["filesystems"]
-        return len(filesystems) == 1 and filesystems[0] == {
-            "target": mountpoint, "uuid": expected_uuid, "fstype": "ext4"}
+        expected = {"target": mountpoint, "uuid": expected_uuid, "fstype": "ext4"}
+        return bool(filesystems) and all(item == expected for item in filesystems)
     except (ValueError, KeyError, TypeError):
         return False
 
