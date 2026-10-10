@@ -6,10 +6,21 @@ private files, or an actual remote-control test.
 ## Keyboard and Synergy
 
 Fully quit and reopen Synergy on the Mac if Omarchy stops responding. The Linux
-Waynergy service reconnects automatically. It has recently connected and then
+Waynergy service reconnects automatically and starts a fresh client five seconds
+after a fatal timeout or process exit. The launcher starts this managed service
+instead of a second client; the helper also refuses concurrent instances.
+It has recently connected and then
 timed out waiting for traffic; subsequent TLS handshakes were reset by the Mac.
 Restarting the Mac application restored access previously. This remains an
 unresolved reliability problem, so don't treat the desktop trial as complete.
+
+Mac-side automatic recovery still needs setup on the Mac. Confirm Synergy's
+login/background settings, then use its connection logs to distinguish a stopped
+server from one that is running but rejecting reconnections. A LaunchAgent could
+restart the affected Synergy component after sustained failures, with a cooldown
+and saved diagnostic logs. It must not restart merely because Omarchy is asleep,
+offline, or logged out. A process-existence or open-port check alone cannot detect
+the TLS-reset failure observed here. Keep TLS encryption enabled.
 
 Test your ZSA's @ key in a ChatGPT message field, a Zen text field, and Kitty.
 It should insert @. Test Option+N/E/I/O navigation and Cmd+C/V afterward.

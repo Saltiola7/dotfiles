@@ -24,6 +24,7 @@ apply-omarchy-theme.sh
 .local/bin/omarchy-espanso-setup
 .local/bin/omarchy-backup-setup
 .local/share/applications/zen.desktop
+.local/share/applications/waynergy.desktop
 .config/waynergy/
 {{ end }}
 {{ if eq .machine_type "omarchy" }}
@@ -91,6 +92,7 @@ apply-omarchy-theme.sh
 !.local/share/applications/
 .local/share/applications/*
 !.local/share/applications/zen.desktop
+!.local/share/applications/waynergy.desktop
 {{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml

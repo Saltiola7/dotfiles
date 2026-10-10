@@ -8,12 +8,17 @@ if ! command -v waynergy >/dev/null; then
   echo "First run omarchy-desk-setup input." >&2
   exit 1
 fi
-echo "Ensure Synergy is sharing the Mac keyboard/mouse and the configured client name matches."
-echo "Stop the Linux Synergy client before this test. Press Ctrl+C to stop Waynergy."
+exec 9>"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/omarchy-waynergy.lock"
+if ! flock -n 9; then
+  echo "Waynergy is already running. Use the Waynergy launcher to start the managed service." >&2
+  exit 1
+fi
 cert_dir="${XDG_CONFIG_HOME:-$HOME/.config}/waynergy/tls"
 paired_cert="${XDG_CONFIG_HOME:-$HOME/.config}/Synergy/synergyCert.pem"
 if [[ -f "$paired_cert" && ! -e "$cert_dir/cert" ]]; then
   mkdir -p "$cert_dir"
   ln -s "$paired_cert" "$cert_dir/cert"
 fi
-exec waynergy --host "$1" --backend wlr --enable-crypto --enable-tofu --loglevel info
+# Exit on a stalled connection so systemd replaces the client and its clipboard
+# helpers instead of reusing a possibly damaged connection state.
+exec waynergy --host "$1" --backend wlr --enable-crypto --enable-tofu --loglevel info --fatal-timeout
