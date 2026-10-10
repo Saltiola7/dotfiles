@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ -t 0 ]] || { echo 'Run in Kitty for the Linux password prompt.' >&2; exit 1; }
+omarchy pkg add borg borgmatic
+sudo "$HOME/.config/omarchy-host/backup/setup" configure "$HOME"
+echo 'Existing USB repository configured; no disk was formatted.'

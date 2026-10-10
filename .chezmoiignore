@@ -22,6 +22,7 @@ apply-omarchy-theme.sh
 .local/bin/omarchy-waynergy-test
 .local/bin/omarchy-recovery-backup
 .local/bin/omarchy-espanso-setup
+.local/bin/omarchy-backup-setup
 .local/share/applications/zen.desktop
 .config/waynergy/
 {{ end }}
@@ -84,6 +85,7 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-waynergy-test
 !.local/bin/omarchy-recovery-backup
 !.local/bin/omarchy-espanso-setup
+!.local/bin/omarchy-backup-setup
 !.local/share/
 .local/share/*
 !.local/share/applications/
@@ -170,3 +172,7 @@ zen-catppuccin-mocha/
 interactive_installers.sh
 graphify-out/
 .agents/.skill-lock.json
+
+# Backup secrets and recovery material are private runtime state.
+.config/omarchy-backup/
+Shared/Backup-Recovery/

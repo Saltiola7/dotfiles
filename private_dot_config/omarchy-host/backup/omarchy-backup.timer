@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Omarchy USB backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Mexico_City
+RandomizedDelaySec=15m
+Persistent=true
+Unit=omarchy-backup.service
+
+[Install]
+WantedBy=timers.target

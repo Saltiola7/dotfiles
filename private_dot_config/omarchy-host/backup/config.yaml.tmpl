@@ -1,0 +1,41 @@
+# Encrypted file recovery; restore Omarchy with chezmoi and this archive.
+source_directories:
+  - {{ .chezmoi.homeDir }}
+  - /etc
+  - /boot
+  - /root
+  - /var/lib/rustdesk-server
+  - /var/lib/samba
+  - /var/lib/tailscale
+  - /var/lib/dotfiles-ai
+  - /var/lib/pacman/local
+  - /var/lib/omarchy-backup/inventory
+repositories:
+  - path: /mnt/omarchy-backup/borg
+    label: desk-usb
+one_file_system: true
+exclude_patterns:
+  - 'sh:{{ .chezmoi.homeDir }}/.cache'
+  - 'sh:{{ .chezmoi.homeDir }}/.local/share/Trash'
+  - 'sh:{{ .chezmoi.homeDir }}/Shared/Backup-Recovery'
+  - 'sh:{{ .chezmoi.homeDir }}/Shared/Recovery'
+  - 'sh:{{ .chezmoi.homeDir }}/.local/state/omarchy-zen'
+  - 'sh:*/node_modules'
+  - 'sh:*/.venv'
+  - 'sh:*/.snapshots'
+  - 'sh:/root/.cache'
+  - 'sh:/etc/omarchy-backup/passphrase'
+exclude_caches: true
+compression: zstd,3
+encryption_passcommand: /usr/bin/cat /etc/omarchy-backup/passphrase
+archive_name_format: '{hostname}-{now:%Y-%m-%dT%H:%M:%S}'
+keep_daily: 7
+keep_weekly: 4
+keep_monthly: 6
+checks:
+  - name: repository
+    frequency: 1 week
+  - name: archives
+    frequency: 1 month
+# Native borgmatic snapshots preserve original paths inside Borg archives.
+btrfs:

@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# Privileged, explicit setup. Formatting is NEVER part of chezmoi apply.
+set -euo pipefail
+umask 077
+[[ $EUID == 0 ]] || { echo 'Run through sudo or pkexec.' >&2; exit 1; }
+command -v borg borgmatic sfdisk mkfs.ext4 >/dev/null
+mode=${1:-}
+user_home=${2:-}
+[[ $user_home == /home/* && -d $user_home ]] || exit 2
+user_name=$(stat -c %U "$user_home")
+[[ $user_name != root ]] || exit 2
+assets=$user_home/.config/omarchy-host/backup
+mkdir -p /etc/omarchy-backup /mnt/omarchy-backup /var/lib/omarchy-backup/inventory
+chmod 700 /etc/omarchy-backup /mnt/omarchy-backup /var/lib/omarchy-backup
+if [[ $mode == initialize-drive ]]; then
+  drive=${3:-}
+  [[ $drive == /dev/disk/by-id/usb-* && $drive != *-part* && -b $drive ]] || exit 2
+  # A receipt prevents accidental repeat formatting on future bootstrap runs.
+  [[ ! -e /etc/omarchy-backup/drive.env ]] || { echo 'Drive already registered. Refusing to erase again.'; exit 1; }
+  real_drive=$(readlink -f "$drive")
+  [[ $(lsblk -dn -o TRAN "$real_drive") == usb ]] || exit 2
+  [[ $(blockdev --getsize64 "$real_drive") == 250047627264 ]] || { echo 'Unexpected drive capacity.'; exit 2; }
+  if lsblk -nr -o MOUNTPOINTS "$real_drive" | grep -q '[^[:space:]]'; then echo 'Drive mounted; refusing erase.'; exit 1; fi
+  sfdisk --wipe always --wipe-partitions always "$real_drive" <<'PARTITIONS'
+label: gpt
+size=+, type=L
+PARTITIONS
+  udevadm settle
+  partition=${drive}-part1
+  [[ -b $partition ]] || { echo 'Partition device not ready.'; exit 1; }
+  mkfs.ext4 -m 0 -L OMARCHY_BACKUP "$partition"
+  uuid=$(blkid -s UUID -o value "$partition")
+  printf 'BACKUP_UUID=%s\n' "$uuid" > /etc/omarchy-backup/drive.env
+elif [[ $mode == configure ]]; then
+  # Restoring configuration requires the retained drive identity, not formatting.
+  if [[ -f $assets/drive.env ]]; then
+    install -m600 "$assets/drive.env" /etc/omarchy-backup/drive.env
+  elif [[ ! -f /etc/omarchy-backup/drive.env ]]; then
+    echo 'Restore backup/drive.env from chezmoi first.'; exit 1
+  fi
+else
+  echo 'Usage: setup {initialize-drive|configure} /home/user [USB-by-id]' >&2; exit 2
+fi
+source /etc/omarchy-backup/drive.env
+[[ $BACKUP_UUID =~ ^[a-fA-F0-9-]+$ ]] || exit 2
+if ! grep -q '^UUID=.* /mnt/omarchy-backup ' /etc/fstab; then
+  cp -a /etc/fstab "/etc/fstab.omarchy-backup.$(date +%s)"
+  printf 'UUID=%s /mnt/omarchy-backup ext4 defaults,nofail,nodev,nosuid,noexec,x-systemd.device-timeout=5s 0 2\n' "$BACKUP_UUID" >> /etc/fstab
+fi
+install -d -m700 /etc/borgmatic
+install -m600 "$assets/config.yaml" /etc/borgmatic/omarchy.yaml
+install -Dm755 "$assets/check_mount.py" /usr/local/libexec/omarchy-backup-check-mount
+install -m600 "$assets/required-files.txt" /etc/omarchy-backup/required-files.txt
+install -Dm755 "$assets/verify_archive.py" /usr/local/libexec/omarchy-backup-verify
+install -Dm755 "$assets/run" /usr/local/libexec/omarchy-backup-run
+install -m644 "$assets/omarchy-backup.service" /etc/systemd/system/omarchy-backup.service
+install -m644 "$assets/omarchy-backup.timer" /etc/systemd/system/omarchy-backup.timer
+systemctl daemon-reload
+/usr/local/libexec/omarchy-backup-run check-drive
+chmod 700 /mnt/omarchy-backup
+if [[ ! -f /etc/omarchy-backup/passphrase ]]; then
+  [[ ! -d /mnt/omarchy-backup/borg ]] || { echo 'Existing encrypted repository: restore its password first.'; exit 1; }
+  openssl rand -base64 48 > /etc/omarchy-backup/passphrase
+fi
+borgmatic --config /etc/borgmatic/omarchy.yaml config validate
+borgmatic --config /etc/borgmatic/omarchy.yaml repo-create --encryption repokey-blake2
+# Private recovery material is deliberately excluded from the public source and backups.
+recovery=$user_home/Shared/Backup-Recovery
+install -d -m700 -o "$user_name" -g "$(id -gn "$user_name")" "$recovery"
+install -m600 -o "$user_name" -g "$(id -gn "$user_name")" /etc/omarchy-backup/passphrase "$recovery/passphrase"
+export BORG_PASSCOMMAND='/usr/bin/cat /etc/omarchy-backup/passphrase'
+if [[ ! -e $recovery/borg-key-export ]]; then borg key export /mnt/omarchy-backup/borg "$recovery/borg-key-export"; fi
+chown "$user_name:$(id -gn "$user_name")" "$recovery/borg-key-export"
+chmod 600 "$recovery/borg-key-export"
+install -m600 -o "$user_name" -g "$(id -gn "$user_name")" /etc/omarchy-backup/drive.env "$assets/drive.env"
+runuser -u "$user_name" -- env HOME="$user_home" chezmoi add "$assets/drive.env"
+systemctl enable --now omarchy-backup.timer
+printf 'Configured. Save Shared/Backup-Recovery to the Mac/1Password before relying on recovery.\n'
