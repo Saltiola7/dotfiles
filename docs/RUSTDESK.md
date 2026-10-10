@@ -63,7 +63,8 @@ References: [RustDesk macOS setup](https://rustdesk.com/docs/en/client/mac/),
 
 On macOS, the managed `dev.dotfiles.tailscale-connect` LaunchAgent invokes the
 installed application's CLI with `up` at graphical login. `TAILSCALE_BE_CLI=1`
-ensures launchd starts the CLI rather than the GUI. Existing tailnet identity,
+requests CLI mode; `SHLVL=1` also supports older app versions that detect a shell
+environment. The connection attempt has a 60-second timeout. Existing tailnet identity,
 exit-node, DNS, and route preferences are preserved. A failed invocation retries
 with a 60-second throttle; a successful connection exits normally without polling
 or overriding a later deliberate disconnect. Initial enrollment still requires
