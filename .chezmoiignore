@@ -10,6 +10,8 @@
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
 .config/systemd/user/espanso.service
+.config/systemd/user/dev.dotfiles.rustdesk-tray.service
+.config/systemd/user/graphical-session.target.wants/dev.dotfiles.rustdesk-tray.service
 .config/xdg-terminals.list
 apply-omarchy-theme.sh
 .local/bin/omarchy-zen-setup
@@ -64,6 +66,10 @@ apply-omarchy-theme.sh
 .config/systemd/user/*
 !.config/systemd/user/omarchy-waynergy.service
 !.config/systemd/user/espanso.service
+!.config/systemd/user/dev.dotfiles.rustdesk-tray.service
+!.config/systemd/user/graphical-session.target.wants/
+.config/systemd/user/graphical-session.target.wants/*
+!.config/systemd/user/graphical-session.target.wants/dev.dotfiles.rustdesk-tray.service
 !apply-omarchy-theme.sh
 !install-zen-catppuccin.sh
 !.config/waynergy/
@@ -92,6 +98,7 @@ apply-omarchy-theme.sh
 {{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
+Library/LaunchAgents/dev.dotfiles.rustdesk-login.plist
 Library/LaunchAgents/com.mgm.aws-sso-login.plist
 .local/bin/aws-sso-refresh
 .local/bin/fedora-parallels
