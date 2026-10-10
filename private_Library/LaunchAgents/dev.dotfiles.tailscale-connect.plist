@@ -8,14 +8,11 @@
     <array>
         <string>/Applications/Tailscale.app/Contents/MacOS/Tailscale</string>
         <string>up</string>
-        <string>--timeout=60s</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
         <key>TAILSCALE_BE_CLI</key>
-        <string>1</string>
-        <key>SHLVL</key>
-        <string>1</string>
+        <string>true</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
