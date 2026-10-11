@@ -13,6 +13,13 @@ It has recently connected and then
 timed out waiting for traffic; subsequent TLS handshakes were reset by the Mac.
 Restarting the Mac application restored access previously. This remains an
 unresolved reliability problem, so don't treat the desktop trial as complete.
+An additional local fault was confirmed: the stock Waynergy 0.0.17 configuration
+readers leaked open fingerprint files until the process exhausted its descriptor
+limit. The managed `waynergy-omarchy` package closes those files. Its build checks
+20,000 reads under a 256-descriptor limit; the unpatched build fails this test.
+Rebuild/install with `omarchy-waynergy-install` in Kitty. The pinned source,
+checksums, patch, package recipe and regression test are managed by chezmoi.
+The package provides Waynergy and replaces the unpatched AUR package.
 
 Mac-side automatic recovery still needs setup on the Mac. Confirm Synergy's
 login/background settings, then use its connection logs to distinguish a stopped
@@ -110,7 +117,11 @@ ssh tis@100.86.125.94
 Complete any Tailscale authorization page. Run `hostname` after connecting.
 Then lock Omarchy, close its lid while plugged into power, wait a minute, and
 try SSH and RustDesk again. Check control, not just connection status.
-Services start automatically, and AC lid-close does not suspend. Locked-screen
+Services start automatically. The managed stay-awake policy disables automatic
+screensaver and lock. `omarchy-desk-setup always-on` installs logind settings that
+ignore lid-close on AC and battery and disable idle sleep. Sleep, lock and logout
+are manual. A real logout ends graphical applications; locking does not.
+Locked-screen
 RustDesk behavior still needs this real test. After a reboot, the encrypted
 disk needs physical unlocking before SSH or RustDesk becomes available.
 
