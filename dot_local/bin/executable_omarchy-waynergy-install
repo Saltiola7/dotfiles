@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Build the pinned managed package as the user; install only in a visible terminal.
+set -euo pipefail
+if [[ $# -gt 1 || ($# == 1 && $1 != --build-only) ]]; then
+  echo 'Usage: omarchy-waynergy-install [--build-only]' >&2
+  exit 2
+fi
+if [[ ${1:-} != --build-only && ! -t 0 ]]; then
+  echo 'Open Kitty and run omarchy-waynergy-install for the password prompt.' >&2
+  exit 1
+fi
+if [[ ${1:-} != --build-only ]]; then
+  omarchy pkg add base-devel meson ninja wayland libxkbcommon libretls
+fi
+recipe="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy-host/waynergy-package"
+build_root="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-waynergy"
+mkdir -p "$build_root"
+build_dir=$(mktemp -d "$build_root/build.XXXXXX")
+trap 'rm -rf -- "$build_dir"' EXIT
+cp "$recipe/PKGBUILD" "$recipe/close-config-files.patch" "$recipe/config-fd-test.c" "$build_dir/"
+cd "$build_dir"
+makepkg --cleanbuild --noconfirm
+package_path=$(makepkg --packagelist)
+[[ -f $package_path ]] || { echo 'Expected one built package.' >&2; exit 1; }
+output="$build_root/$(basename "$package_path")"
+cp "$package_path" "$output"
+echo "Verified package: $output"
+if [[ ${1:-} == --build-only ]]; then
+  exit 0
+fi
+# ALPM question bit 4 allows replacing the conflicting unpatched package.
+sudo pacman -U --noconfirm --ask 4 -- "$output"
+systemctl --user daemon-reload
+systemctl --user enable omarchy-waynergy.service
+systemctl --user restart omarchy-waynergy.service
+pacman -Q waynergy-omarchy

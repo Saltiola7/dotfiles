@@ -1,0 +1,44 @@
+# Locally maintained leak fix; pin upstream and keep secrets outside this recipe.
+pkgname=waynergy-omarchy
+pkgver=0.0.17
+pkgrel=1
+pkgdesc='Waynergy with configuration file descriptor leak fixes'
+arch=('x86_64')
+url='https://github.com/r-c-f/waynergy'
+license=('MIT')
+depends=('wayland' 'libxkbcommon' 'libretls')
+makedepends=('meson' 'ninja')
+provides=("waynergy=$pkgver")
+conflicts=('waynergy')
+optdepends=('wl-clipboard: Clipboard synchronization support')
+options=('!debug')
+source=("waynergy-$pkgver.tar.gz::https://github.com/r-c-f/waynergy/archive/refs/tags/v$pkgver.tar.gz"
+        'close-config-files.patch' 'config-fd-test.c')
+sha256sums=('b8b2d12588cabfe161ce21a5cd898f06bdfd55c0106ecd4a26c8628aafeff990'
+            '27ccac341691d4237e8971aee4d3d8e135a4e03f9b5acebc6a48f6c101b4f5e0' '91d287a5499a5ca276b6dc9f182b9588f963163e084d4addf03c094f610c5fb0')
+
+prepare() {
+    cd "$srcdir/waynergy-$pkgver"
+    patch -Np1 < "$srcdir/close-config-files.patch"
+}
+
+build() {
+    cd "$srcdir/waynergy-$pkgver"
+    arch-meson build
+    meson compile -C build
+}
+
+check() {
+    cd "$srcdir/waynergy-$pkgver"
+    # Do not use -DNDEBUG: assertions are part of the regression test.
+    cc -D_GNU_SOURCE -ffunction-sections -fdata-sections -Iinclude \
+       "$srcdir/config-fd-test.c" src/config.c src/os.c src/log.c \
+       -Wl,--gc-sections -o config-fd-test
+    ./config-fd-test
+}
+
+package() {
+    cd "$srcdir/waynergy-$pkgver"
+    DESTDIR="$pkgdir" meson install -C build
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

@@ -1,0 +1,20 @@
+--- a/src/config.c
++++ b/src/config.c
+@@ -27,6 +27,7 @@
+ 	if (!(ssb_readfile(&s, f) && ssb_truncate(&s, s.pos))) {
+ 		ssb_free(&s);
+ 	}
++	fclose(f);
+ 
+ 	return s.buf;
+ }
+@@ -206,7 +207,9 @@
+ 			break;
+ 		}
+ 	}
++	free(line[pos]);
+ 	line[pos] = NULL;
++	fclose(f);
+ 	free(path);
+ 	return xrealloc(line, sizeof(*line) * (pos + 1));
+ }
