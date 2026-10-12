@@ -188,3 +188,10 @@ graphify-out/
 # Backup secrets and recovery material are private runtime state.
 .config/omarchy-backup/
 Shared/Backup-Recovery/
+
+# Image preparation belongs to macOS administration profiles only.
+{{ if and (ne .machine_type "mac-mini") (ne .machine_type "macbook") }}
+.local/bin/pi-bootstrap
+.local/lib/pi-bootstrap/
+.config/pi-bootstrap/
+{{ end }}

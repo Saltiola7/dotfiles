@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "target": "pi400",
+  "board": "rpi400",
+  "backend": "personal-sandbox",
+  "owner": "tis",
+  "uid": 1000,
+  "network": "ethernet-dhcp",
+  "sudo": "password-required",
+  "filename": "Fedora-Minimal-44-1.7.aarch64.raw.xz",
+  "sha256": "aebf1cb693fbdbd45837980b3be6becbd34c321ff937c49e582244eaa2f48aaf",
+  "checksum_url": "https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Spins/aarch64/images/Fedora-Spins-44-1.7-aarch64-CHECKSUM",
+  "key_url": "https://fedoraproject.org/fedora.pgp",
+  "signer": "36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6"
+}

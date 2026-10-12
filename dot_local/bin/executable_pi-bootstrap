@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""Prepare one private Pi 400 image through existing Lima. Never flash a disk."""
+from __future__ import annotations
+import argparse
+import base64
+import getpass
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import struct
+import subprocess
+import sys
+import tempfile
+import urllib.request
+
+PIN = 'aebf1cb693fbdbd45837980b3be6becbd34c321ff937c49e582244eaa2f48aaf'
+SIGNER = '36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6'
+FILENAME = 'Fedora-Minimal-44-1.7.aarch64.raw.xz'
+CHECKSUM_URL = 'https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Spins/aarch64/images/Fedora-Spins-44-1.7-aarch64-CHECKSUM'
+KEY_URL = 'https://fedoraproject.org/fedora.pgp'
+
+
+class Invalid(ValueError):
+    pass
+
+
+def require(ok: bool, reason: str) -> None:
+    if not ok: raise Invalid(reason)
+
+
+def digest(path: Path) -> str:
+    with path.open('rb') as stream:
+        return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def validate_manifest(value: dict) -> None:
+    expected = dict(schema_version=1, target='pi400', board='rpi400',
+                    backend='personal-sandbox', owner='tis', uid=1000,
+                    network='ethernet-dhcp', sudo='password-required', filename=FILENAME,
+                    sha256=PIN, checksum_url=CHECKSUM_URL, key_url=KEY_URL, signer=SIGNER)
+    require(value == expected and type(value.get('schema_version')) is int and type(value.get('uid')) is int,
+            'manifest differs from reviewed preparation policy')
+
+
+def public_key(value: str) -> str:
+    parts = value.strip().split()
+    require('\n' not in value.strip() and len(parts) >= 2 and parts[0] == 'ssh-ed25519',
+            'one ed25519 public key required; private keys are forbidden')
+    try:
+        wire = base64.b64decode(parts[1], validate=True)
+        require(len(wire) == 51 and struct.unpack('>I', wire[:4])[0] == 11 and
+                wire[4:15] == b'ssh-ed25519' and struct.unpack('>I', wire[15:19])[0] == 32,
+                'invalid ed25519 public key')
+    except (ValueError, struct.error) as error:
+        raise Invalid('invalid public key encoding') from error
+    return parts[0] + ' ' + parts[1] + '\n'
+
+
+def command(args: list[str], stdin: str | None = None) -> str:
+    result = subprocess.run(args, input=stdin, capture_output=True, text=True)
+    require(result.returncode == 0, 'operation failed; no secret output is displayed')
+    return result.stdout
+
+
+def backend_probe() -> dict:
+    script = "import json,platform,shutil; from pathlib import Path; print(json.dumps(dict(arch=platform.machine(),fedora='ID=fedora' in Path('/etc/os-release').read_text(),tools=all(shutil.which(t) for t in ['debugfs','e2fsck','sfdisk','openssl','ssh-keygen','python3','visudo']))))"
+    result = json.loads(command(['limactl', 'shell', '--workdir', '/', 'personal-sandbox', '--', 'python3', '-c', script]))
+    require(result == dict(arch='aarch64', fedora=True, tools=True), 'Lima identity or capabilities mismatch')
+    return result
+
+
+def verify_output(output: Path) -> dict:
+    receipt = json.loads((output / 'receipt.json').read_text())
+    require(type(receipt.get('schema_version')) is int and receipt.get('schema_version') == 1 and receipt.get('target') == 'pi400' and receipt.get('base_sha256') == PIN, 'invalid preparation receipt')
+    require(re.fullmatch(r'[0-9a-f]{64}', receipt.get('prepared_sha256', '')) is not None, 'invalid prepared identity')
+    require(digest(output / 'prepared.raw') == receipt['prepared_sha256'], 'prepared image hash mismatch')
+    return receipt
+
+
+def provenance(manifest: dict, stage: Path) -> None:
+    for url, name in [(manifest['key_url'], 'fedora.pgp'), (manifest['checksum_url'], 'CHECKSUM')]:
+        with urllib.request.urlopen(url, timeout=60) as response:
+            data = response.read(1024 * 1024 + 1)
+        require(len(data) <= 1024 * 1024, 'publisher metadata exceeds limit')
+        (stage / name).write_bytes(data)
+    home = stage / 'gnupg'; home.mkdir(mode=0o700)
+    command(['gpg', '--homedir', str(home), '--batch', '--import', str(stage / 'fedora.pgp')])
+    status = command(['gpg', '--homedir', str(home), '--batch', '--status-fd', '1', '--verify', str(stage / 'CHECKSUM')])
+    require(any(line.startswith('[GNUPG:] VALIDSIG ' + SIGNER + ' ') for line in status.splitlines()), 'publisher signature mismatch')
+    require(f'SHA256 ({FILENAME}) = {PIN}' in (stage / 'CHECKSUM').read_text(), 'signed checksum mismatch')
+
+
+def inputs(args: argparse.Namespace, manifest: dict) -> str:
+    require(args.image.is_file() and args.image.name == manifest['filename'], 'reviewed compressed image required')
+    require(digest(args.image) == manifest['sha256'], 'base image hash mismatch')
+    require(args.key.is_file() and args.key.stat().st_size <= 16384, 'bounded public-key file required')
+    key = public_key(args.key.read_text())
+    backend_probe()
+    homelab = shutil.which('homelab') or str(Path.home() / '.local/bin/homelab')
+    target = json.loads(command([homelab, 'inspect', 'pi400']))['target']
+    require(target['kind'] == 'physical' and target['architecture'] == 'arm64', 'declared Pi target mismatch')
+    return key
+
+
+def prepare(args: argparse.Namespace, manifest: dict) -> dict:
+    require(sys.stdin.isatty(), 'prepare requires an operator terminal for private password entry')
+    require(not args.output.exists(), 'output directory already exists; choose a new directory')
+    key = inputs(args, manifest)
+    args.output.mkdir(mode=0o700, parents=True)
+    stage = args.output / 'provenance'; stage.mkdir(mode=0o700)
+    provenance(manifest, stage)
+    password = getpass.getpass('New Pi tis password (for sudo; SSH stays key-only): ')
+    require(len(password) >= 12 and '\n' not in password, 'password requires at least 12 characters and no newline')
+    require(password == getpass.getpass('Confirm Pi password: '), 'passwords do not match')
+    remote = command(['limactl', 'shell', '--workdir', '/', 'personal-sandbox', '--', 'sh', '-c',
+        'umask 077; mkdir -p "$HOME/.local/state/pi-bootstrap"; mktemp -d "$HOME/.local/state/pi-bootstrap/run-XXXXXXXX"']).strip()
+    require(re.fullmatch(r'/home/tis\.guest/\.local/state/pi-bootstrap/run-[A-Za-z0-9]+', remote) is not None, 'unexpected backend staging path')
+    (stage / 'authorized_keys').write_text(key)
+    (stage / 'manifest.json').write_text(json.dumps(manifest))
+    files = [(args.image, FILENAME), (stage / 'authorized_keys', 'authorized_keys'),
+             (stage / 'manifest.json', 'manifest.json')]
+    for name in ('prepare.sh', 'prepare.py', 'first-boot.sh'):
+        files.append((args.backend_dir / name, name))
+    for path, name in files:
+        require(path.is_file(), 'maintained backend artifact missing')
+        command(['limactl', 'copy', str(path), f'personal-sandbox:{remote}/{name}'])
+    (args.output / 'backend-stage.txt').write_text(remote + '\n')
+    print('Preparing private image in isolated Lima staging; no disk writes.', flush=True)
+    # Password exists only in process memory and encrypted SSH stdin.
+    command(['limactl', 'shell', '--workdir', '/', 'personal-sandbox', '--', 'sh', remote + '/prepare.sh', remote],
+            stdin=json.dumps(dict(password=password)))
+    password = ''
+    for name in ('prepared.raw', 'receipt.json'):
+        command(['limactl', 'copy', f'personal-sandbox:{remote}/{name}', str(args.output / name)])
+        (args.output / name).chmod(0o600)
+    receipt = verify_output(args.output)
+    print('Prepared image verified. Physical boot remains unverified. Retain private staging until successful boot.')
+    return receipt
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--manifest', type=Path, default=Path.home() / '.config/pi-bootstrap/manifest.json')
+    parser.add_argument('--backend-dir', type=Path, default=Path.home() / '.local/lib/pi-bootstrap')
+    subs = parser.add_subparsers(dest='operation', required=True)
+    for name in ('plan', 'prepare'):
+        sub = subs.add_parser(name)
+        sub.add_argument('--image', type=Path, required=True)
+        sub.add_argument('--key', type=Path, required=True)
+        if name == 'prepare': sub.add_argument('--output', type=Path, required=True)
+    verify = subs.add_parser('verify'); verify.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        manifest = json.loads(args.manifest.read_text()); validate_manifest(manifest)
+        if args.operation == 'verify':
+            receipt = verify_output(args.output)
+            print(json.dumps(receipt, sort_keys=True, indent=2))
+        elif args.operation == 'plan':
+            inputs(args, manifest)
+            print(json.dumps(dict(target=manifest['target'], backend=manifest['backend'],
+                  base_sha256=manifest['sha256'], sudo=manifest['sudo'], disk_writes=False,
+                  password_entry='private operator terminal', physical_boot='unverified'), indent=2))
+        else:
+            prepare(args, manifest)
+        return 0
+    except Invalid as error:
+        print(f'pi-bootstrap: {error}', file=sys.stderr)
+    except (OSError, ValueError, EOFError):
+        print('pi-bootstrap: operation unavailable or input invalid; private staging retained', file=sys.stderr)
+    return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
