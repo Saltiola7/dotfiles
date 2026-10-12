@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "id": "personal-homelab",
+  "title": "Personal homelab topology and Raspberry Pi bootstrap",
+  "state": "building",
+  "coordinator_repository": "Saltiola7/dotfiles",
+  "statements": [
+    {
+      "id": "INT-001",
+      "kind": "requirement",
+      "text": "Maintain a personal homelab inventory covering physical machines, virtual machines, containers, storage and access dependencies.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-002",
+      "kind": "constraint",
+      "text": "External and work systems are separate dependencies and are not administered by this initiative.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-003",
+      "kind": "requirement",
+      "text": "Declare development targets, architecture, purpose, configuration owner and access method before moving workloads.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-004",
+      "kind": "non-goal",
+      "text": "Do not move workloads, change existing hosting or select automatic failover in the first delivery.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-005",
+      "kind": "requirement",
+      "text": "Produce a readable topology diagram and equivalent inventory from authoritative declarations.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-006",
+      "kind": "constraint",
+      "text": "Distinguish owner declarations, observations, desired state, unknowns and stale information.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-007",
+      "kind": "decision",
+      "text": "Use separate topology and Raspberry Pi bootstrap bounded contexts in the dotfiles repository.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-008",
+      "kind": "requirement",
+      "text": "Include the owner-reported MacBook Pro with M1 processor, 16 GB memory and 512 GB storage; do not infer its remote identity.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-009",
+      "kind": "requirement",
+      "text": "Bootstrap Raspberry Pi 400 as a headless Fedora Minimal server over Ethernet using an external SSD as its system disk.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-010",
+      "kind": "constraint",
+      "text": "Preparation is launched from a maintained macOS script using the existing personal Lima Fedora VM; existing Parallels guests are excluded and existing services must remain unchanged.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-011",
+      "kind": "requirement",
+      "text": "Declare image identity, integrity verification, user, public-key SSH, network policy and recovery in reproducible source.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-012",
+      "kind": "constraint",
+      "text": "Disk flashing is an explicitly invoked provisioning operation with fresh target verification and approval, never a chezmoi apply hook.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-013",
+      "kind": "decision",
+      "text": "Existing flashed state need not be preserved; the owner reports no SSD data to preserve. This does not waive target-specific erase approval.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-014",
+      "kind": "requirement",
+      "text": "Use owner user tis and existing Mac public SSH key; do not copy private keys or enable password SSH.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-015",
+      "kind": "requirement",
+      "text": "Establish local Ethernet SSH before interactive Tailscale enrollment; never commit enrollment credentials or node state.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-016",
+      "kind": "risk",
+      "text": "USB boot history is unknown and no spare microSD recovery medium is available. A firmware or USB boot failure may require obtaining recovery media.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-017",
+      "kind": "non-goal",
+      "text": "Application and workload configuration are deferred until the initial headless boot and administration path work.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-018",
+      "kind": "constraint",
+      "text": "Existing personal and AI configuration sources retain their target ownership; bootstrap must not introduce overlapping managed files.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ]
+    },
+    {
+      "id": "INT-019",
+      "kind": "constraint",
+      "text": "Inventory includes personal infrastructure and excludes phones and tablets.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    },
+    {
+      "id": "INT-020",
+      "kind": "constraint",
+      "text": "Commit public-safe logical identities, roles and relationships; private endpoints, remote identities, serials and credentials remain in a local private overlay.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_topology/README.md"
+      ]
+    }
+  ],
+  "contexts": [
+    {
+      "id": "homelab_topology",
+      "repository": "Saltiola7/dotfiles",
+      "status": "delivered",
+      "depends_on": []
+    },
+    {
+      "id": "raspberry_pi_bootstrap",
+      "repository": "Saltiola7/dotfiles",
+      "status": "ready",
+      "depends_on": [
+        "homelab_topology"
+      ]
+    }
+  ],
+  "slices": [
+    {
+      "id": "declare-targets",
+      "context": "homelab_topology",
+      "state": "delivered",
+      "requirements": [
+        "INT-001",
+        "INT-002",
+        "INT-003",
+        "INT-004",
+        "INT-005",
+        "INT-006",
+        "INT-007",
+        "INT-008",
+        "INT-019",
+        "INT-020"
+      ],
+      "depends_on": [],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_topology/CHANGELOG.md",
+        "docs/specs/homelab_topology/PROFILE.md",
+        "docs/specs/homelab_topology/README.md",
+        "docs/specs/raspberry_pi_bootstrap/CHANGELOG.md",
+        "docs/specs/raspberry_pi_bootstrap/PROFILE.md",
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ],
+      "release_group": "declare-targets",
+      "execution_owner": "build"
+    },
+    {
+      "id": "prepare-pi-image",
+      "context": "raspberry_pi_bootstrap",
+      "state": "ready",
+      "requirements": [
+        "INT-009",
+        "INT-010",
+        "INT-011",
+        "INT-012",
+        "INT-013",
+        "INT-014",
+        "INT-015",
+        "INT-016",
+        "INT-017",
+        "INT-018"
+      ],
+      "depends_on": [
+        "declare-targets"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_topology/CHANGELOG.md",
+        "docs/specs/homelab_topology/PROFILE.md",
+        "docs/specs/homelab_topology/README.md",
+        "docs/specs/raspberry_pi_bootstrap/CHANGELOG.md",
+        "docs/specs/raspberry_pi_bootstrap/PROFILE.md",
+        "docs/specs/raspberry_pi_bootstrap/README.md"
+      ],
+      "release_group": "prepare-pi-image",
+      "execution_owner": "build"
+    },
+    {
+      "id": "flash-pi-and-verify-boot",
+      "context": "raspberry_pi_bootstrap",
+      "state": "discovering",
+      "requirements": [
+        "INT-009",
+        "INT-010",
+        "INT-011",
+        "INT-012",
+        "INT-013",
+        "INT-014",
+        "INT-015",
+        "INT-016",
+        "INT-017",
+        "INT-018"
+      ],
+      "depends_on": [
+        "prepare-pi-image"
+      ],
+      "artifacts": [
+        "docs/specs/raspberry_pi_bootstrap/README.md",
+        "docs/specs/raspberry_pi_bootstrap/PROFILE.md"
+      ],
+      "release_group": "flash-pi-and-verify-boot",
+      "execution_owner": "build"
+    }
+  ],
+  "release_groups": [
+    {
+      "id": "declare-targets",
+      "members": [
+        "declare-targets"
+      ],
+      "state": "delivered"
+    },
+    {
+      "id": "prepare-pi-image",
+      "members": [
+        "prepare-pi-image"
+      ],
+      "state": "ready"
+    },
+    {
+      "id": "flash-pi-and-verify-boot",
+      "members": [
+        "flash-pi-and-verify-boot"
+      ],
+      "state": "planning"
+    }
+  ]
+}
