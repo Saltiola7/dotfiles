@@ -4,11 +4,11 @@
 
 Bring up a Raspberry Pi 400 headlessly with Fedora Minimal on an external USB SSD,
 Ethernet DHCP, owner-key SSH, then Tailscale enrollment. The macOS administrator
-launches a existing personal Lima Fedora VM to prepare ext4 filesystems; existing
+uses the existing personal Lima Fedora VM to prepare ext4 image files; existing
 Omarchy and Fedora Parallels guests are excluded from image preparation. Workloads
 and desktop installation are deferred. Target identity comes from homelab_topology;
 user configuration ownership stays with existing chezmoi profiles.
-Engineering defaults: PROFILE.md. Method 3.29; current delivery is Discovery only.
+Engineering defaults: PROFILE.md. Method 3.29; PI-BOOTSTRAP-PREPARE-001 owns the approved preparation slice.
 The future disk-write slice is critical risk and is not yet approved or registered.
 
 ## Domain, inputs and baseline
@@ -22,8 +22,9 @@ hardware endpoints are private local bindings, not source manifest values.
 
 Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
 `aebf1cb693fbdbd45837980b3be6becbd34c321ff937c49e582244eaa2f48aaf`.
-It matches the official published checksum; signature authentication has not yet
-been established. Prior read-only inspection found FAT EFI plus ext4 boot/root,
+It matches the official published checksum. Its cleartext signature was verified
+with Fedora 44 fingerprint `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`,
+matched against the Fedora security page. Prior read-only inspection found FAT EFI plus ext4 boot/root,
 SSH and NetworkManager enabled, and interactive initial-setup enabled. No prepared
 image exists yet. No disk writes have been made by this workflow.
 
@@ -88,7 +89,9 @@ partition growth, fresh disk-identity validation, explicit approval invalidation
 SSH host verification, local network access, enrollment and fresh reboot.
 No prepared-image tests, physical boot or deployment have occurred. Backend
 read-only preflight verified Fedora 44 ARM64, 52GB free and required filesystem
-tools. Backend sudo requires interactive authentication; do not weaken policy.
+tools. Backend sudo policy explicitly denies general commands. Existing debugfs permits
+unprivileged offline ext4 editing, so preparation requires no backend sudo.
+Do not weaken the sandbox policy. macOS flashing still requires separate sudo.
 Fedora 44 image metadata records support end 2027-05-19; review upgrades before EOL.
 
 ## Visual Evidence
@@ -156,10 +159,10 @@ None of these artifacts is a chezmoi `run_` script.
 
 The backend is existing `personal-sandbox` Lima, not a newly created disposable
 VM. The script verifies backend architecture/OS/tools, prepares a separate image
-in a unique private staging directory, uses only owned loop devices/mounts, and
-cleans those resources on success/failure. It never stops/deletes the VM or
-changes existing Atuin/PostgreSQL containers, privileges or data. Root access
-inside the backend is interactive; no sudo password enters arguments or logs.
+in a unique private staging directory, uses unprivileged debugfs on extracted private partition copies, and
+leaves failed artifacts private for diagnosis. No loop device, mount or chroot is used. It never stops/deletes the VM or
+changes existing Atuin/PostgreSQL containers, privileges or data. No backend root access is requested. Owner password entry is private stdin,
+not arguments or logs.
 
 Image preparation consumes publisher-authenticated Fedora input and approved
 public key. It configures owner password-required sudo, key-only SSH, Ethernet
@@ -173,3 +176,55 @@ any disk write. No replay of a prepare receipt grants flash permission.
 Implementation delivery is split into image preparation and a later explicit
 flash/boot slice. The latter has fresh physical-disk plan and separate consent.
 It remains critical risk even though the operator reports no SSD data to keep.
+
+## Preparation v1 interface and contract
+
+The macOS CLI supports `plan --image PATH --key PUBLIC_KEY`,
+`prepare --image PATH --key PUBLIC_KEY --output NEW_DIRECTORY`, and
+`verify --output DIRECTORY`. Manifest and backend may be selected explicitly for
+source-checkout validation; installed defaults are under ~/.config/pi-bootstrap
+and ~/.local/lib/pi-bootstrap. Flash is intentionally unavailable in this slice.
+
+The manifest pins Fedora 44 Minimal 1.7 compressed filename, SHA-256, publisher
+checksum URL, public key URL and signing fingerprint; target pi400, board rpi400,
+backend personal-sandbox, owner tis/UID 1000, Ethernet DHCP and password-required
+sudo. Unknown fields and policy changes fail closed. No secret or host endpoint
+belongs in the manifest. Public key accepts only one valid ed25519 public key;
+private-key input is rejected before file transfer. The declared Pi target must
+exist in the installed homelab inventory and be a personal physical ARM64 target.
+
+`plan` reads prerequisites, source identity, and backend identity without image
+mutation. `prepare` verifies publisher signature and compressed hash, then copies
+only reviewed backend files, image, and public key to a new mode-0700 backend
+staging directory. It asks for the Pi owner password twice using getpass on the
+operator terminal. Password is sent over Lima's existing SSH transport as stdin,
+never command arguments or a temporary plaintext file. Backend uses openssl's
+salted SHA-512 crypt verifier; only shadow contains it. Prepared images are mode
+0600 private artifacts, not distributable or source-controlled.
+
+Backend uses existing sfdisk, debugfs, e2fsck, openssl and ssh-keygen. It decompresses
+and validates the expected MBR geometry, extracts the root partition, checks it,
+then edits regular ext4 files without mounts, sudo, chroot or service changes.
+It creates tis home/account/group, appends wheel membership, installs key-only
+sshd policy, password-required sudo rule, unique SSH host key, disables interactive
+initial-setup, clears machine identity and enables first-boot filesystem growth.
+New inodes receive explicit owner/mode; enforcing SELinux and first-boot relabel
+are retained. A reviewed one-shot first-boot unit expands root partition three
+and ext4 within the Pi, never an administrator-host disk. Its disk/partition is
+resolved from the live root filesystem and validated as partition three.
+
+Before joining the edited root partition into a separate raw candidate, run
+read-only e2fsck and inspect account, SSH, sudo, first-boot unit and public-key
+attributes. The backend receipt binds base and prepared SHA-256, target, policy,
+verification checks and unique host-key fingerprint. Host retrieves image/receipt,
+checks prepared hash again and marks files 0600. No existing output directory is
+reused. Failed runs remain private with an actionable stage identifier; explicit
+cleanup removes only the operator-reviewed staging directory after unmount-free
+verification, never the VM, services or arbitrary parent trees.
+
+Verification establishes preparation integrity only. Physical USB firmware,
+DHCP, SSH authentication, relabel completion, root growth and fresh reboot remain
+required in the later flash/boot slice. First boot may take longer for relabeling;
+do not interpret an initial SSH delay as failed boot. Retain private prepared
+artifacts until successful boot/reboot, then at most seven days unless operator
+chooses a protected recovery copy. Reimage requires a newly reviewed disk plan.
