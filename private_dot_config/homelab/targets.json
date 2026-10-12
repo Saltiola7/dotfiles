@@ -1,0 +1,280 @@
+{
+  "schema_version": 1,
+  "targets": [
+    {
+      "id": "mac-mini",
+      "kind": "physical",
+      "architecture": "arm64",
+      "role": "administration workstation and guest host",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "M4 Pro and 64 GB verified in earlier session; macOS observed.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "macbook-pro",
+      "kind": "physical",
+      "architecture": "arm64",
+      "role": "portable workstation",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "owner_reported",
+      "notes": "M1, 16 GB memory, 512 GB SSD; owner-reported.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "hp-envy",
+      "kind": "physical",
+      "architecture": "x86_64",
+      "role": "Omarchy daily-driver workstation",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Approximately 8 GB RAM; other virtualization unverified.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "pi400",
+      "kind": "physical",
+      "architecture": "arm64",
+      "role": "headless Fedora server",
+      "parent_id": null,
+      "lifecycle": "planned",
+      "evidence_status": "owner_reported",
+      "notes": "USB boot and SSH not yet verified; no workloads assigned.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "pi-system-ssd",
+      "kind": "storage",
+      "architecture": "unknown",
+      "role": "Pi system disk",
+      "parent_id": null,
+      "lifecycle": "planned",
+      "evidence_status": "observed",
+      "notes": "Transcend 512.1 GB; observed on administration Mac, Pi attachment planned.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "omarchy-arm",
+      "kind": "vm",
+      "architecture": "arm64",
+      "role": "Parallels daily-driver trial",
+      "parent_id": "mac-mini",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Previously verified 6 CPUs, 12 GB RAM, 64 GB root disk.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "fedora-vm",
+      "kind": "vm",
+      "architecture": "unknown",
+      "role": "preserved Parallels guest",
+      "parent_id": "mac-mini",
+      "lifecycle": "retained",
+      "evidence_status": "observed",
+      "notes": "Suspended; architecture not refreshed.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "personal-sandbox",
+      "kind": "vm",
+      "architecture": "arm64",
+      "role": "Lima service host and image preparation backend",
+      "parent_id": "mac-mini",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Fedora 44 Cloud; 4 CPUs, 8 GiB RAM, 60 GiB disk. Preserve existing services.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "atuin-server",
+      "kind": "container",
+      "architecture": "unknown",
+      "role": "shell-history service",
+      "parent_id": "personal-sandbox",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Persistent named volume; backup policy unverified.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "pm-postgres",
+      "kind": "container",
+      "architecture": "unknown",
+      "role": "PostgreSQL service",
+      "parent_id": "personal-sandbox",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Persistent named volume and initialization/health mounts; consumers and backups unverified.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "dks-schema-test",
+      "kind": "container",
+      "architecture": "unknown",
+      "role": "retained schema test",
+      "parent_id": "personal-sandbox",
+      "lifecycle": "retained",
+      "evidence_status": "observed",
+      "notes": "Exited successfully; no active workload.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "rustdesk-hbbs",
+      "kind": "container",
+      "architecture": "unknown",
+      "role": "RustDesk rendezvous service",
+      "parent_id": "hp-envy",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Root-owned Podman; existing service preserved.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "rustdesk-hbbr",
+      "kind": "container",
+      "architecture": "unknown",
+      "role": "RustDesk relay service",
+      "parent_id": "hp-envy",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Root-owned Podman; existing service preserved.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "home-router",
+      "kind": "physical",
+      "architecture": "unknown",
+      "role": "home network infrastructure",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Peer observed; hardware model and LAN relationships unverified.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "git-hosting",
+      "kind": "external",
+      "architecture": "unknown",
+      "role": "source hosting dependency",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "owner_reported",
+      "notes": "External dependency; not an administration target.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "fedora-sources",
+      "kind": "external",
+      "architecture": "unknown",
+      "role": "operating-system image provenance",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "owner_reported",
+      "notes": "External dependency; not an administration target.",
+      "owner": "personal-dotfiles"
+    },
+    {
+      "id": "tailscale",
+      "kind": "external",
+      "architecture": "unknown",
+      "role": "private access coordination",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "owner_reported",
+      "notes": "External dependency; node identities remain local.",
+      "owner": "personal-dotfiles"
+    }
+  ],
+  "edges": [
+    {
+      "source": "pi-system-ssd",
+      "target": "pi400",
+      "type": "attached_to",
+      "status": "planned"
+    },
+    {
+      "source": "pi400",
+      "target": "mac-mini",
+      "type": "administered_by",
+      "status": "planned"
+    },
+    {
+      "source": "mac-mini",
+      "target": "git-hosting",
+      "type": "depends_on",
+      "status": "declared"
+    },
+    {
+      "source": "mac-mini",
+      "target": "fedora-sources",
+      "type": "depends_on",
+      "status": "declared"
+    },
+    {
+      "source": "mac-mini",
+      "target": "tailscale",
+      "type": "depends_on",
+      "status": "declared"
+    }
+  ],
+  "observations": [
+    {
+      "target_id": "omarchy-arm",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "fedora-vm",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "suspended"
+    },
+    {
+      "target_id": "personal-sandbox",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "atuin-server",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "pm-postgres",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "healthy"
+    },
+    {
+      "target_id": "dks-schema-test",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "exited"
+    },
+    {
+      "target_id": "rustdesk-hbbs",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "rustdesk-hbbr",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "macbook-pro",
+      "source": "bounded native inventory on 2026-10-12",
+      "observed_at": "2026-10-12T00:00:00+00:00",
+      "state": "offline"
+    }
+  ]
+}
