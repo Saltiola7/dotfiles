@@ -1,0 +1,248 @@
+#!/usr/bin/env python3
+"""Read-only, public-safe infrastructure declarations; Python 3.12+."""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timedelta, timezone
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import sys
+from typing import Any
+
+MAX_BYTES = 1024 * 1024
+ID = re.compile(r'[a-z][a-z0-9-]{0,63}\Z')
+TARGET_FIELDS = {'id', 'kind', 'architecture', 'role', 'owner', 'lifecycle',
+                 'parent_id', 'evidence_status', 'notes'}
+
+
+class Invalid(ValueError):
+    """Safe error messages contain no input values."""
+
+
+def require(condition: bool, reason: str) -> None:
+    if not condition:
+        raise Invalid(reason)
+
+
+def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        require(key not in result, 'duplicate JSON field')
+        result[key] = value
+    return result
+
+
+def load(path: Path, private: bool = False) -> dict[str, Any]:
+    # O_NOFOLLOW and fstat bind permission checks to the file actually read.
+    flags = os.O_RDONLY | os.O_NONBLOCK
+    if private:
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        require(stat.S_ISREG(info.st_mode), 'input must be a regular file')
+        if private:
+            require(info.st_uid == os.getuid() and info.st_mode & 0o177 == 0,
+                    'private bindings require owner-only permissions')
+        raw = stream.read(MAX_BYTES + 1)
+    require(len(raw) <= MAX_BYTES, 'input exceeds size limit')
+    value = json.loads(raw, object_pairs_hook=unique_object)
+    require(isinstance(value, dict), 'JSON root must be an object')
+    return value
+
+
+def fields(value: Any, expected: set[str]) -> None:
+    require(isinstance(value, dict) and set(value) == expected, 'invalid object fields')
+
+
+def text(value: Any, limit: int = 512, empty: bool = False) -> None:
+    require(isinstance(value, str) and (empty or bool(value)) and len(value) <= limit,
+            'invalid text field')
+    require(not any(ord(c) < 32 or ord(c) == 127 for c in value), 'control character in text')
+
+
+def identifier(value: Any) -> None:
+    require(isinstance(value, str) and ID.fullmatch(value) is not None, 'invalid logical ID')
+
+
+def choice(value: Any, options: set[str]) -> None:
+    require(isinstance(value, str) and value in options, 'unsupported field value')
+
+
+def stamp(value: Any) -> datetime:
+    text(value, 64)
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as error:
+        raise Invalid('invalid observation timestamp') from error
+    require(parsed.tzinfo is not None, 'observation timestamp requires timezone')
+    require(parsed <= datetime.now(timezone.utc) + timedelta(minutes=5),
+            'observation timestamp is in the future')
+    return parsed
+
+
+def validate(data: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    fields(data, {'schema_version', 'targets', 'edges', 'observations'})
+    require(type(data['schema_version']) is int and data['schema_version'] == 1,
+            'unsupported schema version')
+    for name in ('targets', 'edges', 'observations'):
+        require(isinstance(data[name], list), 'collection must be a list')
+    targets: dict[str, dict[str, Any]] = {}
+    for item in data['targets']:
+        fields(item, TARGET_FIELDS)
+        identifier(item['id'])
+        require(item['id'] not in targets, 'duplicate target ID')
+        choice(item['kind'], {'physical', 'vm', 'container', 'storage', 'external'})
+        choice(item['architecture'], {'arm64', 'x86_64', 'unknown'})
+        choice(item['lifecycle'], {'active', 'planned', 'retained', 'retired'})
+        choice(item['evidence_status'], {'observed', 'owner_reported', 'planned', 'unknown'})
+        for name in ('role', 'owner'):
+            text(item[name])
+        text(item['notes'], 1024, empty=True)
+        if item['parent_id'] is not None:
+            identifier(item['parent_id'])
+        targets[item['id']] = item
+    for item in targets.values():
+        parent = item['parent_id']
+        require(parent is None or parent in targets, 'unknown hosting parent')
+        visited: set[str] = set()
+        cursor = item['id']
+        while cursor is not None:
+            require(cursor not in visited, 'cyclic hosting')
+            visited.add(cursor)
+            cursor = targets[cursor]['parent_id']
+    seen: set[tuple[str, str, str]] = set()
+    for edge in data['edges']:
+        fields(edge, {'source', 'target', 'type', 'status'})
+        for name in ('source', 'target'):
+            identifier(edge[name])
+            require(edge[name] in targets, 'unknown edge endpoint')
+        choice(edge['type'], {'depends_on', 'attached_to', 'administered_by'})
+        choice(edge['status'], {'observed', 'declared', 'planned', 'unknown'})
+        key = (edge['source'], edge['target'], edge['type'])
+        require(key not in seen, 'duplicate edge')
+        seen.add(key)
+    observations: set[tuple[str, str, str]] = set()
+    for item in data['observations']:
+        fields(item, {'target_id', 'source', 'observed_at', 'state'})
+        identifier(item['target_id'])
+        require(item['target_id'] in targets, 'unknown observation target')
+        text(item['source'])
+        stamp(item['observed_at'])
+        choice(item['state'], {'running', 'suspended', 'healthy', 'exited', 'offline', 'unknown', 'unavailable'})
+        key = (item['target_id'], item['observed_at'], item['source'])
+        require(key not in observations, 'duplicate observation')
+        observations.add(key)
+    return targets
+
+
+def bindings(data: dict[str, Any], targets: dict[str, Any]) -> dict[str, Any]:
+    fields(data, {'schema_version', 'bindings'})
+    require(type(data['schema_version']) is int and data['schema_version'] == 1,
+            'unsupported private schema version')
+    require(isinstance(data['bindings'], dict), 'invalid private bindings')
+    for name, item in data['bindings'].items():
+        require(name in targets, 'unknown private target')
+        require(isinstance(item, dict) and 'method' in item and
+                set(item) <= {'method', 'endpoint', 'user'}, 'invalid private binding fields')
+        choice(item['method'], {'ssh', 'tailscale_ssh', 'local', 'parallels', 'lima'})
+        for value in item.values():
+            text(value)
+    return data['bindings']
+
+
+def inspect(data: dict[str, Any], targets: dict[str, Any], name: str) -> dict[str, Any]:
+    require(name in targets, 'unknown target ID')
+    observations = [item for item in data['observations'] if item['target_id'] == name]
+    latest = max(observations, key=lambda item: (stamp(item['observed_at']), item['source']), default=None)
+    freshness = 'unknown'
+    if latest:
+        freshness = ('unavailable' if latest['state'] == 'unavailable' else
+                     'stale' if datetime.now(timezone.utc) - stamp(latest['observed_at']) > timedelta(days=7)
+                     else 'recent')
+    return dict(target=targets[name], children=sorted(t['id'] for t in targets.values()
+                if t['parent_id'] == name), edges=sorted([e for e in data['edges']
+                if name in (e['source'], e['target'])], key=lambda e: (e['source'], e['target'], e['type'])),
+                observation=latest, freshness=freshness, workload_assignment='unassigned')
+
+
+def table(data: dict[str, Any], targets: dict[str, Any]) -> str:
+    lines = ['id\tkind\tarchitecture\tlifecycle\towner\tparent\tevidence\tobservation\tfreshness\trole']
+    for name in sorted(targets):
+        t = targets[name]
+        state = inspect(data, targets, name)
+        lines.append('\t'.join([name, t['kind'], t['architecture'], t['lifecycle'],
+            t['owner'], t['parent_id'] or '-', t['evidence_status'],
+            state['observation']['state'] if state['observation'] else 'unknown', state['freshness'], t['role']]))
+    return '\n'.join(lines)
+
+
+def label(value: str) -> str:
+    # Mermaid entity codes keep quotes/brackets/arrows from becoming syntax.
+    return ''.join(c if c.isascii() and (c.isalnum() or c in ' -_:') else f'#{ord(c)};' for c in value)
+
+
+def topology(data: dict[str, Any], targets: dict[str, Any]) -> str:
+    nodes = {name: f'n{i}' for i, name in enumerate(sorted(targets))}
+    lines = ['```mermaid', 'flowchart TD', '  accTitle: Declared personal homelab',
+             '  accDescr: Hosting and dependency relationships with planned and observed status; no private endpoints.']
+    edges: list[str] = []
+    for name in sorted(targets):
+        t = targets[name]
+        lines.append(f'  {nodes[name]}["{label(name + ": " + t["role"] + " (" + t["lifecycle"] + ")")}"]')
+        if t['parent_id']:
+            lines.append(f'  {nodes[t["parent_id"]]} -->|hosts| {nodes[name]}')
+            edges.append(f'{t["parent_id"]}\thosts\t{name}\tdeclared')
+    for e in sorted(data['edges'], key=lambda e: (e['source'], e['target'], e['type'])):
+        connector = '-.->' if e['status'] in {'planned', 'unknown'} else '-->'
+        lines.append(f'  {nodes[e["source"]]} {connector}|{e["type"]}: {e["status"]}| {nodes[e["target"]]}')
+        edges.append(f'{e["source"]}\t{e["type"]}\t{e["target"]}\t{e["status"]}')
+    lines += ['```', '', '**Text Equivalent:** Targets and relationships follow.', '',
+              '```text', table(data, targets), '', 'source\trelationship\ttarget\tstatus',
+              *sorted(edges), '```']
+    return '\n'.join(lines)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    default = Path(os.environ.get('XDG_CONFIG_HOME', str(Path.home() / '.config'))) / 'homelab/targets.json'
+    parser.add_argument('--inventory', type=Path, default=default)
+    parser.add_argument('--bindings', type=Path)
+    commands = parser.add_subparsers(dest='command', required=True)
+    for name in ('validate', 'targets', 'topology'):
+        commands.add_parser(name)
+    detail = commands.add_parser('inspect')
+    detail.add_argument('target')
+    detail.add_argument('--private', action='store_true')
+    args = parser.parse_args()
+    try:
+        data = load(args.inventory)
+        targets = validate(data)
+        private = bindings(load(args.bindings, private=True), targets) if args.bindings else {}
+        if args.command == 'validate':
+            output = f'valid: {len(targets)} targets, {len(data["edges"])} dependencies'
+        elif args.command == 'targets':
+            output = table(data, targets)
+        elif args.command == 'topology':
+            output = topology(data, targets)
+        else:
+            result = inspect(data, targets, args.target)
+            if args.private:
+                require(args.bindings is not None and args.target in private,
+                        'private inspection requires an explicit target binding')
+                result['binding'] = private[args.target]
+            output = json.dumps(result, sort_keys=True, indent=2)
+        print(output)
+        return 0
+    except Invalid as error:
+        print(f'homelab: {error}', file=sys.stderr)
+    except (OSError, UnicodeError, ValueError, RecursionError):
+        print('homelab: unable to read valid input', file=sys.stderr)
+    return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
