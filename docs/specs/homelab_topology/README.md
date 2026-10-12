@@ -20,7 +20,7 @@ information locally. Observation records source, time, state and uncertainty.
 DeclaredTargetChanged and ObservationRecorded are distinct events; observations
 cannot silently rewrite declarations. The operator owns all personal declarations.
 
-The future versioned inventory is JSON using schema version 1. Each target ID is
+The versioned inventory is JSON using schema version 1. Each target ID is
 unique; hosting edges form an acyclic graph. External dependencies cannot become
 admin targets merely by being visible on Tailscale. Unknown fields remain null or
 explicitly unknown. Sources are declarations and bounded native runtime queries;
@@ -68,7 +68,7 @@ backups and service use need a bounded follow-up inventory. Work sandbox is excl
 - Given no assigned execution workload, target resolution reports unassigned;
   it does not infer a target from architecture, hostname or online state.
 
-Proposed CLI: `homelab validate`, `homelab topology`, `homelab targets`,
+CLI: `homelab validate`, `homelab topology`, `homelab targets`,
 `homelab inspect TARGET`. Mutation is not an inventory command. Observer outputs
 are bounded and redact private fields by default. No broad credential/configuration
 scraping is authorized. Physical boot failure requires explicit recovery handling.
@@ -137,10 +137,11 @@ are retained locally; only redacted status reaches public-safe output.
 
 ## Validation, operations and open decisions
 
-Required evidence: schema/acyclicity tests, public/private output separation,
+Validation covers schema/acyclicity tests, public/private output separation,
 unknown/unreachable handling, deterministic diagram/table parity, exact target
 resolution, and live read-only comparisons. Existing pytest and chezmoi isolation
-are selected authorities; no deployment tests have run for new tooling.
+are selected authorities. macOS and Omarchy isolated target installs passed;
+Mac host installation and CLI validation passed.
 HP virtualization inventory, router interfaces and backup/recovery ownership
 remain unknown. Stateful mounts in personal-sandbox have been observed. Architecture does not assign workloads.
 Observations older than seven days are stale. `inspect TARGET` selects a stable
@@ -150,13 +151,14 @@ logical ID exactly; it never launches an administration action. No new public se
 
 | Gate | Applicability | Result |
 |---|---|---|
-| Domain, Behavior, Spec, Contract | required | pending; Discovery draft only |
-| Test, Refactor, Review/Integrate | required | not_run |
+| Domain, Behavior, Spec, Contract | required | passed |
+| Test | required | passed; 23 scoped tests |
+| Refactor, Review/Integrate | required | pending final closure |
 | Release | not_applicable: no packaged/hosted release | not_run |
-| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | not_run |
+| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | installed host verified; final evidence pending |
 
-No Gate Exceptions approved. Publication authority for private infrastructure
-metadata is a capability gap; candidate artifacts use public-safe logical data.
+No Gate Exceptions approved. Public source review and private-output omission
+tests cover this inventory boundary; there is no private-inventory publication.
 
 ## First implementation slice
 
@@ -287,3 +289,24 @@ third-party dependencies, listening sockets, extra services or paid resources.
 Review runtime security updates and upstream changes during routine dotfiles
 maintenance. Inventory recovery does not imply service-data backup: Atuin and
 PostgreSQL backup policy remains unverified and is an explicit follow-up.
+
+### Administration Mac launch and update
+
+The installed CLI validated 17 targets and five dependency edges. Launch with
+`~/.local/bin/homelab targets`, `~/.local/bin/homelab inspect pi400`, or
+`~/.local/bin/homelab topology`. It creates no network listeners or background
+jobs. The first slice deliberately has no private endpoint overlay populated.
+
+After reviewing a source update, apply only these artifacts:
+
+```sh
+chezmoi --source /path/to/reviewed/dotfiles apply --parent-dirs --exclude scripts \
+  ~/.local/bin/homelab ~/.config/homelab/targets.json
+~/.local/bin/homelab validate
+```
+
+Use a reviewed prior checkout as `--source` for rollback. Do not reset the primary
+checkout or overwrite unrelated local changes. Public declarations are source;
+private bindings are local runtime state and must never be added with chezmoi.
+As of this delivery, the primary source checkout remains unchanged; merge the
+reviewed draft PR before treating this branch as the long-term source authority.

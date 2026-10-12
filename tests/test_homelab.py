@@ -1,7 +1,6 @@
 """Behavioral tests for public-safe, read-only homelab declarations."""
 import copy
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
