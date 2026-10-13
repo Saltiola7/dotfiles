@@ -16,7 +16,7 @@ done
 [[ -d "$share_home" && ! -L "$share_home" ]] || { echo 'Home must be an existing ordinary directory.' >&2; exit 1; }
 [[ ! -L "$share_home/Shared" ]] || { echo 'Refusing symlink share.' >&2; exit 1; }
 [[ ! -e "$share_home/Shared" || -d "$share_home/Shared" ]] || { echo 'Share path is not a directory.' >&2; exit 1; }
-printf 'Plan: owner-only Shared folder, SMB on tailscale0:445, SELinux enforcing; preserve existing data.\n'
+printf 'Plan: owner-only Shared folder, loopback SMB through tailscale0:445 via Tailscale Serve, SELinux enforcing; preserve existing data.\n'
 [[ "$mode" == configure ]] || exit 0
 [[ "$share_home" == "$HOME" && "$EUID" -ne 0 ]] || { echo 'Run as the intended owner using the real home.' >&2; exit 1; }
 . /etc/os-release
@@ -26,7 +26,14 @@ owner="$(id -un)"
 [[ "$share_home" =~ ^/home/[a-z_][a-z0-9_-]*$ ]] || { echo 'Unexpected home path.' >&2; exit 1; }
 [[ "$(getenforce)" == Enforcing ]] || { echo 'Requires SELinux enforcing.' >&2; exit 1; }
 [[ -e /sys/class/net/tailscale0 ]] || { echo 'Tailscale interface missing.' >&2; exit 1; }
-for name in testparm semanage restorecon smbpasswd pdbedit; do command -v "$name" >/dev/null; done
+for name in testparm semanage restorecon smbpasswd pdbedit tailscale python3; do command -v "$name" >/dev/null; done
+tailscale serve status --json | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+route=d.get("TCP",{}).get("445")
+if route and route.get("TCPForward") != "127.0.0.1:445":
+    sys.exit("Refusing to replace existing Tailscale TCP 445 route")
+'
 for file in smb.conf tailscale.conf; do
   [[ -f "$source_dir/$file" && ! -L "$source_dir/$file" ]] || exit 1
 done
@@ -62,5 +69,7 @@ fi
 sudo systemctl daemon-reload
 sudo systemctl enable --now smb.service
 sudo systemctl restart smb.service
+sleep 2
 sudo systemctl is-active smb.service
+sudo tailscale serve --bg --tcp=445 tcp://127.0.0.1:445
 printf 'Configuration backup: %s\nAuthenticated client checks remain required.\n' "$backup"
