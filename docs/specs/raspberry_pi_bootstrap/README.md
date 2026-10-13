@@ -17,7 +17,7 @@ Target, BaseImage, PreparedImage, PreparationReceipt, PreparationBackend, DiskId
 FlashPlan and BootEvidence are distinct values. BaseImage is immutable upstream
 input; PreparedImage contains reviewed first-access configuration and its own
 checksum. FlashPlan binds target identity and prepared-image digest. PreparationBackend
-has a verified identity and isolated staging files, image loop devices and mounts. Credentials and
+has a verified identity and isolated private staging files and extracted ext4 partition copies. Credentials and
 hardware endpoints are private local bindings, not source manifest values.
 
 Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
@@ -41,7 +41,7 @@ lifecycle. Backend capabilities and image provenance are checked before preparin
 - Given unavailable prerequisites or invalid integrity, preparation fails before
   disk mutation and reports a bounded actionable error.
 - Given the approved personal Lima backend, preparation verifies its identity and
-  capabilities and isolates owned image mounts; existing services remain running.
+  capabilities and isolates owned image files without mounts; existing services remain running.
 - Given a reviewed flash plan, flashing requires fresh physical-disk identity and
   explicit matching approval; identity or artifact changes invalidate the plan.
 - Given normal chezmoi apply, no disk is written and no helper is launched.
@@ -83,7 +83,7 @@ There is no promise of rollback after flashing. Re-preparation/reflash is recove
 for this empty target, not recovery for writing the wrong disk. Preserve all other
 disks, VMs, applications and credentials.
 
-Required checks: image signature/hash, helper isolation and mount/resource limits,
+Required checks: image signature/hash, helper isolation and staging/resource limits,
 headless account/auth configuration, filesystem labels and SELinux, boot firmware,
 partition growth, fresh disk-identity validation, explicit approval invalidation,
 SSH host verification, local network access, enrollment and fresh reboot.
