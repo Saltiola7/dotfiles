@@ -239,6 +239,15 @@
         "docs/specs/homelab_backup/README.md",
         "docs/specs/homelab_object_storage/README.md"
       ]
+    },
+    {
+      "id": "INT-027",
+      "kind": "requirement",
+      "text": "Install capped private Forgejo Git hosting on Pi where capacity permits, with declared SQLite/repository ownership and consistent encrypted recovery; retain HP fallback only if Pi cannot host the initial load.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_git_hosting/README.md"
+      ]
     }
   ],
   "contexts": [
@@ -268,7 +277,7 @@
     {
       "id": "homelab_backup",
       "repository": "Saltiola7/dotfiles",
-      "status": "ready",
+      "status": "delivered",
       "depends_on": [
         "homelab_file_storage"
       ]
@@ -280,6 +289,16 @@
       "depends_on": [
         "homelab_topology",
         "raspberry_pi_bootstrap"
+      ]
+    },
+    {
+      "id": "homelab_git_hosting",
+      "repository": "Saltiola7/dotfiles",
+      "status": "ready",
+      "depends_on": [
+        "homelab_topology",
+        "raspberry_pi_bootstrap",
+        "homelab_backup"
       ]
     }
   ],
@@ -447,7 +466,7 @@
     {
       "id": "pi-rustfs-consistent-backup",
       "context": "homelab_backup",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-022",
         "INT-023",
@@ -467,6 +486,27 @@
         "docs/specs/homelab_object_storage/README.md"
       ],
       "release_group": "pi-rustfs-consistent-backup",
+      "execution_owner": "build"
+    },
+    {
+      "id": "pi-private-forgejo",
+      "context": "homelab_git_hosting",
+      "state": "ready",
+      "requirements": [
+        "INT-023",
+        "INT-027"
+      ],
+      "depends_on": [
+        "pi-versioned-backup",
+        "pi-private-s3"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_git_hosting/PROFILE.md",
+        "docs/specs/homelab_git_hosting/README.md"
+      ],
+      "release_group": "pi-private-forgejo",
       "execution_owner": "build"
     }
   ],
@@ -517,6 +557,13 @@
       "id": "pi-rustfs-consistent-backup",
       "members": [
         "pi-rustfs-consistent-backup"
+      ],
+      "state": "delivered"
+    },
+    {
+      "id": "pi-private-forgejo",
+      "members": [
+        "pi-private-forgejo"
       ],
       "state": "ready"
     }
