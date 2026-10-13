@@ -1,6 +1,6 @@
 # Private Pi Git hosting
 
-Status: Discovery-ready, not installed. Operator approved separate Git-hosting
+Status: Installed; private Git and encrypted isolated Forgejo restore passed. Operator approved separate Git-hosting
 context in personal dotfiles. Probe shows four ARM64 CPU cores, 3.2 GiB available
 memory, zero swap use and 446 GiB SSD free, with low current load. These are
 observations, not a sustained concurrency guarantee.
@@ -122,3 +122,27 @@ After version upgrades, preserve the compatible binary and full data/configurati
 and repeat isolated restore proof before resuming retention. A binary downgrade
 cannot reverse SQLite migrations. Source data replacement always needs a separate
 operator-approved production recovery procedure.
+
+
+## Verified rollout and limits
+
+Official ARM64 LTS signature and both release checksums were verified before
+execution. Git/Git LFS were installed by the owner using password-required sudo.
+Forgejo 15.0.10 runs as an enabled owner service with SQLite, one-CPU/768 MiB
+limits, no swap and loopback web/embedded Git SSH. Initial observed idle service
+memory was approximately 100 MiB; this is not a capacity benchmark.
+
+The generated probe account/repository pushed a committed payload over signed
+SSH with strict host-key trust bound to owned Forgejo keys. The complete stopped
+SQLite/data/configuration/binary generation was encrypted in existing Borg.
+Recovered bytes and manifest matched; an isolated loopback instance returned the
+private repository metadata, denied anonymous access and produced matching bytes
+in a fresh Git clone. Probe repository/account were removed; no owner repositories
+were moved or deleted. Original Forgejo readiness recovered; RustFS and Samba
+remained healthy. Daily retention now requires compatible Forgejo restore proof.
+
+Web access is private Tailscale HTTPS; Git uses embedded SSH on its private port.
+Enrollment is an explicit owner-sudo step and does not reset other Serve routes.
+The operator retrieves initial administrator enrollment from its owner-private
+file and changes the password during first login; credentials are never posted
+in chat. Add client public SSH keys through Forgejo; keep private keys on clients.
