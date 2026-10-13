@@ -4,6 +4,9 @@ Operator-owned private development infrastructure in personal dotfiles. Fedora
 ARM64 Raspberry Pi 400; native RustFS binary and systemd user service. Cloud and
 Security modules apply; elevated risk. This is a bounded single-node development
 service, not a high-availability or production-capacity commitment.
+Mac S3/DVC client is separate Python 3.13 with hash-locked DVC/S3 dependencies;
+standard-library provisioning/check helpers support Python 3.12+. Python module
+applies. Existing generic DVC and project configuration are preserved.
 
 Interfaces: S3 path-style requests, private Tailscale TCP forwarding, separate
 object data and owner-only credential files. Public source owns version, digest,

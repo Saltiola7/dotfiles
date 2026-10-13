@@ -1,0 +1,6 @@
+{
+  "version": "1.0.1",
+  "architecture": "aarch64",
+  "url": "https://github.com/rustfs/rustfs/releases/download/1.0.1/rustfs-linux-aarch64-gnu-v1.0.1.zip",
+  "sha256": "1dcfb6ae59702b8e90394157e57450ed219515a1cc63525f730d4e120e9be7b9"
+}

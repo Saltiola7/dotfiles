@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Separate hash-locked DVC S3 runtime; preserve existing global DVC installation.
+set -euo pipefail
+source_dir="${XDG_CONFIG_HOME:-$HOME/.config}/homelab-object-storage"
+case "${1:---plan}" in
+  --plan) echo 'Plan: isolated Python 3.13 DVC 3.67.1 with S3 plugin and hash-locked dependencies.'; exit 0 ;;
+  --install) ;;
+  *) exit 2 ;;
+esac
+if [[ $# -gt 1 ]]; then
+  [[ $# -eq 3 && "$2" == --source ]] || exit 2
+  source_dir="$3"
+fi
+lock="$source_dir/client-requirements.lock"
+[[ -f "$lock" && ! -L "$lock" ]] || exit 1
+runtime="$HOME/.local/state/homelab-object-storage/dvc-client"
+[[ ! -L "$runtime" ]] || exit 1
+if [[ ! -d "$runtime" ]]; then uv venv --python 3.13 "$runtime"; fi
+uv pip sync --python "$runtime/bin/python" --require-hashes "$lock"
+"$runtime/bin/dvc" --version
