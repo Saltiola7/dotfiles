@@ -198,6 +198,11 @@ graphify-out/
 .config/omarchy-backup/
 Shared/Backup-Recovery/
 
+{{ if ne .machine_type "fedora-server" }}
+.config/homelab-file-storage/
+.local/bin/pi-samba-setup
+{{ end }}
+
 # Image preparation belongs to macOS administration profiles only.
 {{ if and (ne .machine_type "mac-mini") (ne .machine_type "macbook") }}
 .local/bin/pi-bootstrap
