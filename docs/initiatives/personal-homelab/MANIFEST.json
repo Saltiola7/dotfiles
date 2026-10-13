@@ -220,6 +220,15 @@
       "artifacts": [
         "docs/specs/homelab_file_storage/README.md"
       ]
+    },
+    {
+      "id": "INT-025",
+      "kind": "requirement",
+      "text": "Deploy private RustFS on Pi for DVC/S3 development using isolated object data, verified ARM64 release, private credentials and bounded resources.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_object_storage/README.md"
+      ]
     }
   ],
   "contexts": [
@@ -240,7 +249,7 @@
     {
       "id": "homelab_file_storage",
       "repository": "Saltiola7/dotfiles",
-      "status": "ready",
+      "status": "delivered",
       "depends_on": [
         "homelab_topology",
         "raspberry_pi_bootstrap"
@@ -249,9 +258,18 @@
     {
       "id": "homelab_backup",
       "repository": "Saltiola7/dotfiles",
-      "status": "discovering",
+      "status": "ready",
       "depends_on": [
         "homelab_file_storage"
+      ]
+    },
+    {
+      "id": "homelab_object_storage",
+      "repository": "Saltiola7/dotfiles",
+      "status": "ready",
+      "depends_on": [
+        "homelab_topology",
+        "raspberry_pi_bootstrap"
       ]
     }
   ],
@@ -351,7 +369,7 @@
     {
       "id": "pi-private-samba",
       "context": "homelab_file_storage",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-021",
         "INT-024"
@@ -374,7 +392,7 @@
     {
       "id": "pi-versioned-backup",
       "context": "homelab_backup",
-      "state": "discovering",
+      "state": "ready",
       "requirements": [
         "INT-022",
         "INT-023"
@@ -383,11 +401,37 @@
         "pi-private-samba"
       ],
       "artifacts": [
-        "docs/specs/homelab_backup/README.md",
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
         "docs/specs/homelab_backup/PROFILE.md",
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_object_storage/PROFILE.md",
+        "docs/specs/homelab_object_storage/README.md",
         "docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md"
       ],
       "release_group": "pi-versioned-backup",
+      "execution_owner": "build"
+    },
+    {
+      "id": "pi-private-s3",
+      "context": "homelab_object_storage",
+      "state": "ready",
+      "requirements": [
+        "INT-025"
+      ],
+      "depends_on": [
+        "pi-private-samba"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_backup/PROFILE.md",
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_object_storage/PROFILE.md",
+        "docs/specs/homelab_object_storage/README.md",
+        "docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md"
+      ],
+      "release_group": "pi-private-s3",
       "execution_owner": "build"
     }
   ],
@@ -418,14 +462,21 @@
       "members": [
         "pi-private-samba"
       ],
-      "state": "ready"
+      "state": "delivered"
     },
     {
       "id": "pi-versioned-backup",
       "members": [
         "pi-versioned-backup"
       ],
-      "state": "planning"
+      "state": "ready"
+    },
+    {
+      "id": "pi-private-s3",
+      "members": [
+        "pi-private-s3"
+      ],
+      "state": "ready"
     }
   ]
 }

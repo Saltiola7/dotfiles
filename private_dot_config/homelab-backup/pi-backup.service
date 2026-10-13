@@ -1,0 +1,12 @@
+[Unit]
+Description=Private Pi encrypted Borg backup to Mac-connected disk
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/homelab-backup run --config %h/.config/homelab-backup/client.json
+UMask=0077
+CPUQuota=50%
+MemoryMax=1G
+Nice=10
+IOSchedulingClass=idle

@@ -35,9 +35,9 @@ below. Offline means an observation, not retirement.
 | Logical ID | Kind / architecture | Role and hosting | Evidence / limits |
 |---|---|---|---|
 | mac-mini | physical / ARM64 | administration workstation and guest host | Existing session machine; macOS 27.0.1 observed; M4 Pro / 64GB known from earlier host inspection |
-| macbook-pro | physical / ARM64 | portable workstation; no workload assigned | Owner reports M1 / 16GB / 512GB; owner confirms remote identity; Tailscale peer observed offline |
+| macbook-pro | physical / ARM64 | portable workstation; private Samba, S3 development and local Borg recovery verified | Owner reports M1 / 16GB / 512GB; owner confirms remote identity; Tailscale peer observed offline |
 | hp-envy | physical / x86_64 | Omarchy daily-driver workstation | Live owner probe verified x86_64 and roughly 8GB RAM; user-level Podman empty; root-level Podman hosts two RustDesk containers; Docker daemon unavailable |
-| pi400 | physical / ARM64 | active headless Fedora server | Fedora 44 USB boot, trusted key-only SSH, expanded root and two fresh reboots verified; Tailscale access persists; IPv4 DHCP and internet verified after recovery; no workload assigned |
+| pi400 | physical / ARM64 | active headless Fedora server | Fedora 44 USB boot, trusted key-only SSH, expanded root and two fresh reboots verified; Tailscale access persists; IPv4 DHCP and internet verified after recovery; private Samba, S3 development and local Borg recovery verified |
 | pi-system-ssd | storage | external Pi system drive | Transcend 512.1GB flash and full image readback verified; attached to Pi as system disk; root filesystem reports 467.2GiB |
 | omarchy-arm | VM / ARM64 | Mac mini Parallels guest, daily-driver trial | Running observed; resource allocation previously verified as 6 CPU / 12GB RAM / 64GB root |
 | fedora-vm | VM / unknown until refreshed | Mac mini Parallels guest | Suspended observed; no resource or workload changes |
@@ -110,6 +110,8 @@ flowchart TD
   Pi -.->|planned household LAN| Flint
   Pi -->|current Ethernet and DHCP| Router
   Pi[Pi 400: boot-verified Fedora server] -->|USB system disk| SSD[Transcend SSD]
+  Mac -->|attached storage| BackupDisk[Existing 8TB disk: Pi Borg destination]
+  Pi -->|private encrypted Borg backup| BackupDisk
   Mac -->|trusted SSH administration| Pi
   External[External dependencies: Git hosting, Fedora sources, Tailscale]
   Mac -.->|consumes services| External
@@ -121,6 +123,7 @@ Atuin and healthy PostgreSQL and retains an exited schema-test container. MacBoo
 Pro, HP, router and Pi are separate targets; only Pi Ethernet and extender uplink to the provider gateway are verified. Flint is planned, with WAN uplink to the provider gateway and future Pi/extender LAN attachment; these dashed relationships are not deployed.
 HP hosts running root-owned Podman containers for RustDesk hbbs and hbbr.
 Pi administration from Mac mini and SSD system-drive attachment are verified.
+Pi also runs private Samba and capped RustFS development storage, and backs up ordinary Shared files to a dedicated Borg repository on the existing Mac-connected 8TB disk. Local encrypted restore and fresh startup passed; Backblaze upload/restore and object consistency remain unverified.
 Totalplay supplies upstream provider services. Git hosting, Fedora sources and Tailscale are external services, not managed hosts.
 
 ```mermaid
@@ -302,7 +305,7 @@ PostgreSQL backup policy remains unverified and is an explicit follow-up.
 
 ### Administration Mac launch and update
 
-The initial installed CLI validated 17 targets and five dependency edges. This update declares 20 targets and 11 dependency edges; apply the reviewed inventory to refresh local output. Launch with
+The initial installed CLI validated 17 targets and five dependency edges. This update declares 21 targets and 13 dependency edges; apply the reviewed inventory to refresh local output. Launch with
 `~/.local/bin/homelab targets`, `~/.local/bin/homelab inspect pi400`, or
 `~/.local/bin/homelab topology`. It creates no network listeners or background
 jobs. The first slice shipped without a populated private endpoint overlay.
@@ -339,3 +342,12 @@ peer. Router peer identity remains unverified. The gateway and wired extender we
 ## Network recovery and planned gateway
 
 [DHCP incident and recovery](DHCP-RECOVERY.md) records observed failure, owner-approved changes, verification and uncertainty. [Flint target setup](FLINT-TARGET.md) declares the future network boundary, cutover checks and rollback. Planned edges describe desired connectivity only; current observed edges remain until migration is verified. No runtime settings are applied by these declarations.
+
+## Private storage services update
+
+Samba and RustFS/DVC functional checks and fresh startup are verified. Native
+services are recorded as Pi roles, not mislabeled as containers. The existing
+Mac-connected backup disk is an observed storage target; its dependency edge
+represents Pi backup only, not a requirement for Pi boot or file serving.
+Encrypted Borg archive/restore and daily timer catch-up passed. Offsite upload
+and consistent object-store recovery remain separate unverified obligations.

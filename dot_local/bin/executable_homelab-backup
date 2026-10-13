@@ -1,0 +1,234 @@
+#!/usr/bin/env python3
+"""Explicit encrypted Pi backup and guarded macOS repository service."""
+import argparse
+import datetime
+import fcntl
+import json
+import os
+from pathlib import Path
+import plistlib
+import secrets
+import shlex
+import subprocess
+import sys
+import tempfile
+from urllib.parse import urlparse
+import ipaddress
+
+
+def ordinary(path: Path) -> None:
+    for candidate in (path, *path.parents):
+        if candidate.is_symlink():
+            raise ValueError("Refusing symlink backup path")
+
+
+def read_config(path: Path) -> dict:
+    ordinary(path)
+    st = path.stat()
+    if st.st_uid != os.getuid() or st.st_mode & 0o077:
+        raise ValueError("Configuration must be owner-private")
+    return json.loads(path.read_text())
+
+
+def volume_info(path: Path) -> dict:
+    return plistlib.loads(subprocess.check_output(["/usr/sbin/diskutil", "info", "-plist", str(path)]))
+
+
+def destination_guard(cfg: dict) -> Path:
+    mount = Path(cfg["mount"])
+    repo = Path(cfg["repository"])
+    ordinary(mount)
+    ordinary(repo)
+    if not mount.is_absolute() or repo != mount / "Homelab-Backups/pi400":
+        raise ValueError("Unexpected dedicated repository location")
+    info = volume_info(mount)
+    if info.get("Mounted") is False or info.get("MountPoint") != str(mount) or info.get("VolumeUUID") != cfg["volume_uuid"]:
+        raise ValueError("Destination disk identity mismatch")
+    available = info.get("APFSContainerFree", info.get("FreeSpace", 0))
+    if available < 20 * 1024**3:
+        raise ValueError("Destination needs 20 GiB free headroom")
+    return repo
+
+
+def private_write(path: Path, value: str) -> None:
+    ordinary(path)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        stream.write(value)
+
+
+def secret_env(password: Path) -> dict:
+    ordinary(password)
+    if password.stat().st_mode & 0o077 or password.stat().st_uid != os.getuid():
+        raise ValueError("Password file must be owner-private")
+    env = {key: value for key, value in os.environ.items() if not key.startswith("BORG_")}
+    env["BORG_PASSPHRASE"] = password.read_text().strip()
+    return env
+
+
+def borg(*args: str, env: dict | None = None, cwd: Path | None = None) -> None:
+    subprocess.run(["borg", *args], env=env, cwd=cwd, check=True)
+
+
+def initialize(cfg: dict) -> None:
+    repo = destination_guard(cfg)
+    if repo.exists():
+        raise ValueError("Refusing to initialize an existing repository path")
+    password = Path(cfg["password_file"])
+    key = Path(cfg["recovery_key_file"])
+    ordinary(key)
+    if key.exists():
+        raise ValueError("Existing recovery material needs review")
+    if not password.exists():
+        private_write(password, secrets.token_hex(32) + "\n")
+    # Preserve a private password created by a previously interrupted initialization.
+    env = secret_env(password)
+    repo.mkdir(parents=True, mode=0o700)
+    borg("init", "--encryption=repokey-blake2", str(repo), env=env)
+    key.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    borg("key", "export", str(repo), str(key), env=env)
+    key.chmod(0o600)
+    print("Encrypted dedicated repository initialized; recovery material is private.")
+
+
+def client_env(cfg: dict) -> dict:
+    parsed = urlparse(cfg["repository"])
+    if parsed.scheme != "ssh" or not parsed.hostname or not parsed.path.endswith("/Homelab-Backups/pi400"):
+        raise ValueError("Expected dedicated SSH repository")
+    identity, hosts = Path(cfg["identity_file"]), Path(cfg["known_hosts"])
+    for path in (identity, hosts):
+        ordinary(path)
+        if path.stat().st_mode & 0o077 or path.stat().st_uid != os.getuid():
+            raise ValueError("SSH identity and trust must be owner-private")
+    env = secret_env(Path(cfg["password_file"]))
+    env["BORG_RSH"] = shlex.join(["ssh", "-F", "/dev/null", "-i", str(identity), "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "GlobalKnownHostsFile=/dev/null", "-o", "UserKnownHostsFile=" + str(hosts)])
+    return env
+
+
+def authorize_key(auth: Path, public: str, expected: str) -> None:
+    """Preserve existing identities and refuse conflicting permissions for this key."""
+    ordinary(auth)
+    data = auth.read_text() if auth.exists() else ""
+    key = public.split()[1]
+    matches = [line for line in data.splitlines() if key in line.split()]
+    if matches and matches != [expected.rstrip("\n")]:
+        raise ValueError("Existing backup identity permissions differ; review required")
+    if not matches:
+        auth.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with auth.open("a") as stream:
+            if data and not data.endswith("\n"):
+                stream.write("\n")
+            stream.write(expected)
+        auth.chmod(0o600)
+
+
+def enroll_client(cfg: dict) -> None:
+    """Enroll a new Pi-generated identity without copying host private keys."""
+    destination_guard(cfg)
+    home = Path.home()
+    ssh = ["ssh", "-F", "/dev/null", "-i", cfg["admin_identity"], "-o", "IdentitiesOnly=yes", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "GlobalKnownHostsFile=/dev/null", "-o", "UserKnownHostsFile=" + cfg["pi_known_hosts"], cfg["pi_ssh_host"]]
+    code = 'from pathlib import Path; import subprocess,json; p=Path.home()/".config/homelab-backup/identity"; p.mkdir(parents=True,exist_ok=True,mode=0o700); k=p/"id_ed25519"; subprocess.run(["ssh-keygen","-q","-t","ed25519","-N","","-C","pi400-borg-only","-f",str(k)],check=True) if not k.exists() else None; print(json.dumps({"home":str(Path.home()),"public":k.with_suffix(".pub").read_text().strip(),"ip":subprocess.check_output(["tailscale","ip","-4"],text=True).strip()}))'
+    peer = json.loads(subprocess.check_output(ssh + ["python3 -c " + shlex.quote(code)], text=True))
+    if not peer["public"].startswith("ssh-ed25519 ") or "\n" in peer["public"]:
+        raise ValueError("Invalid public identity")
+    if ipaddress.ip_address(peer["ip"]) not in ipaddress.ip_network("100.64.0.0/10"):
+        raise ValueError("Expected tailnet client address")
+    forced = str(home / ".local/bin/homelab-borg-serve")
+    if '"' in forced or "\n" in forced:
+        raise ValueError("Unsupported forced-command path")
+    auth = home / ".ssh/authorized_keys"
+    line = f'from="{peer["ip"]}",restrict,command="{forced}" ' + peer["public"] + "\n"
+    authorize_key(auth, peer["public"], line)
+    public = Path("/etc/ssh/ssh_host_ed25519_key.pub").read_text().split()
+    remote = Path(peer["home"])
+    base = remote / ".config/homelab-backup"
+    client = {"repository": "ssh://" + cfg["server_user"] + "@" + cfg["server_ip"] + cfg["repository"], "identity_file": str(base / "identity/id_ed25519"), "known_hosts": str(base / "identity/known_hosts"), "password_file": str(base / "passphrase"), "sources": [str(remote / "Shared"), str(remote / ".config/homelab-file-storage")]}
+    contents = {"client.json": json.dumps(client), "passphrase": Path(cfg["password_file"]).read_text(), "identity/known_hosts": cfg["server_ip"] + " " + public[0] + " " + public[1] + "\n"}
+    writer = 'import json,sys,os; from pathlib import Path; d=json.load(sys.stdin); b=Path.home()/".config/homelab-backup";\nfor n,v in d.items():\n p=b/n\n if p.is_symlink(): raise ValueError("Symlink runtime file")\n if p.exists():\n  if p.stat().st_mode & 0o077 or p.read_text()!=v: raise ValueError("Conflicting private runtime file")\n else:\n  fd=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\n  with os.fdopen(fd,"w") as f: f.write(v)\nprint("Private backup client enrolled")'
+    subprocess.run(ssh + ["python3 -c " + shlex.quote(writer)], input=json.dumps(contents).encode(), check=True)
+
+
+def archive(cfg: dict, retention: bool) -> str:
+    sources = [Path(s) for s in cfg["sources"]]
+    if not sources or sources[0] != Path.home() / "Shared":
+        raise ValueError("Primary source must be owner Shared directory")
+    for source in sources:
+        ordinary(source)
+        if not source.exists():
+            raise ValueError("Required backup source is missing")
+    env = client_env(cfg)
+    name = "pi400-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
+    locator = cfg["repository"] + "::" + name
+    borg("create", "--compression", "zstd,3", locator, *map(str, sources), env=env)
+    borg("check", "--archives-only", locator, env=env)
+    state = Path.home() / ".local/state/homelab-backup"
+    if retention:
+        if not (state / "restore-verified").is_file():
+            raise ValueError("Restore must pass before retention")
+        borg("prune", "--glob-archives", "pi400-*", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6", cfg["repository"], env=env)
+        borg("compact", cfg["repository"], env=env)
+    (state / "last-success.json").write_text(json.dumps({"archive": name, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}) + "\n")
+    return name
+
+
+def restore_check(cfg: dict) -> None:
+    source = Path.home() / "Shared" / (".backup-probe-" + secrets.token_hex(8))
+    payload = "Private backup restore probe " + secrets.token_hex(16) + "\n"
+    private_write(source, payload)
+    try:
+        name = archive(cfg, False)
+        with tempfile.TemporaryDirectory(prefix="pi-borg-restore-") as target:
+            borg("extract", cfg["repository"] + "::" + name, str(source).lstrip("/"), env=client_env(cfg), cwd=Path(target))
+            restored = Path(target) / str(source).lstrip("/")
+            if restored.read_text() != payload:
+                raise ValueError("Restored bytes differ")
+        (Path.home() / ".local/state/homelab-backup/restore-verified").write_text(name + "\n")
+        print("Encrypted remote archive restored and bytes matched; retention may be enabled.")
+    finally:
+        source.unlink(missing_ok=True)
+
+
+def main() -> None:
+    os.umask(0o077)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("destination-plan", "destination-init", "enroll-client", "serve", "client-plan", "run", "restore-check"))
+    parser.add_argument("--config", type=Path, required=True)
+    args = parser.parse_args()
+    cfg = read_config(args.config)
+    if args.action == "enroll-client":
+        enroll_client(cfg)
+        return
+    if args.action.startswith("destination") or args.action == "serve":
+        repo = destination_guard(cfg)
+        if args.action == "destination-plan":
+            print("Expected disk verified; dedicated repository only; no writes.")
+        elif args.action == "destination-init":
+            initialize(cfg)
+        else:
+            if not (repo / "config").is_file():
+                raise ValueError("Repository not initialized")
+            os.execv("/opt/homebrew/bin/borg", ["borg", "serve", "--restrict-to-repository", str(repo)])
+        return
+    client_env(cfg)
+    if args.action == "client-plan":
+        print("Dedicated SSH repository, strict trust, 7/4/6 retention; no writes.")
+        return
+    state = Path.home() / ".local/state/homelab-backup"
+    ordinary(state)
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (state / "job.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.action == "run":
+            name = archive(cfg, True)
+            print("Backup completed:", name)
+        else:
+            restore_check(cfg)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"Backup failed: {error}", file=sys.stderr)
+        sys.exit(1)

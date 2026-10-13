@@ -197,6 +197,19 @@ graphify-out/
 # Backup secrets and recovery material are private runtime state.
 .config/omarchy-backup/
 Shared/Backup-Recovery/
+.config/homelab-backup/client.json
+.config/homelab-backup/destination.json
+.config/homelab-backup/recovery/
+.config/homelab-backup/passphrase
+.config/homelab-backup/identity/
+
+{{ if and (ne .machine_type "fedora-server") (ne .machine_type "mac-mini") }}
+.config/homelab-backup/
+.local/bin/homelab-backup
+{{ end }}
+{{ if ne .machine_type "mac-mini" }}
+.local/bin/homelab-borg-serve
+{{ end }}
 
 {{ if ne .machine_type "fedora-server" }}
 .config/homelab-file-storage/
