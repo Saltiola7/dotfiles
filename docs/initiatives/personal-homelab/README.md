@@ -49,3 +49,18 @@ Run initiative-check after manifest changes. Before implementation, run the
 slice receipt and real DBSCTR begin preflight in a clean isolated checkout, then
 present the exact launch digest for approval. No disk-write approval is implied
 by context-map approval.
+
+## Topology delivery and next slice
+
+Topology declarations and CLI were delivered in draft PR
+https://github.com/Saltiola7/dotfiles/pull/33 at commit
+5ad8c6dffa99a1f4a3edf887c38f90df09461f40. The administration Mac has the
+reviewed CLI and declarations installed; 23 scoped tests passed and the GitHub
+Mermaid baseline, private boundary and entity diagram rendered successfully.
+Main is unchanged and merging the draft is a separate integration decision.
+
+`prepare-pi-image` is now ready for exact-plan approval. Its maintained macOS
+entry point uses personal-sandbox Lima, asks for required Linux sudo and a private
+Pi administrator password, verifies Fedora input authenticity before processing,
+and produces a private prepared image plus a receipt. Password-required Pi sudo
+is the owner's selected policy. No physical disk write belongs to this slice.

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "id": "personal-homelab",
   "title": "Personal homelab topology and Raspberry Pi bootstrap",
-  "state": "discovering",
+  "state": "building",
   "coordinator_repository": "Saltiola7/dotfiles",
   "statements": [
     {
@@ -190,7 +190,7 @@
     {
       "id": "homelab_topology",
       "repository": "Saltiola7/dotfiles",
-      "status": "ready",
+      "status": "delivered",
       "depends_on": []
     },
     {
@@ -206,7 +206,7 @@
     {
       "id": "declare-targets",
       "context": "homelab_topology",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-001",
         "INT-002",
@@ -235,7 +235,7 @@
     {
       "id": "prepare-pi-image",
       "context": "raspberry_pi_bootstrap",
-      "state": "discovering",
+      "state": "ready",
       "requirements": [
         "INT-009",
         "INT-010",
@@ -252,8 +252,13 @@
         "declare-targets"
       ],
       "artifacts": [
-        "docs/specs/raspberry_pi_bootstrap/README.md",
-        "docs/specs/raspberry_pi_bootstrap/PROFILE.md"
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_topology/CHANGELOG.md",
+        "docs/specs/homelab_topology/PROFILE.md",
+        "docs/specs/homelab_topology/README.md",
+        "docs/specs/raspberry_pi_bootstrap/CHANGELOG.md",
+        "docs/specs/raspberry_pi_bootstrap/PROFILE.md",
+        "docs/specs/raspberry_pi_bootstrap/README.md"
       ],
       "release_group": "prepare-pi-image",
       "execution_owner": "build"
@@ -291,14 +296,14 @@
       "members": [
         "declare-targets"
       ],
-      "state": "ready"
+      "state": "delivered"
     },
     {
       "id": "prepare-pi-image",
       "members": [
         "prepare-pi-image"
       ],
-      "state": "planning"
+      "state": "ready"
     },
     {
       "id": "flash-pi-and-verify-boot",
