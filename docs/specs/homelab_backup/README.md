@@ -39,15 +39,23 @@ Candidate repository folder: `Homelab-Backups/pi400` under the dedicated externa
 disk. Public declarations use logical disk identity only. Bind the actual UUID
 privately and check it at the destination, including remote writes. Candidate
 schedule matches HP: daily, with 7 daily, 4 weekly and 6 monthly archives.
+The Pi pushes archives over existing Mac SSH using a newly generated dedicated
+Pi identity and a restricted forced command on the destination. The forced
+command checks the mounted filesystem UUID before starting Borg, then restricts
+access to this repository only. Existing Mac SSH identities remain unchanged.
+Never reuse or copy the Mac's private administration key onto the Pi.
 Repository passwords and exported recovery keys must be kept independently of
 the Pi, repository and sole Mac copy. Use a restricted backup identity rather
-than unrestricted remote shell credentials. Direction and credential enrollment
-are finalized after checking macOS SSH availability; no private keys are copied.
+than unrestricted remote shell credentials. Existing Mac SSH and Borg 1.4.5 are
+available. Public host keys are verified from the owned destination before trust
+is installed; no private keys are copied.
 
 Backblaze inclusion and a cloud restore must be verified separately. A successful
 Borg job is not evidence of cloud protection. Concurrent edits give file-level
 copies, not transactional snapshots; databases require separate consistent dumps.
 Initial scope is ordinary shared files plus declared configuration inventories.
+RustFS object data has independent consistent-backup obligations; this ordinary
+file slice must not falsely claim active object/database consistency.
 
 ## Visual Evidence
 

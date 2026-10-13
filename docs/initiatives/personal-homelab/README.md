@@ -80,3 +80,11 @@ RustFS installation for DVC is additionally requested; hosting selection remains
 pending and object-storage data must stay separate. Baserow is deferred. See
 `docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md` for boundaries and prerequisites.
 No deployment is claimed by these declarations.
+
+## Verified Samba and next deployments
+
+Samba delivered in merged PR #38: authenticated read/write/delete, private-only
+network access and fresh reboot passed. Borg backup and Pi RustFS are separate
+ready slices; RustFS placement on Pi is explicitly owner-selected. Their exact
+launch plans include private credential enrollment, restore/roundtrip checks and
+existing-service preservation. No valuable data migration is included.
