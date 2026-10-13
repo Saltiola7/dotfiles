@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Pi Borg backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Mexico_City
+RandomizedDelaySec=15m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
