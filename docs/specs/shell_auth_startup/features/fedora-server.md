@@ -34,9 +34,9 @@ Reuse `.bashrc`, `.bash_profile`, `.common_profile`, Atuin and Starship configur
 plus the homelab CLI/inventory. Add `.config/fedora-server/dnf-packages.txt` and an
 explicit `fedora-server-setup` helper. The helper validates Fedora and root/user
 execution mode, reads a constrained package list and delegates only to DNF install.
-Baseline tools: chezmoi, Git, Python, uv, Node/npm, Neovim, tmux, ripgrep, fd, fzf,
+Baseline tools: chezmoi, Git, Python, uv, Node/npm, Neovim, ripgrep, fd, fzf,
 direnv, Starship, Atuin and zoxide, subject to confirmed repository availability.
-No downloaded installer pipes, external repos or unverified binaries are needed.
+Most tools use Fedora packages. Starship uses the existing verified official ARM64 release pin and SHA-256, without installer pipes or external repositories. Package setup currently supports Fedora ARM64; no Pi hardware settings are involved.
 
 Reuse the portable `lmsh` shell branch where suitable; platform-specific branches
 remain unchanged. Disable unattended Atuin synchronization on the server until

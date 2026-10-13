@@ -1,4 +1,8 @@
+{{ if eq .machine_type "fedora-server" -}}
+auto_sync = false
+{{ else -}}
 auto_sync = true
+{{ end -}}
 sync_address = {{ .atuin_sync_address | quote }}
 sync_frequency = "10m"
 filter_mode = "global"

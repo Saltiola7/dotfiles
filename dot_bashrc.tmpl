@@ -26,10 +26,13 @@ fi
 # Everything below is interactive-only (skip for bash -l -c "..." contexts)
 [[ $- != *i* ]] && return
 
-{{ if eq .machine_type "lmsh" -}}
+{{ if or (eq .machine_type "lmsh") (eq .machine_type "fedora-server") -}}
 if [ -z "$INTELLIJ_ENVIRONMENT_READER" ] && [ -t 0 ]; then
     command -v atuin >/dev/null && eval "$(atuin init bash)"
     command -v zoxide >/dev/null && eval "$(zoxide init bash)"
+{{ if eq .machine_type "fedora-server" -}}
+    command -v direnv >/dev/null && eval "$(direnv hook bash)"
+{{ end -}}
     if command -v starship >/dev/null; then
         export SHELL_LABEL="bash ${BASH_VERSION%%(*}"
         eval "$(starship init bash)"

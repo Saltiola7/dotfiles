@@ -17,7 +17,7 @@ if command -v yazi >/dev/null 2>&1; then
 fi
 # END_YAZI_WRAPPER
 
-{{ if eq .machine_type "lmsh" -}}
+{{ if or (eq .machine_type "lmsh") (eq .machine_type "fedora-server") -}}
 export PATH="{{ .chezmoi.homeDir }}/.local/bin:{{ .chezmoi.homeDir }}/.cargo/bin:$PATH"
 alias vim='nvim'
 alias python='python3'

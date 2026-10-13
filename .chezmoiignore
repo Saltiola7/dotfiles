@@ -204,3 +204,33 @@ Shared/Backup-Recovery/
 .local/lib/pi-bootstrap/
 .config/pi-bootstrap/
 {{ end }}
+
+# Headless Fedora uses an explicit personal terminal allowlist. No apply hooks.
+{{ if ne .machine_type "fedora-server" }}
+.config/fedora-server/
+.local/bin/fedora-server-setup
+{{ end }}
+{{ if eq .machine_type "fedora-server" }}
+*
+!.bash_profile
+!.bashrc
+!.common_profile
+!.config/
+.config/*
+!.config/atuin/
+.config/atuin/*
+!.config/atuin/config.toml
+!.config/starship.toml
+!.config/homelab/
+.config/homelab/*
+!.config/homelab/targets.json
+!.config/fedora-server/
+.config/fedora-server/*
+!.config/fedora-server/dnf-packages.txt
+!.local/
+.local/*
+!.local/bin/
+.local/bin/*
+!.local/bin/homelab
+!.local/bin/fedora-server-setup
+{{ end }}

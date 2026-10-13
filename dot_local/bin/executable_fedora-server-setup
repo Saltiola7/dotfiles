@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# Explicit package setup; never a chezmoi apply hook.
+set -euo pipefail
+manifest="$HOME/.config/fedora-server/dnf-packages.txt"
+mode=install
+while (($#)); do
+  case "$1" in
+    --plan) mode=plan; shift ;;
+    --manifest) [[ $# -ge 2 ]] || exit 2; manifest=$2; shift 2 ;;
+    *) printf 'Usage: fedora-server-setup [--plan] [--manifest PATH]\n' >&2; exit 2 ;;
+  esac
+done
+[[ -f "$manifest" && ! -L "$manifest" ]] || { echo 'Missing regular package manifest.' >&2; exit 2; }
+packages=()
+while IFS= read -r package || [[ -n "$package" ]]; do
+  [[ -z "$package" || "$package" == \#* ]] && continue
+  [[ "$package" =~ ^[a-z0-9][a-z0-9+._-]*$ ]] || { echo 'Invalid package name.' >&2; exit 2; }
+  packages+=("$package")
+done < "$manifest"
+((${#packages[@]})) || { echo 'Empty package plan.' >&2; exit 2; }
+if [[ "$mode" == plan ]]; then
+  printf '%s\n' "${packages[@]}"
+  printf 'Starship: official ARM64 v1.26.0, SHA-256 verified, user-local binary\n'
+  exit 0
+fi
+[[ $(id -u) -ne 0 ]] || { echo 'Run as the owner user; sudo is used only for DNF.' >&2; exit 2; }
+[[ $(uname -s) == Linux && $(uname -m) == aarch64 ]] || { echo 'Supported platform: Fedora ARM64.' >&2; exit 2; }
+[[ -r /etc/os-release ]] || exit 2
+. /etc/os-release
+[[ "$ID" == fedora ]] || { echo 'Fedora required.' >&2; exit 2; }
+sudo dnf install -y "${packages[@]}"
+bin="$HOME/.local/bin"
+mkdir -p "$bin"
+if [[ -x "$bin/starship" ]] && [[ $("$bin/starship" --version) == 'starship 1.26.0'* ]]; then
+  echo 'Starship pin already installed.'
+  exit 0
+fi
+stage=$(mktemp -d)
+trap 'rm -rf -- "$stage"' EXIT
+curl --proto '=https' --tlsv1.2 -fsSL \
+  https://github.com/starship/starship/releases/download/v1.26.0/starship-aarch64-unknown-linux-musl.tar.gz \
+  -o "$stage/starship.tar.gz"
+printf '%s  %s\n' dc30189378d2f2e287384e8a692d3f95ad1df64cf0e8c36aa9201516028aed6b "$stage/starship.tar.gz" | sha256sum -c -
+tar -xzf "$stage/starship.tar.gz" -C "$stage" starship
+if [[ -e "$bin/starship" || -L "$bin/starship" ]]; then
+  cp -P -- "$bin/starship" "$stage/previous-starship"
+  backup="$HOME/.local/state/fedora-server/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  mkdir -p "$backup"
+  cp -P -- "$stage/previous-starship" "$backup/starship"
+fi
+install -m 0755 "$stage/starship" "$bin/.starship.new"
+mv -f -- "$bin/.starship.new" "$bin/starship"
+echo 'Fedora server tools installed; no services or network settings changed.'
