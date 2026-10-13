@@ -37,7 +37,7 @@ below. Offline means an observation, not retirement.
 | mac-mini | physical / ARM64 | administration workstation and guest host | Existing session machine; macOS 27.0.1 observed; M4 Pro / 64GB known from earlier host inspection |
 | macbook-pro | physical / ARM64 | portable workstation; no workload assigned | Owner reports M1 / 16GB / 512GB; owner confirms remote identity; Tailscale peer observed offline |
 | hp-envy | physical / x86_64 | Omarchy daily-driver workstation | Live owner probe verified x86_64 and roughly 8GB RAM; user-level Podman empty; root-level Podman hosts two RustDesk containers; Docker daemon unavailable |
-| pi400 | physical / ARM64 | active headless Fedora server | Fedora 44 USB boot, trusted key-only SSH, expanded root and two fresh reboots verified; Tailscale access persists; no workload assigned |
+| pi400 | physical / ARM64 | active headless Fedora server | Fedora 44 USB boot, trusted key-only SSH, expanded root and two fresh reboots verified; Tailscale access persists; IPv4 DHCP and internet verified after recovery; no workload assigned |
 | pi-system-ssd | storage | external Pi system drive | Transcend 512.1GB flash and full image readback verified; attached to Pi as system disk; root filesystem reports 467.2GiB |
 | omarchy-arm | VM / ARM64 | Mac mini Parallels guest, daily-driver trial | Running observed; resource allocation previously verified as 6 CPU / 12GB RAM / 64GB root |
 | fedora-vm | VM / unknown until refreshed | Mac mini Parallels guest | Suspended observed; no resource or workload changes |
@@ -47,7 +47,10 @@ below. Offline means an observation, not retirement.
 | dks-schema-test | container / unknown until image metadata checked | personal-sandbox; existing test container | Exited successfully; retained container is not an active workload |
 | rustdesk-hbbs | container / unknown until image metadata checked | hp-envy; existing RustDesk server component | Running, root-owned Podman; pinned image digest |
 | rustdesk-hbbr | container / unknown until image metadata checked | hp-envy; existing RustDesk server component | Running, root-owned Podman; pinned image digest |
-| home-router | physical / unknown | network infrastructure | Router peer observed on Tailscale; model inferred from peer label, not hardware-verified; LAN relationships unverified |
+| home-router | physical / unknown | provider gateway and current DHCP server | Huawei HG8245H verified; recovered DHCP capacity and six-hour leases; prior Tailscale peer mapping remains unverified |
+| home-extender | physical / unknown | wired household Wi-Fi repeater | Huawei WA8021V5-10 verified, attached to provider gateway; future Flint compatibility unverified |
+| flint-router | physical / unknown | planned household gateway | Not deployed; model and subnet undecided; separate household LAN and DHCP authority |
+| totalplay | external / unknown | internet/provider services | External dependency; Club relationship to stale leases unverified |
 
 Docker and Podman command names returned the same container names/images/states.
 This is one observed set; Podman reports rootless container storage and crun.
@@ -88,7 +91,7 @@ visuals and Text Equivalents whenever hosting, scope or trust boundaries change.
 ```mermaid
 flowchart TD
   accTitle: Personal homelab baseline
-  accDescr: Mac mini hosts Parallels guests and a personal Lima sandbox. Sandbox hosts three observed containers. MacBook Pro, HP and the boot-verified Pi are separate physical targets. Pi storage and administration are observed. External providers are separate dependencies.
+  accDescr: Mac mini hosts Parallels guests and a personal Lima sandbox. Sandbox hosts three observed containers. MacBook Pro, HP and the boot-verified Pi are separate physical targets. Pi storage and administration are observed. Huawei currently supplies Pi DHCP and the extender uplink. Flint links are planned only. External providers are separate dependencies.
   Mac[Mac mini] -->|hosts Parallels| Omarchy[Omarchy ARM: running]
   Mac -->|hosts Parallels| Fedora[Fedora VM: suspended]
   Mac -->|hosts Lima| Lima[personal-sandbox: running]
@@ -99,7 +102,13 @@ flowchart TD
   HP[HP Envy: virtualization unverified]
   HP -->|hosts root-owned Podman| HBBS[RustDesk hbbs: running]
   HP -->|hosts root-owned Podman| HBBR[RustDesk hbbr: running]
-  Router[Home router: relationships unverified]
+  Router[Huawei provider gateway: DHCP recovered]
+  Router -->|provider dependency| Provider[Totalplay: external]
+  Extender[Huawei wired repeater] -->|current uplink| Router
+  Flint[Flint: planned household gateway] -.->|planned WAN uplink| Router
+  Extender -.->|planned LAN uplink| Flint
+  Pi -.->|planned household LAN| Flint
+  Pi -->|current Ethernet and DHCP| Router
   Pi[Pi 400: boot-verified Fedora server] -->|USB system disk| SSD[Transcend SSD]
   Mac -->|trusted SSH administration| Pi
   External[External dependencies: Git hosting, Fedora sources, Tailscale]
@@ -109,10 +118,10 @@ flowchart TD
 **Text Equivalent:** Mac mini hosts Omarchy ARM and suspended Fedora through
 Parallels, and running personal-sandbox through Lima. The sandbox hosts running
 Atuin and healthy PostgreSQL and retains an exited schema-test container. MacBook
-Pro, HP, router and Pi are separate targets; their LAN links are not asserted.
+Pro, HP, router and Pi are separate targets; only Pi Ethernet and extender uplink to the provider gateway are verified. Flint is planned, with WAN uplink to the provider gateway and future Pi/extender LAN attachment; these dashed relationships are not deployed.
 HP hosts running root-owned Podman containers for RustDesk hbbs and hbbr.
 Pi administration from Mac mini and SSD system-drive attachment are verified.
-Git hosting, Fedora sources and Tailscale are external services, not managed hosts.
+Totalplay supplies upstream provider services. Git hosting, Fedora sources and Tailscale are external services, not managed hosts.
 
 ```mermaid
 flowchart LR
@@ -143,7 +152,7 @@ unknown/unreachable handling, deterministic diagram/table parity, exact target
 resolution, and live read-only comparisons. Existing pytest and chezmoi isolation
 are selected authorities. macOS and Omarchy isolated target installs passed;
 Mac host installation and CLI validation passed.
-HP virtualization inventory, router interfaces and backup/recovery ownership
+HP virtualization inventory, provider network isolation and backup/recovery ownership
 remain unknown. Stateful mounts in personal-sandbox have been observed. Architecture does not assign workloads.
 Observations older than seven days are stale. `inspect TARGET` selects a stable
 logical ID exactly; it never launches an administration action. No new public service or spend is authorized.
@@ -326,3 +335,7 @@ stay in local owner-only files. Router IPv6 internet works; IPv4 DHCP lease
 exhaustion remains unresolved. The owner supplied a Huawei HG8245H interface
 view; this does not establish that it is the previously observed Tailscale router
 peer. Router peer identity and extender/client inventory need separate discovery.
+
+## Network recovery and planned gateway
+
+[DHCP incident and recovery](DHCP-RECOVERY.md) records observed failure, owner-approved changes, verification and uncertainty. [Flint target setup](FLINT-TARGET.md) declares the future network boundary, cutover checks and rollback. Planned edges describe desired connectivity only; current observed edges remain until migration is verified. No runtime settings are applied by these declarations.
