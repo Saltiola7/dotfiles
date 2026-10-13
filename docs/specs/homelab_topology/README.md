@@ -26,18 +26,19 @@ admin targets merely by being visible on Tailscale. Unknown fields remain null o
 explicitly unknown. Sources are declarations and bounded native runtime queries;
 sinks are inventory table, topology diagram and explicit target resolution.
 
-## Baseline inventory
+## Inventory and verified updates
 
 Baseline gathered during this session on 2026-10-12. Prior-session facts are
-identified separately. Offline means an observation, not retirement.
+identified separately. Pi and SSD rows include the verified bootstrap update
+below. Offline means an observation, not retirement.
 
 | Logical ID | Kind / architecture | Role and hosting | Evidence / limits |
 |---|---|---|---|
 | mac-mini | physical / ARM64 | administration workstation and guest host | Existing session machine; macOS 27.0.1 observed; M4 Pro / 64GB known from earlier host inspection |
 | macbook-pro | physical / ARM64 | portable workstation; no workload assigned | Owner reports M1 / 16GB / 512GB; owner confirms remote identity; Tailscale peer observed offline |
 | hp-envy | physical / x86_64 | Omarchy daily-driver workstation | Live owner probe verified x86_64 and roughly 8GB RAM; user-level Podman empty; root-level Podman hosts two RustDesk containers; Docker daemon unavailable |
-| pi400 | physical / ARM64 | planned headless Fedora server | Owner reports Pi 400; boot/SSH not verified; no workload assigned |
-| pi-system-ssd | storage | external Pi system drive | Transcend 512.1GB observed attached to administration Mac; permanent Pi attachment is planned |
+| pi400 | physical / ARM64 | active headless Fedora server | Fedora 44 USB boot, trusted key-only SSH, expanded root and two fresh reboots verified; Tailscale access persists; no workload assigned |
+| pi-system-ssd | storage | external Pi system drive | Transcend 512.1GB flash and full image readback verified; attached to Pi as system disk; root filesystem reports 467.2GiB |
 | omarchy-arm | VM / ARM64 | Mac mini Parallels guest, daily-driver trial | Running observed; resource allocation previously verified as 6 CPU / 12GB RAM / 64GB root |
 | fedora-vm | VM / unknown until refreshed | Mac mini Parallels guest | Suspended observed; no resource or workload changes |
 | personal-sandbox | VM / ARM64 | Mac mini Lima guest, current service host | Fedora 44 Cloud observed; running; 4 CPU / 8GiB RAM / 60GiB disk reported by Lima |
@@ -81,7 +82,7 @@ transition table below. Data/trust: required boundary diagram below. Schema: req
 are explicit above. Dependency/deployment: required topology. Quantitative:
 not_applicable; no performance or capacity claims are inferred from this inventory.
 
-Canonical sources: baseline table and owner declarations; operator owned. Update
+Canonical sources: inventory table and owner declarations; operator owned. Update
 visuals and Text Equivalents whenever hosting, scope or trust boundaries change.
 
 ```mermaid
@@ -153,9 +154,9 @@ logical ID exactly; it never launches an administration action. No new public se
 |---|---|---|
 | Domain, Behavior, Spec, Contract | required | passed |
 | Test | required | passed; 23 scoped tests |
-| Refactor, Review/Integrate | required | pending final closure |
+| Refactor, Review/Integrate | required | passed; delivered in PR #33 |
 | Release | not_applicable: no packaged/hosted release | not_run |
-| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | installed host verified; final evidence pending |
+| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | passed; installed host verified and recovery documented |
 
 No Gate Exceptions approved. Public source review and private-output omission
 tests cover this inventory boundary; there is no private-inventory publication.
@@ -295,7 +296,9 @@ PostgreSQL backup policy remains unverified and is an explicit follow-up.
 The installed CLI validated 17 targets and five dependency edges. Launch with
 `~/.local/bin/homelab targets`, `~/.local/bin/homelab inspect pi400`, or
 `~/.local/bin/homelab topology`. It creates no network listeners or background
-jobs. The first slice deliberately has no private endpoint overlay populated.
+jobs. The first slice shipped without a populated private endpoint overlay.
+Pi bootstrap subsequently installed an owner-only local binding and trusted
+known-hosts file; neither belongs in Git or default public output.
 
 After reviewing a source update, apply only these artifacts:
 
@@ -308,8 +311,9 @@ chezmoi --source /path/to/reviewed/dotfiles apply --parent-dirs --exclude script
 Use a reviewed prior checkout as `--source` for rollback. Do not reset the primary
 checkout or overwrite unrelated local changes. Public declarations are source;
 private bindings are local runtime state and must never be added with chezmoi.
-As of this delivery, the primary source checkout remains unchanged; merge the
-reviewed draft PR before treating this branch as the long-term source authority.
+The primary source checkout's unrelated local changes remain untouched. Merged
+PR #33 is the inventory source authority; Pi bootstrap updates are delivered
+separately in PR #36.
 
 ## Pi bootstrap observation update — 2026-10-12
 
