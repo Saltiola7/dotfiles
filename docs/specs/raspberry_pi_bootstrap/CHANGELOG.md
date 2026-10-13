@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-12 — Guarded StoreJet flash and initial headless boot
+
+Implemented explicit macOS flash-plan and flash commands. A short-lived private
+plan binds the prepared image, external whole-disk identity and original header;
+matching approval, private files, fresh identity checks and bounded full readback
+guard the physical write. Ordinary chezmoi apply never flashes a disk.
+
+Validation: 50 initial affected-scope tests and 63 final union-scope tests passed. The owner executed the approved sudo
+flash; all 5,596,250,112 image bytes passed readback verification and the SSD was
+ejected. Initial headless Pi 400 USB boot and receipt-bound SSH host authentication
+passed over direct IPv6 Ethernet. Fedora 44 aarch64, expanded USB root, successful
+growth service, enforcing SELinux and active SSH/NetworkManager were observed.
+Noninteractive sudo was refused as required; interactive owner-password sudo
+rebooted successfully. A new boot ID confirmed fresh boot, persistent SSH identity,
+expanded root and enforcing SELinux. Router IPv6 internet, DNS/clock sync, signed
+Tailscale installation, private enrollment and MagicDNS OpenSSH survived a second
+reboot. Private connection/known-hosts files stay local; topology declarations
+record the active Pi and observed SSD/admin relationships. Router IPv4 DHCP pool
+exhaustion remains unresolved. Delivery target is a checked draft PR, then merge
+under existing owner authorization. No gate exceptions; recovery staging remains
+private under the documented seven-day/protected-copy retention policy.
+
 ## 2026-10-12 — Pi image preparation
 
 Implemented maintained macOS plan/prepare/verify commands and an unprivileged

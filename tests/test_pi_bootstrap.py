@@ -75,7 +75,7 @@ def test_backend_is_unprivileged_and_first_boot_is_guest_bound():
     assert not list(ROOT.glob('run_*pi*'))
 
 
-def test_flash_unavailable():
+def test_flash_requires_explicit_plan():
     r = subprocess.run([sys.executable, str(CLI), 'flash'], capture_output=True, text=True)
     assert r.returncode == 2
 

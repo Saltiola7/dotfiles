@@ -235,7 +235,7 @@
     {
       "id": "prepare-pi-image",
       "context": "raspberry_pi_bootstrap",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-009",
         "INT-010",
@@ -266,7 +266,7 @@
     {
       "id": "flash-pi-and-verify-boot",
       "context": "raspberry_pi_bootstrap",
-      "state": "discovering",
+      "state": "ready",
       "requirements": [
         "INT-009",
         "INT-010",
@@ -283,8 +283,14 @@
         "prepare-pi-image"
       ],
       "artifacts": [
+        "docs/initiatives/personal-homelab/README.md",
         "docs/specs/raspberry_pi_bootstrap/README.md",
-        "docs/specs/raspberry_pi_bootstrap/PROFILE.md"
+        "docs/specs/raspberry_pi_bootstrap/PROFILE.md",
+        "docs/specs/raspberry_pi_bootstrap/CHANGELOG.md",
+        "docs/specs/raspberry_pi_bootstrap/BACKLOG.md",
+        "docs/specs/homelab_topology/README.md",
+        "docs/specs/homelab_topology/PROFILE.md",
+        "docs/specs/homelab_topology/CHANGELOG.md"
       ],
       "release_group": "flash-pi-and-verify-boot",
       "execution_owner": "build"
@@ -303,14 +309,14 @@
       "members": [
         "prepare-pi-image"
       ],
-      "state": "ready"
+      "state": "delivered"
     },
     {
       "id": "flash-pi-and-verify-boot",
       "members": [
         "flash-pi-and-verify-boot"
       ],
-      "state": "planning"
+      "state": "ready"
     }
   ]
 }

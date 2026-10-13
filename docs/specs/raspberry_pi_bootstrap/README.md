@@ -9,7 +9,7 @@ Omarchy and Fedora Parallels guests are excluded from image preparation. Workloa
 and desktop installation are deferred. Target identity comes from homelab_topology;
 user configuration ownership stays with existing chezmoi profiles.
 Engineering defaults: PROFILE.md. Method 3.29; PI-BOOTSTRAP-PREPARE-001 owns the approved preparation slice.
-The future disk-write slice is critical risk and is not yet approved or registered.
+The approved flash/boot slice is critical risk; its private Cycle Record owns execution evidence.
 
 ## Domain, inputs and baseline
 
@@ -25,7 +25,7 @@ Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
 It matches the official published checksum. Its cleartext signature was verified
 with Fedora 44 fingerprint `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`,
 matched against the Fedora security page. Prior read-only inspection found FAT EFI plus ext4 boot/root,
-SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. No disk writes have been made by this workflow.
+SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. The owner-approved StoreJet flash completed with full prepared-image readback verification. Initial headless USB boot, host-authenticated SSH and fresh reboot have passed; router IPv6 internet and Tailscale access also passed.
 
 The owner selected existing personal-sandbox Lima Fedora 44 ARM64 as preparation
 backend. The maintained macOS entry point owns preparation steps and private
@@ -76,8 +76,7 @@ sudo. No backend sudo is used: its deny policy remains intact. Tailscale node cr
 are enrolled after initial SSH and never baked into a distributable image.
 Retain manual lock/power/recovery options; this context does not configure apps.
 
-Owner reports no SSD data to preserve and no spare microSD. USB boot from this drive has not been attempted. Firmware USB capability remains
-unverified. Recovery may require obtaining a microSD; no purchase is authorized.
+Owner reports no SSD data to preserve and no spare microSD. Initial USB boot from the approved StoreJet succeeded on the Pi 400. Recovery may still require obtaining a microSD if firmware or media later fails; no purchase is authorized.
 There is no promise of rollback after flashing. Re-preparation/reflash is recovery
 for this empty target, not recovery for writing the wrong disk. Preserve all other
 disks, VMs, applications and credentials.
@@ -86,12 +85,32 @@ Required checks: image signature/hash, helper isolation and staging/resource lim
 headless account/auth configuration, filesystem labels and SELinux, boot firmware,
 partition growth, fresh disk-identity validation, explicit approval invalidation,
 SSH host verification, local network access, enrollment and fresh reboot.
-Prepared-image tests and host script deployment passed; physical Pi boot and disk deployment remain unverified. Backend
+Prepared-image tests, host script deployment, owner-approved disk deployment and initial physical Pi boot passed. Backend
 read-only preflight verified Fedora 44 ARM64, 52GB free and required filesystem
 tools. Backend sudo policy explicitly denies general commands. Existing debugfs permits
 unprivileged offline ext4 editing, so preparation requires no backend sudo.
 Do not weaken the sandbox policy. macOS flashing still requires separate sudo.
 Fedora 44 image metadata records support end 2027-05-19; review upgrades before EOL.
+
+### Physical deployment observations
+
+The macOS flasher verified all 5,596,250,112 image bytes before ejecting the approved
+SSD. Direct Ethernet DHCP capture identified the prepared hostname, and IPv6
+link-local SSH supplied the exact host fingerprint from the private preparation
+receipt. Authenticated inspection verified Raspberry Pi 400 hardware, Fedora 44
+aarch64, the USB SSD root filesystem expanded to approximately 467 GiB usable,
+successful growth service, SELinux enforcing, and active SSH/NetworkManager.
+An unattended sudo request was rejected because a password is required.
+
+The home router reports a fully occupied IPv4 lease pool; no Pi IPv4 lease was
+identified. This is a network diagnosis, not evidence that the image failed to
+boot. Direct IPv6 administration bypasses IPv4 DHCP for diagnosis. A fresh owner-authorized reboot returned with a new boot ID, the same trusted SSH
+identity, expanded root filesystem and enforcing SELinux. Password-required sudo
+worked interactively. Router IPv6 internet, DNS and clock synchronization passed.
+Tailscale was installed from its signed official repository, enrolled privately,
+and survived a second reboot with key-based OpenSSH access over MagicDNS.
+The router IPv4 lease issue remains unresolved; no router settings were changed.
+Actual addresses, MACs, boot IDs and host fingerprints remain private.
 
 ## Visual Evidence
 
@@ -181,7 +200,7 @@ The macOS CLI supports `plan --image PATH --key PUBLIC_KEY`,
 `prepare --image PATH --key PUBLIC_KEY --output NEW_DIRECTORY`, and
 `verify --output DIRECTORY`. Manifest and backend may be selected explicitly for
 source-checkout validation; installed defaults are under ~/.config/pi-bootstrap
-and ~/.local/lib/pi-bootstrap. Flash is intentionally unavailable in this slice.
+and ~/.local/lib/pi-bootstrap. These preparation commands never flash; the separate explicit flash interface is defined below.
 
 The manifest pins Fedora 44 Minimal 1.7 compressed filename, SHA-256, publisher
 checksum URL, public key URL and signing fingerprint; target pi400, board rpi400,
@@ -233,8 +252,11 @@ erDiagram
   BASE_IMAGE ||--o{ PREPARED_IMAGE : copied_into
   PREPARED_IMAGE ||--|| RECEIPT : verified_by
   MANIFEST ||--o{ RECEIPT : policy_for
+  RECEIPT ||--o{ FLASH_PLAN : pins_input
+  DISK_IDENTITY ||--o{ FLASH_PLAN : binds
+  FLASH_PLAN ||--o| FLASH_RECEIPT : verifies_write
   accTitle: Pi preparation provenance schema
-  accDescr: A public policy pins the base image. Each private prepared image has a receipt binding hashes, target, checks and host-key fingerprint. Passwords are absent from the receipt.
+  accDescr: A public policy pins the base image. Each private prepared image has a receipt binding hashes, target, checks and host-key fingerprint. A fresh private flash plan also binds current disk identity, input image and expiry; its matching write receipt records readback success. Passwords are absent from receipts.
   MANIFEST {
     string target
     string board
@@ -245,6 +267,27 @@ erDiagram
   PREPARED_IMAGE {
     string sha256
     string private_local_path
+  }
+  DISK_IDENTITY {
+    string device_node
+    string media_name
+    int capacity_bytes
+    string usb_attachment
+    string original_header_sha256
+  }
+  FLASH_PLAN {
+    int schema_version
+    string canonical_digest
+    string image_sha256
+    int image_size
+    int expires_at
+  }
+  FLASH_RECEIPT {
+    string plan_digest
+    string image_sha256
+    int byte_count
+    string readback
+    string physical_boot
   }
   RECEIPT {
     int schema_version
@@ -259,7 +302,135 @@ erDiagram
 
 **Text Equivalent:** Public policy pins the publisher-authenticated base image.
 Each preparation makes a private candidate and receipt binding target, input/output
-hashes, host-key fingerprint and verification checks. Password and salted verifier
-are absent from the receipt. Physical boot remains unverified until the later
-flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
+hashes, host-key fingerprint and verification checks. Fresh private FlashPlan
+binds that input to disk identity, header hash and expiry. At most one successful
+write receipt binds each plan to exact byte count and readback digest. Password
+and salted verifier are absent from receipts. Preparation receipts do not claim
+physical boot; authenticated runtime evidence belongs to the flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
 operator owns updates when policy or artifact interfaces change.
+
+
+## Flash and headless boot v1 contract
+
+This slice extends the maintained macOS CLI with explicit `flash-plan --output
+PREPARED_DIRECTORY --disk /dev/diskN --plan NEW_PRIVATE_FILE` and
+`flash --plan PRIVATE_FILE --approve-plan SHA256`. Creating a plan is read-only
+apart from its new private plan file. Chezmoi installs the command but never
+invokes it automatically. Root execution is requested only in the operator
+terminal, with sudo password hidden; no password belongs in chat or arguments.
+
+A FlashPlan binds schema version, logical target, verified prepared-image path,
+byte count and SHA-256, current external whole-disk identity, media name, exact
+capacity, USB attachment path, device node, and original disk-header fingerprint.
+It records a bounded expiry and its canonical digest. Serial numbers, connection
+endpoints and actual device identities remain local. The plan is immutable;
+changes to image, receipt, device or approval digest invalidate it. All ordinary
+host/internal disks, undersized targets, unexpected media and non-whole-disk
+nodes are rejected before any unmount or write. The fresh observed StoreJet
+must be selected explicitly; a remembered BSD disk number is not authority.
+
+Given a valid plan and matching approval, the command revalidates input and
+fresh disk identity, unmounts only that disk, and rechecks identity before
+opening its raw whole-disk node. It writes exactly the candidate image length,
+flushes writes, reads back that same byte range and compares SHA-256. It writes
+a private receipt only after verification succeeds, then ejects the target for
+physical handoff. Any failure is non-success; no automatic retry or alternative
+disk selection is allowed. Partial-write recovery is a new verified plan and
+reflash of the same reviewed target. There is no rollback of erased content;
+the owner reports no target data to preserve. All other disks and VMs remain
+untouched.
+
+Given the verified flash receipt, the owner connects the SSD and Ethernet to the
+Pi 400 and powers it on. The administrator discovers a candidate through local
+DNS/DHCP/router observations, requests only its public SSH host key, and compares
+its fingerprint with trusted preparation receipt before adding a dedicated
+private known-hosts entry. SSH never disables host checking. Initial-setup must
+be noninteractive, login must use the existing owner SSH key, and root/password
+SSH must remain disabled. Private keys stay on macOS.
+
+Headless success requires observed aarch64 Fedora identity, expected Pi board,
+USB-backed root filesystem, completed SELinux relabel, successful root-growth
+unit and disk capacity, enabled SSH/network services, and key-only login.
+Password-required sudo is verified privately in the owner's terminal. A fresh
+reboot must preserve SSH access and filesystem identity before completion.
+Tailscale enrollment is an explicit owner authentication step after local SSH;
+no reusable auth key is baked into image or public state. Physical USB boot
+firmware requires physical runtime evidence, not a readiness promise.
+If USB boot fails, diagnose Ethernet/power/firmware evidence and report the
+possible need for microSD recovery media; never purchase or alter another device.
+
+Validation uses failing boundary tests before implementation: internal/partition
+or wrong-media disk rejection, stale image/device/header/expiry/approval mismatch,
+partial write and readback mismatch, and no mutation on invalid input. A regular
+file simulation verifies streaming and readback without access to real disks.
+Configured Python 3.12–3.14 tests, chezmoi isolation, source review and real
+operator-authorized StoreJet verification cover deployment. Physical boot and
+fresh SSH/reboot evidence remain required, and failures cannot be converted to
+passes. The existing flow diagram and operation table cover flash/boot trust
+boundaries; this section is their canonical contract extension.
+
+
+Operator commands use the explicitly installed Homebrew Python interpreter
+with sudo, so sudo's PATH cannot select an older macOS Python. Pass the installed
+manifest path explicitly because root's home is not the operator's home. Root
+creates private plan/write receipts and returns their ownership to the original
+sudo operator. A plan expires after 30 minutes; expired plans must be recreated
+under a new filename. Flash refuses an existing write receipt, so repetition
+requires a reviewed recovery decision. The regular-file simulation exercises the
+same bounded streaming/hash implementation used for the raw device.
+
+## Post-boot administration, updates and recovery
+
+Fedora 44 uses DNF5. The reviewed Tailscale installation and enrollment procedure
+is explicit and operator-run after trusted SSH access:
+
+```sh
+sudo dnf config-manager addrepo --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+sudo dnf install tailscale
+sudo systemctl enable --now tailscaled
+sudo tailscale up --hostname=pi400 --ssh=false --accept-routes=false
+```
+
+The official repository enables both metadata and RPM signature verification.
+Compare any signing-key prompt with the official source; the reviewed repository
+key fingerprint is `2596A99EAAB33821893C0A79458CA832957F5868`. Enrollment uses
+the owner's browser and personal tailnet. OpenSSH remains key-only; Tailscale SSH
+is disabled and the Pi accepts no advertised subnet routes. No private node
+credentials or login links belong in source control.
+
+Private connection bindings are stored locally in
+`~/.config/homelab/access-bindings.json`; trusted public host keys are in
+`~/.config/homelab/pi400_known_hosts`, both owner-only. Resolve the private
+endpoint with `homelab --bindings PATH inspect pi400 --private`. Connect using
+the approved host private key, this dedicated known-hosts file and strict host
+checking. IPv6 link-local rescue access requires the local interface scope;
+discover the address and verify its key against the preparation receipt before
+login. DHCP exhaustion does not prevent IPv6 or Tailscale administration when
+IPv6 internet connectivity is available.
+
+Before `sudo dnf upgrade --refresh` or a Fedora release upgrade, back up guest
+configuration and any future workload data, and verify the backup can be read.
+This physical SSD has no automatic Parallels/Lima snapshot facility. For a full
+rollback point, shut the Pi down cleanly and make a verified offline SSD image to
+separate storage with enough capacity. Do not image a changing live filesystem.
+The prepared installer image restores initial access, not later data or node state.
+After an upgrade, verify SSH, network, SELinux, disk health and a fresh reboot.
+Review Fedora support before 2027-05-19 and check Tailscale's current support and
+security notices during maintenance.
+
+Monitor root capacity (`df -h /`), failed services (`systemctl --failed`), kernel
+USB/storage errors (`journalctl -k`) and clock sync (`timedatectl`). Tailscale node
+keys can expire: record the private expiry date locally, and renew through the
+owner account before access lapses; do not silently disable expiry. If access
+fails, first check power, Ethernet link, DHCP and IPv6; use direct Ethernet with
+trusted IPv6 SSH to distinguish boot failure from router failure.
+
+Retain generated preparation artifacts privately until boot/reboot verification,
+then remove owned staging within seven days or explicitly choose a protected
+recovery copy. Never delete unrelated Lima data or public/private keys. The
+current recovery artifacts remain retained; no cleanup was performed during this
+flash slice. Reimaging requires a newly verified candidate, fresh disk identity,
+new expiring plan and explicit erasure approval; it destroys later SSD data. For
+retirement, shut down cleanly, revoke the Pi node through Tailscale, remove its
+private access binding and host-key entries, and review secure SSD disposal.
+Preserve the host key itself because other machines use it.

@@ -40,9 +40,9 @@
       "architecture": "arm64",
       "role": "headless Fedora server",
       "parent_id": null,
-      "lifecycle": "planned",
-      "evidence_status": "owner_reported",
-      "notes": "USB boot and SSH not yet verified; no workloads assigned.",
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Fedora 44 aarch64 USB boot, trusted key-only SSH, root growth and reboot verified; Tailscale enrolled; no workloads assigned.",
       "owner": "personal-dotfiles"
     },
     {
@@ -51,9 +51,9 @@
       "architecture": "unknown",
       "role": "Pi system disk",
       "parent_id": null,
-      "lifecycle": "planned",
+      "lifecycle": "active",
       "evidence_status": "observed",
-      "notes": "Transcend 512.1 GB; observed on administration Mac, Pi attachment planned.",
+      "notes": "Transcend 512.1 GB; approved image write and full readback verified; observed as Pi USB root system disk.",
       "owner": "personal-dotfiles"
     },
     {
@@ -194,13 +194,13 @@
       "source": "pi-system-ssd",
       "target": "pi400",
       "type": "attached_to",
-      "status": "planned"
+      "status": "observed"
     },
     {
       "source": "pi400",
       "target": "mac-mini",
       "type": "administered_by",
-      "status": "planned"
+      "status": "observed"
     },
     {
       "source": "mac-mini",
@@ -275,6 +275,18 @@
       "source": "bounded native inventory on 2026-10-12",
       "observed_at": "2026-10-12T00:00:00+00:00",
       "state": "offline"
+    },
+    {
+      "target_id": "pi400",
+      "source": "owner-approved flash and host-authenticated SSH after fresh reboot",
+      "observed_at": "2026-10-13T01:16:50.668862+00:00",
+      "state": "running"
+    },
+    {
+      "target_id": "pi-system-ssd",
+      "source": "owner-approved flash and host-authenticated SSH after fresh reboot",
+      "observed_at": "2026-10-13T01:16:50.668862+00:00",
+      "state": "healthy"
     }
   ]
 }

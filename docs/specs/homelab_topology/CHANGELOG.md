@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-10-12 — Verified Pi deployment observations
+
+Updated existing Pi and SSD declarations after owner-approved physical deployment.
+Trusted SSH, USB root growth, router IPv6, Tailscale and fresh reboot are verified;
+attachment and administration edges are observed. Workload assignment remains
+unassigned. Private endpoints and SSH identities are local; no other target was
+changed. Router IPv4 DHCP and router-peer identity remain separate follow-ups.
+
 ## 2026-10-12 — Read-only target inventory
 
 Added versioned public-safe declarations for 17 infrastructure targets and five

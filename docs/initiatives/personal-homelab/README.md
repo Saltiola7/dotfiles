@@ -32,7 +32,7 @@ existing VM replacement, cloud purchase or public service exposure is included.
 - MacBook Pro remote identity is owner-confirmed and remains private. Pi USB
   boot from this drive has not been attempted; HP root-level Podman RustDesk inventory is observed; virtualization remains unknown.
 - Personal Lima backend is selected; tools, architecture and free space verified.
-  Interactive sudo and image provenance are implementation checks; VM and services
+  Image provenance is verified; backend needs no sudo. VM and services
   remain running.
 - Password-required sudo with key-only SSH is owner-approved.
 
@@ -50,17 +50,19 @@ slice receipt and real DBSCTR begin preflight in a clean isolated checkout, then
 present the exact launch digest for approval. No disk-write approval is implied
 by context-map approval.
 
-## Topology delivery and next slice
+## Delivery and flash handoff
 
-Topology declarations and CLI were delivered in draft PR
-https://github.com/Saltiola7/dotfiles/pull/33 at commit
-5ad8c6dffa99a1f4a3edf887c38f90df09461f40. The administration Mac has the
-reviewed CLI and declarations installed; 23 scoped tests passed and the GitHub
-Mermaid baseline, private boundary and entity diagram rendered successfully.
-Main is unchanged and merging the draft is a separate integration decision.
+Topology PR #33 and preparation PR #34 are merged into the personal dotfiles
+repository. Maintained CLI/declarations are installed on the administration Mac.
+Combined scoped validation passed 32 tests; GitHub diagrams rendered. The owner
+privately entered the Pi sudo password, and the final image hash, receipt and
+permissions were independently verified. Existing Lima services remain healthy.
+Preparation uses rootless ext4 editing; backend sudo is not required.
 
-`prepare-pi-image` is now ready for exact-plan approval. Its maintained macOS
-entry point uses personal-sandbox Lima, asks for required Linux sudo and a private
-Pi administrator password, verifies Fedora input authenticity before processing,
-and produces a private prepared image plus a receipt. Password-required Pi sudo
-is the owner's selected policy. No physical disk write belongs to this slice.
+`flash-pi-and-verify-boot` is ready for exact launch-plan preflight. The owner
+explicitly requested StoreJet flashing and headless SSH verification. The
+maintained command must produce a private fresh disk/image-bound plan, reject
+identity drift, require matching approval, verify readback and eject only its
+target. Physical handoff and sudo password entry remain owner-local steps.
+No disk has been written by this workflow, and USB boot remains unverified.
+This is critical risk; exact DBSCTR registration approval follows preflight.

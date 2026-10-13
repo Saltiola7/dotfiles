@@ -114,7 +114,7 @@ def test_shipped_inventory_is_truthful(tmp_path):
     ids = {t['id'] for t in declaration['targets']}
     assert {'mac-mini', 'macbook-pro', 'hp-envy', 'pi400', 'personal-sandbox', 'pi-system-ssd', 'omarchy-arm', 'atuin-server', 'pm-postgres'} <= ids
     assert run(tmp_path, declaration, 'validate').returncode == 0
-    assert next(t for t in declaration['targets'] if t['id'] == 'pi400')['lifecycle'] == 'planned'
+    assert next(t for t in declaration['targets'] if t['id'] == 'pi400')['lifecycle'] == 'active'
     assert not {'endpoint', 'password', 'serial', 'tailscale_identity'} & set(declaration)
 
 

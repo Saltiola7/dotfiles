@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Prepare one private Pi 400 image through existing Lima. Never flash a disk."""
+"""Prepare one private Pi 400 image through existing Lima. Flash only through an explicit, current disk-bound plan."""
 from __future__ import annotations
 import argparse
+import errno
+import plistlib
+import stat
+import time
 import base64
 import getpass
 import hashlib
@@ -141,6 +145,170 @@ def prepare(args: argparse.Namespace, manifest: dict) -> dict:
     return receipt
 
 
+# Physical operations are explicit and require an operator-owned private plan.
+DISK_FIELDS = ('DeviceIdentifier', 'DeviceNode', 'WholeDisk', 'Internal', 'Writable',
+               'BusProtocol', 'MediaName', 'TotalSize', 'DeviceTreePath')
+
+
+def disk_identity(info: dict, node: str) -> dict:
+    require(re.fullmatch(r'/dev/disk[0-9]+', node) is not None, 'external whole-disk node required')
+    require(info.get('DeviceNode') == node and info.get('DeviceIdentifier') == node[5:], 'disk node identity mismatch')
+    require(info.get('WholeDisk') is True and info.get('Internal') is False and
+            info.get('Writable') is True and info.get('BusProtocol') == 'USB', 'writable external USB whole disk required')
+    require(info.get('MediaName') == 'Transcend' and type(info.get('TotalSize')) is int and
+            info['TotalSize'] == 512110190592, 'disk differs from approved StoreJet media and capacity')
+    require(isinstance(info.get('DeviceTreePath'), str) and bool(info['DeviceTreePath']), 'USB attachment identity unavailable')
+    return {key: info[key] for key in DISK_FIELDS}
+
+
+def disk_info(node: str) -> dict:
+    require(re.fullmatch(r'/dev/disk[0-9]+', node) is not None, 'invalid disk node')
+    value = plistlib.loads(command(['/usr/sbin/diskutil', 'info', '-plist', node]).encode())
+    return disk_identity(value, node)
+
+
+def plan_digest(value: dict) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def validate_flash_plan(value: dict, approval: str) -> None:
+    require(set(value) == {'schema_version', 'target', 'image', 'image_size', 'image_sha256',
+            'disk', 'header_sha256', 'created_at', 'expires_at'}, 'invalid flash plan schema')
+    require(type(value['schema_version']) is int and value['schema_version'] == 1 and value['target'] == 'pi400', 'invalid flash target')
+    require(type(value['created_at']) is int and type(value['expires_at']) is int and
+            value['created_at'] <= time.time() < value['expires_at'] and
+            0 < value['expires_at'] - value['created_at'] <= 1800, 'flash plan expired or invalid')
+    require(type(value['image_size']) is int and 0 < value['image_size'] <= value['disk']['TotalSize'] and
+            value['image_size'] % 512 == 0, 'invalid image byte count')
+    require(isinstance(value['image'], str) and Path(value['image']).is_absolute(), 'absolute private image path required')
+    for key in ('image_sha256', 'header_sha256'):
+        require(isinstance(value[key], str) and re.fullmatch(r'[0-9a-f]{64}', value[key]) is not None, 'invalid plan hash')
+    require(value['disk'] == disk_identity(value['disk'], value['disk']['DeviceNode']), 'invalid disk identity')
+    require(approval == plan_digest(value), 'approval does not match immutable flash plan')
+
+
+def raw_node(node: str) -> str:
+    require(re.fullmatch(r'/dev/disk[0-9]+', node) is not None, 'invalid whole-disk node')
+    return '/dev/r' + node[5:]
+
+
+def header_digest(node: str) -> str:
+    raw = raw_node(node)
+    require(stat.S_ISCHR(os.stat(raw).st_mode), 'raw device must be a character device')
+    with open(raw, 'rb', buffering=0) as source:
+        data = source.read(1024 * 1024)
+    require(len(data) == 1024 * 1024, 'unable to read disk identity header')
+    return hashlib.sha256(data).hexdigest()
+
+
+def operator_uid() -> int:
+    require(os.geteuid() == 0 and sys.stdin.isatty(), 'run this operation with sudo in your own terminal')
+    require(os.environ.get('SUDO_UID', '').isdigit(), 'sudo operator identity required')
+    uid = int(os.environ['SUDO_UID']); require(uid > 0, 'non-root operator required')
+    return uid
+
+
+def private_file(path: Path, uid: int) -> None:
+    require(not path.is_symlink() and path.is_file() and path.stat().st_uid == uid and
+            path.stat().st_mode & 0o077 == 0, 'operator-owned private regular file required')
+    parent = path.parent
+    require(not parent.is_symlink() and parent.stat().st_uid == uid and
+            parent.stat().st_mode & 0o077 == 0, 'operator-owned private directory required')
+
+
+def private_json(path: Path, value: dict, uid: int) -> None:
+    require(not path.exists() and not path.is_symlink(), 'private output already exists')
+    require(path.parent.stat().st_uid == uid and path.parent.stat().st_mode & 0o077 == 0, 'unsafe private output parent')
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, 'w') as stream:
+        json.dump(value, stream, indent=2); stream.write('\n'); stream.flush(); os.fsync(stream.fileno())
+        os.fchown(stream.fileno(), uid, int(os.environ['SUDO_GID']))
+
+
+def flash_plan(args: argparse.Namespace) -> None:
+    uid = operator_uid()
+    output = args.output.resolve(); image = output / 'prepared.raw'
+    private_file(image, uid); private_file(output / 'receipt.json', uid)
+    receipt = verify_output(output)
+    required = {'publisher-verified-input', 'offline-filesystem', 'account-uid-gid', 'key-owner-mode',
+                'key-only-ssh', 'password-required-sudo', 'SELinux-enforcing-relabel',
+                'initial-setup-masked', 'first-boot-growth-installed'}
+    require(required <= set(receipt.get('checks', [])), 'preparation verification checks incomplete')
+    require(image.stat().st_size == 5596250112, 'unexpected prepared image size')
+    identity = disk_info(args.disk)
+    now = int(time.time())
+    value = dict(schema_version=1, target='pi400', image=str(image), image_size=image.stat().st_size,
+                 image_sha256=receipt['prepared_sha256'], disk=identity,
+                 header_sha256=header_digest(args.disk), created_at=now, expires_at=now+1800)
+    require(args.plan.resolve().parent == output, 'plan must stay in private prepared directory')
+    private_json(args.plan, value, uid)
+    print(json.dumps(value, indent=2)); print('Approval digest: ' + plan_digest(value))
+    print('Read-only plan created; no disk was unmounted or written. Valid for 30 minutes.')
+
+
+def flush_device(device) -> None:
+    device.flush()
+    try:
+        os.fsync(device.fileno())
+    except OSError as error:
+        if error.errno not in (errno.EINVAL, errno.ENOTSUP): raise
+        # Some character devices do not implement fsync; sync is the OS fallback.
+        command(['/bin/sync'])
+
+
+def write_and_verify(source, device, size: int, expected: str, flush=flush_device) -> str:
+    require(type(size) is int and size > 0 and size % 512 == 0, 'invalid write byte count')
+    source.seek(0, os.SEEK_END)
+    require(source.tell() == size, 'image size changed before disk write')
+    source.seek(0)
+    require(hashlib.file_digest(source, 'sha256').hexdigest() == expected, 'image changed before disk write')
+    source.seek(0); device.seek(0); remaining = size; written = hashlib.sha256()
+    while remaining:
+        data = source.read(min(4 * 1024 * 1024, remaining))
+        require(bool(data), 'image truncated during disk write')
+        written.update(data); view = memoryview(data)
+        while view:
+            count = device.write(view)
+            require(isinstance(count, int) and 0 < count <= len(view), 'incomplete disk write')
+            view = view[count:]
+        remaining -= len(data)
+    require(not source.read(1) and written.hexdigest() == expected, 'image changed during disk write')
+    flush(device); device.seek(0); remaining = size; verified = hashlib.sha256()
+    while remaining:
+        data = device.read(min(4 * 1024 * 1024, remaining))
+        require(bool(data), 'disk readback truncated')
+        verified.update(data); remaining -= len(data)
+    require(verified.hexdigest() == expected, 'disk readback hash mismatch; do not boot this disk')
+    return verified.hexdigest()
+
+
+def flash(args: argparse.Namespace) -> None:
+    uid = operator_uid(); private_file(args.plan, uid)
+    require(args.plan.stat().st_size <= 65536, 'flash plan too large')
+    value = json.loads(args.plan.read_text()); validate_flash_plan(value, args.approve_plan)
+    image = Path(value['image']); private_file(image, uid)
+    require(image.parent == args.plan.resolve().parent, 'plan/image directory mismatch')
+    receipt = verify_output(image.parent)
+    require(image.stat().st_size == value['image_size'] and receipt['prepared_sha256'] == value['image_sha256'], 'prepared identity changed')
+    node = value['disk']['DeviceNode']
+    require(disk_info(node) == value['disk'] and header_digest(node) == value['header_sha256'], 'disk identity changed; create new plan')
+    destination = args.plan.parent / 'flash-receipt.json'
+    require(not destination.exists(), 'flash receipt exists; review before another operation')
+    command(['/usr/sbin/diskutil', 'unmountDisk', node])
+    require(disk_info(node) == value['disk'] and header_digest(node) == value['header_sha256'], 'disk identity changed after unmount')
+    raw = raw_node(node); require(stat.S_ISCHR(os.stat(raw).st_mode), 'raw device type changed')
+    print('Writing approved StoreJet and verifying full image readback; do not unplug.', flush=True)
+    with image.open('rb') as source, open(raw, 'r+b', buffering=0) as device:
+        require(disk_info(node) == value['disk'], 'disk identity changed before write')
+        verified = write_and_verify(source, device, value['image_size'], value['image_sha256'])
+    require(disk_info(node) == value['disk'], 'disk identity changed after verification')
+    private_json(destination, dict(schema_version=1, target='pi400', plan_digest=args.approve_plan,
+                 image_sha256=verified, byte_count=value['image_size'], readback='passed',
+                 physical_boot='unverified', completed_at=int(time.time())), uid)
+    command(['/usr/sbin/diskutil', 'eject', node])
+    print('StoreJet full readback verified and ejected. Connect SSD + Ethernet to Pi 400, then power on.')
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path, default=Path.home() / '.config/pi-bootstrap/manifest.json')
@@ -152,10 +320,21 @@ def main() -> int:
         sub.add_argument('--key', type=Path, required=True)
         if name == 'prepare': sub.add_argument('--output', type=Path, required=True)
     verify = subs.add_parser('verify'); verify.add_argument('--output', type=Path, required=True)
+    planned = subs.add_parser('flash-plan')
+    planned.add_argument('--output', type=Path, required=True)
+    planned.add_argument('--disk', required=True)
+    planned.add_argument('--plan', type=Path, required=True)
+    writer = subs.add_parser('flash')
+    writer.add_argument('--plan', type=Path, required=True)
+    writer.add_argument('--approve-plan', required=True)
     args = parser.parse_args()
     try:
         manifest = json.loads(args.manifest.read_text()); validate_manifest(manifest)
-        if args.operation == 'verify':
+        if args.operation == 'flash-plan':
+            flash_plan(args)
+        elif args.operation == 'flash':
+            flash(args)
+        elif args.operation == 'verify':
             receipt = verify_output(args.output)
             print(json.dumps(receipt, sort_keys=True, indent=2))
         elif args.operation == 'plan':
@@ -168,7 +347,7 @@ def main() -> int:
         return 0
     except Invalid as error:
         print(f'pi-bootstrap: {error}', file=sys.stderr)
-    except (OSError, ValueError, EOFError):
+    except (OSError, ValueError, EOFError, KeyError, TypeError):
         print('pi-bootstrap: operation unavailable or input invalid; private staging retained', file=sys.stderr)
     return 2
 
