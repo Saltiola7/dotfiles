@@ -30,6 +30,8 @@ if [[ ${1:-} == --build-only ]]; then
 fi
 # ALPM question bit 4 allows replacing the conflicting unpatched package.
 sudo pacman -U --noconfirm --ask 4 -- "$output"
+# Native Synergy requires a portal unavailable on Hyprland; only Waynergy runs.
+systemctl --user mask --now synergy-3.service
 systemctl --user daemon-reload
 systemctl --user enable omarchy-waynergy.service
 systemctl --user restart omarchy-waynergy.service

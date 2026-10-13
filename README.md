@@ -108,11 +108,13 @@ including after Mise updates PATH. Open a new terminal after applying it.
 ### Input-sharing experiment
 
 Run `omarchy-desk-setup input` in a terminal to install `synergy3-bin` and
-`waynergy` through Omarchy's AUR package workflow, plus `wl-clipboard` from the
-Arch repositories. Test the clients separately; never run both simultaneously.
+the pinned, patched `waynergy-omarchy` package, plus `wl-clipboard` from the
+Arch repositories. Waynergy is the active client on Hyprland.
 Synergy activation and generated runtime state remain outside Git. Hyprland
 support and interoperability with the Mac's Synergy version remain experimental.
 The setup helper enables `omarchy-waynergy.service` for future desktop logins.
+Chezmoi masks the native `synergy-3.service` and hides its desktop autostart,
+so it cannot compete with Waynergy or repeatedly start an unsupported portal client.
 Set `[data].waynergy_server` in chezmoi to override the default Mac LAN address,
 and `waynergy_client_name` to match the Mac screen name.
 Verify screen-edge switching, Finnish symbols and modifiers on both keyboards.
@@ -205,8 +207,8 @@ does not overwrite this machine’s managed preset.
 1. Install chezmoi from Arch and authenticate GitHub to clone both repositories.
 2. Initialize this source with `machine_type=omarchy`, then review the diff and
    apply. Use the Omarchy branch containing these changes until merged.
-3. Run `omarchy-desk-setup input`, pair Synergy on the Mac, and stop its native
-   Linux client before starting `systemctl --user start omarchy-waynergy`.
+3. Run `omarchy-desk-setup input` and pair Synergy on the Mac. The native Linux
+   service is masked automatically; Waynergy starts and reconnects by itself.
 4. Run `omarchy-desk-setup tailscale`, enroll in the tailnet, then
    `omarchy-rustdesk-setup`. Configure clients with its printed public key.
 5. Run `omarchy-desk-setup terminal`, `omarchy-desk-setup smb`, and
