@@ -38,11 +38,11 @@
       "id": "pi400",
       "kind": "physical",
       "architecture": "arm64",
-      "role": "headless Fedora server",
+      "role": "headless Fedora file and S3 development server",
       "parent_id": null,
       "lifecycle": "active",
       "evidence_status": "observed",
-      "notes": "Fedora 44 ARM64 USB boot, expanded root, key-only SSH and fresh reboot verified. IPv4 DHCP, IPv6, internet and Tailscale verified after DHCP recovery; password-required sudo; no workloads assigned.",
+      "notes": "Fedora ARM64 with private Samba, capped RustFS 1.0.1 S3 development storage and daily encrypted Borg backup to Mac-connected disk. Authenticated file/DVC roundtrips, local backup restore and fresh startup verified. Cloud upload/restore and consistent object backup unverified.",
       "owner": "personal-dotfiles"
     },
     {
@@ -220,6 +220,17 @@
       "evidence_status": "owner_reported",
       "notes": "Provider configuration and optional Club service are external dependencies. Club relationship to stale leases unverified.",
       "owner": "personal-dotfiles"
+    },
+    {
+      "id": "mac-backup-disk",
+      "kind": "storage",
+      "architecture": "unknown",
+      "role": "Mac-connected backup destination",
+      "parent_id": null,
+      "lifecycle": "active",
+      "evidence_status": "observed",
+      "notes": "Existing 8 TB APFS HDD; dedicated encrypted Pi Borg repository added without replacing existing data. Backblaze drive selection observed; new repository cloud upload/restore not yet verified.",
+      "owner": "personal-dotfiles"
     }
   ],
   "edges": [
@@ -288,6 +299,18 @@
       "target": "flint-router",
       "type": "depends_on",
       "status": "planned"
+    },
+    {
+      "source": "mac-backup-disk",
+      "target": "mac-mini",
+      "type": "attached_to",
+      "status": "observed"
+    },
+    {
+      "source": "pi400",
+      "target": "mac-backup-disk",
+      "type": "depends_on",
+      "status": "observed"
     }
   ],
   "observations": [
@@ -368,6 +391,12 @@
       "source": "2026-10-12 owner router evidence and trusted Pi SSH; DHCP recovery verified",
       "observed_at": "2026-10-13T02:06:28+00:00",
       "state": "running"
+    },
+    {
+      "target_id": "mac-backup-disk",
+      "source": "Guarded destination initialization and Pi encrypted archive/restore verification",
+      "observed_at": "2026-10-13T05:45:56.203849+00:00",
+      "state": "healthy"
     }
   ]
 }

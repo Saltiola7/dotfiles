@@ -1,0 +1,10 @@
+{
+  "engine": "borg-1.4",
+  "fedora_packages": ["borgbackup", "borgmatic"],
+  "macos_packages": ["borgbackup"],
+  "repository_folder": "Homelab-Backups/pi400",
+  "retention": {"daily": 7, "weekly": 4, "monthly": 6},
+  "minimum_destination_free_gib": 20,
+  "source": "Shared",
+  "schedule": "03:00 America/Mexico_City"
+}
