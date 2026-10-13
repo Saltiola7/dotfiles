@@ -73,7 +73,7 @@ keeping SSH key-only. Collect that password privately during preparation, store
 only its salted verifier in the target account, and never put password/verifier
 in Git, process arguments or logs. Prepared images contain authentication data
 and must remain private local artifacts. The owner approved password-required
-sudo. Preparation backend sudo is requested interactively when needed. Tailscale node credentials
+sudo. No backend sudo is used: its deny policy remains intact. Tailscale node credentials
 are enrolled after initial SSH and never baked into a distributable image.
 Retain manual lock/power/recovery options; this context does not configure apps.
 
@@ -98,8 +98,7 @@ Fedora 44 image metadata records support end 2027-05-19; review upgrades before 
 
 Boundary and dependency/deployment: required flow diagram below. Interaction and
 state: required operation sequence table. Data/trust: required flow diagram with
-public-key/private-key and approval boundaries. Schema: not_applicable until
-manifest/receipt schema is finalized. Quantitative: not_applicable; no measured
+public-key/private-key and approval boundaries. Schema: required manifest/image/receipt entity diagram below. Quantitative: not_applicable; no measured
 capacity or performance comparison is claimed.
 Canonical sources: this contract, target declaration and future preparation
 receipt. Operator owns updates; change visuals with trust/operation boundaries.
@@ -135,23 +134,23 @@ host-verified SSH checks; Tailscale enrollment is a separate operator step.
 | enroll | Private operator Tailscale authentication; no baked node state |
 | verify | Fresh reboot retains administration access; reconcile owned staging/mount cleanup |
 
-## Gate Ledger and Build handoff
+## Gate applicability and delivery boundary
 
-| Gate | Applicability | Result |
-|---|---|---|
-| Domain, Behavior, Spec, Contract | required | pending; Discovery draft only |
-| Test, Refactor, Review/Integrate | required | not_run |
-| Release, Deploy, Operate, Maintain/Retire | required by prepared-image and target lifecycle | not_run |
+All Development Kernel and completion gates are required. The private Cycle
+Record owns current gate results and evidence; this README defines stable
+acceptance criteria. No Gate Exceptions are approved.
 
-No Gate Exceptions approved. Open: backend
-capability preflight and publisher provenance, exact manifest/receipt
-schema and publisher-signature authority. First Build slice must not flash until
-its tool, candidate image and target-bound erase plan are concretely reviewable.
+Preparation must authenticate publisher provenance, pass isolated filesystem
+and full-image integration checks, and produce an owner-password candidate
+with a verified private receipt. Installation must preserve existing backend
+services. Physical flashing and Pi boot verification belong to the later
+critical-risk slice, with a fresh disk-bound erasure approval. Integration-test
+images use disposable credentials and must never be flashed as the owner image.
 
 ## Concrete preparation artifact contract
 
-The maintained macOS entry point will be `dot_local/bin/executable_pi-bootstrap`.
-Its reviewed backend steps will be `dot_local/lib/pi-bootstrap/prepare.sh` and
+The maintained macOS entry point is `dot_local/bin/executable_pi-bootstrap`.
+Its reviewed backend steps are `dot_local/lib/pi-bootstrap/prepare.sh` and
 its non-secret target/image policy `private_dot_config/pi-bootstrap/manifest.json`.
 The topology declaration owns the logical `pi400` target; private image paths,
 key paths, disk identities and authentication inputs are local arguments/state.
@@ -228,3 +227,40 @@ required in the later flash/boot slice. First boot may take longer for relabelin
 do not interpret an initial SSH delay as failed boot. Retain private prepared
 artifacts until successful boot/reboot, then at most seven days unless operator
 chooses a protected recovery copy. Reimage requires a newly reviewed disk plan.
+
+```mermaid
+erDiagram
+  MANIFEST ||--|| BASE_IMAGE : pins
+  BASE_IMAGE ||--o{ PREPARED_IMAGE : copied_into
+  PREPARED_IMAGE ||--|| RECEIPT : verified_by
+  MANIFEST ||--o{ RECEIPT : policy_for
+  accTitle: Pi preparation provenance schema
+  accDescr: A public policy pins the base image. Each private prepared image has a receipt binding hashes, target, checks and host-key fingerprint. Passwords are absent from the receipt.
+  MANIFEST {
+    string target
+    string board
+    string backend
+    string base_sha256
+    string signer
+  }
+  PREPARED_IMAGE {
+    string sha256
+    string private_local_path
+  }
+  RECEIPT {
+    int schema_version
+    string target
+    string base_sha256
+    string prepared_sha256
+    string host_key_fingerprint
+    string checks
+    string physical_boot
+  }
+```
+
+**Text Equivalent:** Public policy pins the publisher-authenticated base image.
+Each preparation makes a private candidate and receipt binding target, input/output
+hashes, host-key fingerprint and verification checks. Password and salted verifier
+are absent from the receipt. Physical boot remains unverified until the later
+flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
+operator owns updates when policy or artifact interfaces change.
