@@ -136,3 +136,13 @@ credentials and retains data until explicit disposal.
 Sources: [RustFS project](https://github.com/rustfs/rustfs),
 [container deployment characteristics](https://docs.rustfs.com/en/installation/container),
 [DVC S3 interface](https://doc.dvc.org/user-guide/data-management/remote-storage/amazon-s3).
+
+
+## Requested consistent backup integration
+
+The operator requested frozen full-data and credential recovery into the existing
+Borg repository. The candidate protocol and acceptance contract are owned by
+`../homelab_backup/README.md` under Consistent RustFS recovery extension. That
+extension must prove clean shutdown and isolated restored S3 reads before it
+changes the current object-backup limitation. Live data remains exclusive to
+RustFS, and an ordinary chezmoi apply never restores it automatically.

@@ -88,3 +88,15 @@ network access and fresh reboot passed. Borg backup and Pi RustFS are separate
 ready slices; RustFS placement on Pi is explicitly owner-selected. Their exact
 launch plans include private credential enrollment, restore/roundtrip checks and
 existing-service preservation. No valuable data migration is included.
+
+
+## Consistent object recovery extension
+
+Borg PR #39 and Pi RustFS PR #40 are merged and deployed. Local ordinary-file
+restore, private signed S3/DVC operations and fresh service startup passed.
+Earlier pending text above is historical. The operator now requests consistent
+RustFS recovery in the existing Borg repository. INT-026 and the dependent
+pi-rustfs-consistent-backup slice add frozen capture, original service-state
+recovery and isolated object restoration. Context boundaries remain approved;
+no hardware, repository or external service migration is included. Launch awaits
+exact preflight approval under DBSCTR V3 revision 3.29.
