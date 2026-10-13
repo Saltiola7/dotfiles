@@ -9,6 +9,8 @@
 .config/omarchy-host/
 .config/zen-managed/
 .config/systemd/user/omarchy-waynergy.service
+.config/systemd/user/synergy-3.service
+.config/autostart/synergy-3.desktop
 .config/systemd/user/espanso.service
 .config/xdg-terminals.list
 apply-omarchy-theme.sh
@@ -69,6 +71,10 @@ apply-omarchy-theme.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-waynergy.service
+!.config/systemd/user/synergy-3.service
+!.config/autostart/
+.config/autostart/*
+!.config/autostart/synergy-3.desktop
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
 !install-zen-catppuccin.sh

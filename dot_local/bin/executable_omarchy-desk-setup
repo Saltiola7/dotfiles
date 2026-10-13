@@ -52,8 +52,7 @@ if [[ $1 == "input" ]]; then
   pacman -Q synergy3-bin waynergy-omarchy wl-clipboard wtype
   systemctl --user daemon-reload
   systemctl --user enable omarchy-waynergy.service
-  echo "Input-sharing packages installed. Configure Synergy 3 before starting it."
-  echo "Run only one input-sharing client at a time."
+  echo "Waynergy is the only enabled Linux input client; configure the Mac Synergy server."
   exit 0
 fi
 
