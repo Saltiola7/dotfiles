@@ -1,10 +1,30 @@
 {
   "engine": "borg-1.4",
-  "fedora_packages": ["borgbackup", "borgmatic"],
-  "macos_packages": ["borgbackup"],
+  "fedora_packages": [
+    "borgbackup",
+    "borgmatic"
+  ],
+  "macos_packages": [
+    "borgbackup"
+  ],
   "repository_folder": "Homelab-Backups/pi400",
-  "retention": {"daily": 7, "weekly": 4, "monthly": 6},
+  "retention": {
+    "daily": 7,
+    "weekly": 4,
+    "monthly": 6
+  },
   "minimum_destination_free_gib": 20,
   "source": "Shared",
-  "schedule": "03:00 America/Mexico_City"
+  "schedule": "03:00 America/Mexico_City",
+  "rustfs": {
+    "capture": "orderly-stop-independent-copy-resume-before-upload",
+    "sources": [
+      "full data and hidden metadata",
+      "private credentials",
+      "pinned binary",
+      "service and release metadata"
+    ],
+    "restore": "isolated signed S3 bytes and metadata match",
+    "retention_requires_object_restore": true
+  }
 }

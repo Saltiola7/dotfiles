@@ -128,11 +128,22 @@ before upgrades; stop service and make a consistent object-data/credential backu
 first. Preserve prior binary and compatible metadata backup. Data-format rollback
 may require full restore; never downgrade newly migrated data blindly.
 
-Ordinary-file Borg job does not yet back up live object-store internals. Treat S3
-as development storage for reproducible objects until consistent object backup
-is verified. Retirement disables only this service/Serve route, revokes client
+The Borg job now captures stopped RustFS data, hidden metadata, credentials and
+pinned binary/configuration into a private frozen generation, then resumes S3
+before upload. Isolated encrypted restore and signed object byte/metadata checks
+passed. See the backup context for recovery requirements and schedule. Retirement disables only this service/Serve route, revokes client
 credentials and retains data until explicit disposal.
 
 Sources: [RustFS project](https://github.com/rustfs/rustfs),
 [container deployment characteristics](https://docs.rustfs.com/en/installation/container),
 [DVC S3 interface](https://doc.dvc.org/user-guide/data-management/remote-storage/amazon-s3).
+
+
+## Requested consistent backup integration
+
+The operator requested frozen full-data and credential recovery into the existing
+Borg repository. The candidate protocol and acceptance contract are owned by
+`../homelab_backup/README.md` under Consistent RustFS recovery extension. That
+extension must prove clean shutdown and isolated restored S3 reads before it
+changes the current object-backup limitation. Live data remains exclusive to
+RustFS, and an ordinary chezmoi apply never restores it automatically.

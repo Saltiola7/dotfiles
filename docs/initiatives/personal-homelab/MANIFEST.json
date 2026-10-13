@@ -229,6 +229,16 @@
       "artifacts": [
         "docs/specs/homelab_object_storage/README.md"
       ]
+    },
+    {
+      "id": "INT-026",
+      "kind": "requirement",
+      "text": "Add consistent frozen RustFS data and private credential backups to the existing encrypted Borg repository, with isolated S3 restore verification and original service-state recovery.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_object_storage/README.md"
+      ]
     }
   ],
   "contexts": [
@@ -266,7 +276,7 @@
     {
       "id": "homelab_object_storage",
       "repository": "Saltiola7/dotfiles",
-      "status": "ready",
+      "status": "delivered",
       "depends_on": [
         "homelab_topology",
         "raspberry_pi_bootstrap"
@@ -392,7 +402,7 @@
     {
       "id": "pi-versioned-backup",
       "context": "homelab_backup",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-022",
         "INT-023"
@@ -415,7 +425,7 @@
     {
       "id": "pi-private-s3",
       "context": "homelab_object_storage",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-025"
       ],
@@ -432,6 +442,31 @@
         "docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md"
       ],
       "release_group": "pi-private-s3",
+      "execution_owner": "build"
+    },
+    {
+      "id": "pi-rustfs-consistent-backup",
+      "context": "homelab_backup",
+      "state": "ready",
+      "requirements": [
+        "INT-022",
+        "INT-023",
+        "INT-025",
+        "INT-026"
+      ],
+      "depends_on": [
+        "pi-versioned-backup",
+        "pi-private-s3"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_backup/PROFILE.md",
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_object_storage/PROFILE.md",
+        "docs/specs/homelab_object_storage/README.md"
+      ],
+      "release_group": "pi-rustfs-consistent-backup",
       "execution_owner": "build"
     }
   ],
@@ -469,12 +504,19 @@
       "members": [
         "pi-versioned-backup"
       ],
-      "state": "ready"
+      "state": "delivered"
     },
     {
       "id": "pi-private-s3",
       "members": [
         "pi-private-s3"
+      ],
+      "state": "delivered"
+    },
+    {
+      "id": "pi-rustfs-consistent-backup",
+      "members": [
+        "pi-rustfs-consistent-backup"
       ],
       "state": "ready"
     }

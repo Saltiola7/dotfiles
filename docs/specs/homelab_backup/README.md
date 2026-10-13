@@ -167,3 +167,148 @@ remote guard refuses new sessions until headroom is recovered.
 Initial backups cover Shared and declared Samba configuration, not a full system
 image, root-owned SMB identity database, databases or live RustFS objects. Recreate
 service identities through explicit private enrollment after a rebuild.
+
+
+## Consistent RustFS recovery extension
+
+Status: Implemented; encrypted full-data restore into isolated RustFS passed.
+`homelab_backup` owns frozen capture, encrypted archives and recovery evidence;
+`homelab_object_storage` retains exclusive ownership of live object internals.
+The operator requested consistent RustFS backups to the existing dedicated
+Mac-connected repository. No new repository, cloud purchase, production-data
+replacement, hardware snapshot layer or workload move is required.
+
+### Behavior and concrete interfaces
+
+The maintained backup CLI provides `rustfs-plan`, `rustfs-enable`,
+`rustfs-restore-check` and `rustfs-recover`. Capture is integrated into `run`
+when the private client binding enables `include_rustfs`. Integrate capture into the existing daily timer;
+retain ordinary Shared sources, the existing repository, encryption, restricted
+SSH identity, schedule and 7/4/6 retention. Do not directly archive live object
+internals while RustFS runs.
+
+Before stopping S3, validate the private destination and pinned service identity,
+acquire the existing exclusive backup lock, record initial service state and
+verify local staging headroom for a full independent copy plus the existing
+20 GiB reserve. ext4 has no reflink snapshot primitive in this deployment;
+ordinary private copying is the selected baseline. Failure before this point
+leaves RustFS untouched. Staging is not exposed by Samba or committed to Git.
+
+For an active service, use RustFS's own orderly SIGTERM shutdown to fence new
+S3 admissions and drain accepted requests. Inspection of the exact deployed
+commit shows signal handling, S3 shutdown waiting and clean-state persistence; stop timeout, forced termination or unconfirmed process exit
+must fail capture rather than assert consistency. Complete capture includes all
+object files and hidden internal metadata, owner-private credential files,
+installed binary, service definition and release/version manifest. Reject unknown
+source identities, symlink ancestors and insufficient space. Do not copy
+administration SSH keys or tailnet state.
+
+Copy into a newly owned generation directory, then restart the previously active
+service and verify readiness before network transfer. A previously inactive
+service stays inactive. Use exception/signal recovery and a systemd stop-post
+recovery hook for interrupted scheduled jobs. On host reboot the enabled RustFS
+service returns independently. Never promote a partial generation. Remove only
+owned staging generations after successful archive/check or explicit recovery;
+unknown paths are preserved. Keep one complete capture available if upload fails.
+
+A failed capture, restart, archive check or object restore test prevents pruning.
+Snapshot manifest identifies version, capture time and covered components without
+credentials. Archive names and source layout remain compatible with prior
+ordinary-only archives; those earlier archives do not contain object recovery.
+Runtime enrollment is explicit and preserves unrelated private configuration.
+
+### Consistency and restore acceptance
+
+Given an accepted S3 write, when frozen capture succeeds, restored S3 reads return
+matching bytes and retained object metadata. Given disk substitution, unavailable
+Mac, insufficient staging space or failed shutdown, capture fails safely and no
+unverified archive is represented as consistent. Given interrupted copying or
+failed uploading, the original service state is recovered and prior Borg archives
+remain available. No routine restore writes to the production data directory.
+
+Create only a uniquely generated test bucket/object for the recovery drill.
+Recover the selected Borg generation into an isolated owner-private directory,
+check its manifest and pinned binary identity, and start a bounded test instance
+on unused loopback-only ports using recovered credentials through files. Verify
+signed object retrieval and relevant metadata, denied anonymous access, and byte
+comparison. Stop the test process and remove only its owned temporary resources.
+Production remains untouched except its own generated probe bucket cleanup.
+Exercise failure paths with regression tests before deployment.
+
+### Extension visual evidence
+
+Boundary/data-trust/deployment: required, represented by the existing diagram
+with this additional contract: live RustFS has exclusive access to live data;
+backup captures an independent private generation while that writer is stopped;
+only the frozen generation crosses to encrypted Borg on the Mac disk.
+Interaction/state: required, expressed by this transition table. Schema and
+quantitative: not applicable; no application schema or capacity benchmark.
+
+| State | Guard and next state | Failure behavior |
+| --- | --- | --- |
+| Planned | Identity, destination, lock and staging headroom verified | No service change |
+| Quiesced | New S3 admissions fenced; accepted requests drained; writer stopped cleanly | Recover original service state; no capture claim |
+| Captured | Complete private generation and manifest finished | Do not promote partial copy; recover service |
+| Resumed | Original active service is ready, or original inactive state preserved | Fail archive rollout; retain capture for diagnosis |
+| Archived | Encrypted Borg create and integrity check pass | No pruning; preserve prior archives |
+| Restore verified | Isolated RustFS reads match stored object bytes/metadata | No object-retention eligibility |
+
+**Text Equivalent:** Validate everything before downtime; quiesce the writer;
+freeze complete data and credentials; recover original service state before
+upload; verify encrypted archive and isolated object restoration before retention.
+Canonical source is this contract, owned by the operator, updated whenever data
+layout, shutdown, version, staging, archive or recovery behavior changes.
+
+### Operations, maintenance and gates
+
+Owner: personal homelab operator. Python, Cloud and Security modules apply;
+elevated risk because service availability, private keys and recovery integrity
+are affected. Kernel, review/integrate, deploy, operate and maintain/retire gates
+are required; release is not applicable because no package is published.
+Project authorities remain scoped pytest/Python 3.12–3.14, source/diff and
+public/private review, mounted-disk guards, live service-state checks, signed
+S3/Borg restore drills and timer verification. No validation exceptions approved.
+
+Record capture age, archive identity, duration, failure and restore status without
+secrets. Stage full-copy space and S3 downtime scale with object data; local
+measurements cannot guarantee future throughput. Stop scheduling before service
+retirement, retain archives until explicitly approved expiry, and restore the
+same data format before upgrades. Backblaze upload/cloud restore and independent
+Borg-key custody remain separate follow-ups; successful local object recovery
+must not imply offsite recovery.
+
+
+Pinned source inspected: [startup shutdown sequence](https://github.com/rustfs/rustfs/blob/6de965ae3c965a78ff819fbcd7acd4aa44177d92/rustfs/src/startup_shutdown.rs)
+and [signal handling](https://github.com/rustfs/rustfs/blob/6de965ae3c965a78ff819fbcd7acd4aa44177d92/rustfs/src/server/service_state.rs).
+This supports the selected stop-and-copy design, but does not replace deployed
+shutdown/restore validation. No Tailscale route, router or host remote-session
+change is needed. If the service starts inactive without demonstrable clean
+shutdown state, capture refuses consistency rather than laundering crash state.
+
+
+### Deployment evidence and operator procedure
+
+The full encrypted generation restored into a separate loopback-only RustFS
+instance. Signed object bytes, ETag/content length/content type matched and
+anonymous retrieval returned 403. Original service readiness recovered; Samba
+remained active. Regression tests cover wrong disks, private configuration,
+conflicting SSH permissions, symlink capture rejection, failed clean-stop recovery
+and preserving an initially inactive service.
+
+On Pi, run `homelab-backup rustfs-plan --config` against the private client binding,
+then explicitly `rustfs-enable`, then `rustfs-restore-check`. Only after restore
+success enable the existing timer with the updated service's ExecStopPost recovery
+hook. Ordinary `run` now captures RustFS before encrypted archive creation.
+Inspect `last-success.json` for the archive and frozen source locator, and
+`rustfs-restore-verified` for the compatible binary identity. Earlier archives
+without a source locator contain ordinary files only.
+
+If a job is interrupted while RustFS is stopped, the scheduled stop-post hook
+acquires the same exclusive lock and resumes only its recorded previously active
+service. Manual SIGKILL requires `rustfs-recover`; pending recovery refuses a new
+capture. No hook starts a service that was already intentionally inactive.
+Capture failures retain incomplete owned generations for inspection; successful
+archive jobs remove only their own frozen staging generation. Before production
+restore, stop RustFS, retain its current tree and restore a selected complete
+generation privately; validate isolated S3 first and obtain approval before
+replacing live data. Never mix a new binary with older-format object metadata.
