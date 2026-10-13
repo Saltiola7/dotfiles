@@ -25,8 +25,7 @@ Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
 It matches the official published checksum. Its cleartext signature was verified
 with Fedora 44 fingerprint `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`,
 matched against the Fedora security page. Prior read-only inspection found FAT EFI plus ext4 boot/root,
-SSH and NetworkManager enabled, and interactive initial-setup enabled. No prepared
-image exists yet. No disk writes have been made by this workflow.
+SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. No disk writes have been made by this workflow.
 
 The owner selected existing personal-sandbox Lima Fedora 44 ARM64 as preparation
 backend. The maintained macOS entry point owns preparation steps and private
@@ -59,8 +58,8 @@ path are supplied locally. Flash is never an apply script or automatic retry.
 
 ## Security, recovery and validation contracts
 
-Verify publisher provenance and artifact hashes. Review all privileged helper
-commands, restrict mounts to input/output artifacts, and exclude host home/SSH
+Verify publisher provenance and artifact hashes. Review all backend
+commands, restrict edits to owned input/output artifacts, and exclude host home/SSH
 private-key directories. Physical writes run on macOS against freshly identified
 external whole disks; never trust a remembered disk number. Default is plan-only.
 Retain image/manifest/receipt identity locally for boot evidence and recovery.
@@ -87,7 +86,7 @@ Required checks: image signature/hash, helper isolation and staging/resource lim
 headless account/auth configuration, filesystem labels and SELinux, boot firmware,
 partition growth, fresh disk-identity validation, explicit approval invalidation,
 SSH host verification, local network access, enrollment and fresh reboot.
-No prepared-image tests, physical boot or deployment have occurred. Backend
+Prepared-image tests and host script deployment passed; physical Pi boot and disk deployment remain unverified. Backend
 read-only preflight verified Fedora 44 ARM64, 52GB free and required filesystem
 tools. Backend sudo policy explicitly denies general commands. Existing debugfs permits
 unprivileged offline ext4 editing, so preparation requires no backend sudo.
@@ -132,7 +131,7 @@ host-verified SSH checks; Tailscale enrollment is a separate operator step.
 | flash | Current disk identity and artifact-bound consent; verified write |
 | first boot | Physical USB boot plus DHCP and key-only SSH evidence |
 | enroll | Private operator Tailscale authentication; no baked node state |
-| verify | Fresh reboot retains administration access; reconcile owned staging/mount cleanup |
+| verify | Fresh reboot retains administration access; reconcile owned staging cleanup |
 
 ## Gate applicability and delivery boundary
 
@@ -169,7 +168,7 @@ DHCP, noninteractive initial setup, enforcing SELinux and deferred target growth
 Password input is private and omitted from the public manifest and receipt.
 Outputs are a private prepared image and a public-safe provenance/verification
 receipt; sensitive host-identity evidence remains local. Paths and permissions
-are validated before every privileged command. Exact preparation checks precede
+are validated before image modification. Exact preparation checks precede
 any disk write. No replay of a prepare receipt grants flash permission.
 
 Implementation delivery is split into image preparation and a later explicit
@@ -218,7 +217,7 @@ attributes. The backend receipt binds base and prepared SHA-256, target, policy,
 verification checks and unique host-key fingerprint. Host retrieves image/receipt,
 checks prepared hash again and marks files 0600. No existing output directory is
 reused. Failed runs remain private with an actionable stage identifier; explicit
-cleanup removes only the operator-reviewed staging directory after unmount-free
+cleanup removes only the operator-reviewed staging directory after staging
 verification, never the VM, services or arbitrary parent trees.
 
 Verification establishes preparation integrity only. Physical USB firmware,
