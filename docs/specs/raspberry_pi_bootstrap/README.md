@@ -9,7 +9,7 @@ Omarchy and Fedora Parallels guests are excluded from image preparation. Workloa
 and desktop installation are deferred. Target identity comes from homelab_topology;
 user configuration ownership stays with existing chezmoi profiles.
 Engineering defaults: PROFILE.md. Method 3.29; PI-BOOTSTRAP-PREPARE-001 owns the approved preparation slice.
-The future disk-write slice is critical risk and is not yet approved or registered.
+The approved flash/boot slice is critical risk; its private Cycle Record owns execution evidence.
 
 ## Domain, inputs and baseline
 
@@ -233,8 +233,11 @@ erDiagram
   BASE_IMAGE ||--o{ PREPARED_IMAGE : copied_into
   PREPARED_IMAGE ||--|| RECEIPT : verified_by
   MANIFEST ||--o{ RECEIPT : policy_for
+  RECEIPT ||--o{ FLASH_PLAN : pins_input
+  DISK_IDENTITY ||--o{ FLASH_PLAN : binds
+  FLASH_PLAN ||--o| FLASH_RECEIPT : verifies_write
   accTitle: Pi preparation provenance schema
-  accDescr: A public policy pins the base image. Each private prepared image has a receipt binding hashes, target, checks and host-key fingerprint. Passwords are absent from the receipt.
+  accDescr: A public policy pins the base image. Each private prepared image has a receipt binding hashes, target, checks and host-key fingerprint. A fresh private flash plan also binds current disk identity, input image and expiry; its matching write receipt records readback success. Passwords are absent from receipts.
   MANIFEST {
     string target
     string board
@@ -245,6 +248,27 @@ erDiagram
   PREPARED_IMAGE {
     string sha256
     string private_local_path
+  }
+  DISK_IDENTITY {
+    string device_node
+    string media_name
+    int capacity_bytes
+    string usb_attachment
+    string original_header_sha256
+  }
+  FLASH_PLAN {
+    int schema_version
+    string canonical_digest
+    string image_sha256
+    int image_size
+    int expires_at
+  }
+  FLASH_RECEIPT {
+    string plan_digest
+    string image_sha256
+    int byte_count
+    string readback
+    string physical_boot
   }
   RECEIPT {
     int schema_version
@@ -259,8 +283,10 @@ erDiagram
 
 **Text Equivalent:** Public policy pins the publisher-authenticated base image.
 Each preparation makes a private candidate and receipt binding target, input/output
-hashes, host-key fingerprint and verification checks. Password and salted verifier
-are absent from the receipt. Physical boot remains unverified until the later
+hashes, host-key fingerprint and verification checks. Fresh private FlashPlan
+binds that input to disk identity, header hash and expiry. At most one successful
+write receipt binds each plan to exact byte count and readback digest. Password
+and salted verifier are absent from receipts. Physical boot remains unverified until the later
 flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
 operator owns updates when policy or artifact interfaces change.
 
@@ -323,3 +349,13 @@ operator-authorized StoreJet verification cover deployment. Physical boot and
 fresh SSH/reboot evidence remain required, and failures cannot be converted to
 passes. The existing flow diagram and operation table cover flash/boot trust
 boundaries; this section is their canonical contract extension.
+
+
+Operator commands use the explicitly installed Homebrew Python interpreter
+with sudo, so sudo's PATH cannot select an older macOS Python. Pass the installed
+manifest path explicitly because root's home is not the operator's home. Root
+creates private plan/write receipts and returns their ownership to the original
+sudo operator. A plan expires after 30 minutes; expired plans must be recreated
+under a new filename. Flash refuses an existing write receipt, so repetition
+requires a reviewed recovery decision. The regular-file simulation exercises the
+same bounded streaming/hash implementation used for the raw device.

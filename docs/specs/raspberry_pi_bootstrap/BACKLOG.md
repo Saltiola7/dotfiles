@@ -7,5 +7,5 @@
 | Full authenticated-image integration test | Backend file edits | Passed; no physical disk access |
 | Operator enters unique Pi password and generates final private candidate | Successful backend integration | Completed privately; final candidate verified |
 | Release receipt, installation checks and recovery instructions | Final candidate | Passed preparation checks; draft delivery pending |
-| Fresh disk-bound plan, explicit erasure consent and macOS sudo | Preparation delivery | Later critical-risk slice |
-| Physical Pi USB boot, key-only SSH, filesystem growth, Tailscale and fresh reboot | Explicitly approved flash | Pending; no physical boot claim |
+| Fresh disk-bound plan, explicit erasure consent and macOS sudo | Preparation delivery | Implemented and tested; operator-private plan step pending |
+| Physical Pi USB boot, key-only SSH, filesystem growth, Tailscale and fresh reboot | Explicitly approved flash | Pending physical handoff, verified host key and SSH/reboot; no boot claim |
