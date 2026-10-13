@@ -25,7 +25,7 @@ Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
 It matches the official published checksum. Its cleartext signature was verified
 with Fedora 44 fingerprint `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`,
 matched against the Fedora security page. Prior read-only inspection found FAT EFI plus ext4 boot/root,
-SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. No disk writes have been made by this workflow.
+SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. The owner-approved StoreJet flash completed with full prepared-image readback verification. Initial headless USB boot, host-authenticated SSH and fresh reboot have passed; permanent network access remains pending.
 
 The owner selected existing personal-sandbox Lima Fedora 44 ARM64 as preparation
 backend. The maintained macOS entry point owns preparation steps and private
@@ -76,8 +76,7 @@ sudo. No backend sudo is used: its deny policy remains intact. Tailscale node cr
 are enrolled after initial SSH and never baked into a distributable image.
 Retain manual lock/power/recovery options; this context does not configure apps.
 
-Owner reports no SSD data to preserve and no spare microSD. USB boot from this drive has not been attempted. Firmware USB capability remains
-unverified. Recovery may require obtaining a microSD; no purchase is authorized.
+Owner reports no SSD data to preserve and no spare microSD. Initial USB boot from the approved StoreJet succeeded on the Pi 400. Recovery may still require obtaining a microSD if firmware or media later fails; no purchase is authorized.
 There is no promise of rollback after flashing. Re-preparation/reflash is recovery
 for this empty target, not recovery for writing the wrong disk. Preserve all other
 disks, VMs, applications and credentials.
@@ -86,12 +85,30 @@ Required checks: image signature/hash, helper isolation and staging/resource lim
 headless account/auth configuration, filesystem labels and SELinux, boot firmware,
 partition growth, fresh disk-identity validation, explicit approval invalidation,
 SSH host verification, local network access, enrollment and fresh reboot.
-Prepared-image tests and host script deployment passed; physical Pi boot and disk deployment remain unverified. Backend
+Prepared-image tests, host script deployment, owner-approved disk deployment and initial physical Pi boot passed. Backend
 read-only preflight verified Fedora 44 ARM64, 52GB free and required filesystem
 tools. Backend sudo policy explicitly denies general commands. Existing debugfs permits
 unprivileged offline ext4 editing, so preparation requires no backend sudo.
 Do not weaken the sandbox policy. macOS flashing still requires separate sudo.
 Fedora 44 image metadata records support end 2027-05-19; review upgrades before EOL.
+
+### Physical deployment observations
+
+The macOS flasher verified all 5,596,250,112 image bytes before ejecting the approved
+SSD. Direct Ethernet DHCP capture identified the prepared hostname, and IPv6
+link-local SSH supplied the exact host fingerprint from the private preparation
+receipt. Authenticated inspection verified Raspberry Pi 400 hardware, Fedora 44
+aarch64, the USB SSD root filesystem expanded to approximately 467 GiB usable,
+successful growth service, SELinux enforcing, and active SSH/NetworkManager.
+An unattended sudo request was rejected because a password is required.
+
+The home router reports a fully occupied IPv4 lease pool; no Pi IPv4 lease was
+identified. This is a network diagnosis, not evidence that the image failed to
+boot. Direct IPv6 administration bypasses IPv4 DHCP for diagnosis. A fresh owner-authorized reboot returned with a new boot ID, the same trusted SSH
+identity, expanded root filesystem and enforcing SELinux. Password-required sudo
+worked interactively. Permanent network access and Tailscale enrollment remain
+unverified.
+Actual addresses, MACs, boot IDs and host fingerprints remain private.
 
 ## Visual Evidence
 
