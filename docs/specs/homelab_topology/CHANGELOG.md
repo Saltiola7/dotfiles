@@ -22,3 +22,12 @@ No gate exceptions. Kernel commits: fc7d032 and 10f1043; lifecycle closure commi
 is recorded in the private Cycle Record. Intended Final Push: feature branch and
 draft PR to Saltiola7/dotfiles main. Pi provisioning and physical boot remain pending.
 Backup policies, router links and HP virtualization remain explicitly unverified.
+
+## 2026-10-12 — DHCP recovery and planned Flint boundary
+
+Recorded evidence and uncertainty for provider DHCP exhaustion and recovery;
+verified Pi IPv4 internet and six-hour lease, plus 242 free addresses in the owner
+router table. Updated observed provider gateway/extender and Pi network links.
+Declared a future Flint gateway with separate household DHCP/DNS/firewall,
+initial double NAT, compatibility checks, cutover approval and rollback. No model,
+private addressing, workload move or runtime network change is implied.
