@@ -202,7 +202,21 @@ Shared/Backup-Recovery/
 .config/homelab-file-storage/
 .local/bin/pi-samba-setup
 .local/bin/pi-samba-check
+.local/bin/pi-rustfs-setup
+.config/homelab-object-storage/rustfs.service
+.config/homelab-object-storage/release.json
 {{ end }}
+
+{{ if and (ne .machine_type "fedora-server") (ne .machine_type "mac-mini") }}
+.local/bin/pi-rustfs-check
+.local/bin/pi-rustfs-client-setup
+.local/bin/pi400-dvc
+.config/homelab-object-storage/
+{{ end }}
+
+# Runtime object data and authentication are not provisioning source.
+.local/share/rustfs/
+.config/homelab-object-storage/client.json
 
 # Image preparation belongs to macOS administration profiles only.
 {{ if and (ne .machine_type "mac-mini") (ne .machine_type "macbook") }}

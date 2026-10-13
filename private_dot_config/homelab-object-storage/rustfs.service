@@ -1,0 +1,19 @@
+[Unit]
+Description=Private Pi RustFS development S3 storage
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/rustfs server --address 127.0.0.1:9000 --console-address 127.0.0.1:9001 --access-key-file %h/.local/share/rustfs/private/access-key --secret-key-file %h/.local/share/rustfs/private/secret-key %h/.local/share/rustfs/data
+WorkingDirectory=%h/.local/share/rustfs
+Environment=RUST_LOG=warn
+UMask=0077
+NoNewPrivileges=yes
+CPUQuota=100%
+MemoryHigh=1536M
+MemoryMax=2G
+MemorySwapMax=0
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
