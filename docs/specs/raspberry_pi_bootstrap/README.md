@@ -25,7 +25,7 @@ Observed Fedora input: Minimal 44 build 1.7 aarch64. Compressed SHA-256:
 It matches the official published checksum. Its cleartext signature was verified
 with Fedora 44 fingerprint `36F612DCF27F7D1A48A835E4DBFCF71C6D9F90A6`,
 matched against the Fedora security page. Prior read-only inspection found FAT EFI plus ext4 boot/root,
-SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. The owner-approved StoreJet flash completed with full prepared-image readback verification. Initial headless USB boot, host-authenticated SSH and fresh reboot have passed; permanent network access remains pending.
+SSH and NetworkManager enabled, and interactive initial-setup enabled. Private prepared images are verified locally; identities remain in private receipts. The owner-approved StoreJet flash completed with full prepared-image readback verification. Initial headless USB boot, host-authenticated SSH and fresh reboot have passed; router IPv6 internet and Tailscale access also passed.
 
 The owner selected existing personal-sandbox Lima Fedora 44 ARM64 as preparation
 backend. The maintained macOS entry point owns preparation steps and private
@@ -106,8 +106,10 @@ The home router reports a fully occupied IPv4 lease pool; no Pi IPv4 lease was
 identified. This is a network diagnosis, not evidence that the image failed to
 boot. Direct IPv6 administration bypasses IPv4 DHCP for diagnosis. A fresh owner-authorized reboot returned with a new boot ID, the same trusted SSH
 identity, expanded root filesystem and enforcing SELinux. Password-required sudo
-worked interactively. Permanent network access and Tailscale enrollment remain
-unverified.
+worked interactively. Router IPv6 internet, DNS and clock synchronization passed.
+Tailscale was installed from its signed official repository, enrolled privately,
+and survived a second reboot with key-based OpenSSH access over MagicDNS.
+The router IPv4 lease issue remains unresolved; no router settings were changed.
 Actual addresses, MACs, boot IDs and host fingerprints remain private.
 
 ## Visual Evidence
@@ -198,7 +200,7 @@ The macOS CLI supports `plan --image PATH --key PUBLIC_KEY`,
 `prepare --image PATH --key PUBLIC_KEY --output NEW_DIRECTORY`, and
 `verify --output DIRECTORY`. Manifest and backend may be selected explicitly for
 source-checkout validation; installed defaults are under ~/.config/pi-bootstrap
-and ~/.local/lib/pi-bootstrap. Flash is intentionally unavailable in this slice.
+and ~/.local/lib/pi-bootstrap. These preparation commands never flash; the separate explicit flash interface is defined below.
 
 The manifest pins Fedora 44 Minimal 1.7 compressed filename, SHA-256, publisher
 checksum URL, public key URL and signing fingerprint; target pi400, board rpi400,
@@ -303,8 +305,8 @@ Each preparation makes a private candidate and receipt binding target, input/out
 hashes, host-key fingerprint and verification checks. Fresh private FlashPlan
 binds that input to disk identity, header hash and expiry. At most one successful
 write receipt binds each plan to exact byte count and readback digest. Password
-and salted verifier are absent from receipts. Physical boot remains unverified until the later
-flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
+and salted verifier are absent from receipts. Preparation receipts do not claim
+physical boot; authenticated runtime evidence belongs to the flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
 operator owns updates when policy or artifact interfaces change.
 
 
@@ -353,7 +355,7 @@ Password-required sudo is verified privately in the owner's terminal. A fresh
 reboot must preserve SSH access and filesystem identity before completion.
 Tailscale enrollment is an explicit owner authentication step after local SSH;
 no reusable auth key is baked into image or public state. Physical USB boot
-firmware remains an unverified runtime prerequisite, not a readiness promise.
+firmware requires physical runtime evidence, not a readiness promise.
 If USB boot fails, diagnose Ethernet/power/firmware evidence and report the
 possible need for microSD recovery media; never purchase or alter another device.
 
@@ -376,3 +378,59 @@ sudo operator. A plan expires after 30 minutes; expired plans must be recreated
 under a new filename. Flash refuses an existing write receipt, so repetition
 requires a reviewed recovery decision. The regular-file simulation exercises the
 same bounded streaming/hash implementation used for the raw device.
+
+## Post-boot administration, updates and recovery
+
+Fedora 44 uses DNF5. The reviewed Tailscale installation and enrollment procedure
+is explicit and operator-run after trusted SSH access:
+
+```sh
+sudo dnf config-manager addrepo --from-repofile=https://pkgs.tailscale.com/stable/fedora/tailscale.repo
+sudo dnf install tailscale
+sudo systemctl enable --now tailscaled
+sudo tailscale up --hostname=pi400 --ssh=false --accept-routes=false
+```
+
+The official repository enables both metadata and RPM signature verification.
+Compare any signing-key prompt with the official source; the reviewed repository
+key fingerprint is `2596A99EAAB33821893C0A79458CA832957F5868`. Enrollment uses
+the owner's browser and personal tailnet. OpenSSH remains key-only; Tailscale SSH
+is disabled and the Pi accepts no advertised subnet routes. No private node
+credentials or login links belong in source control.
+
+Private connection bindings are stored locally in
+`~/.config/homelab/access-bindings.json`; trusted public host keys are in
+`~/.config/homelab/pi400_known_hosts`, both owner-only. Resolve the private
+endpoint with `homelab --bindings PATH inspect pi400 --private`. Connect using
+the approved host private key, this dedicated known-hosts file and strict host
+checking. IPv6 link-local rescue access requires the local interface scope;
+discover the address and verify its key against the preparation receipt before
+login. DHCP exhaustion does not prevent IPv6 or Tailscale administration when
+IPv6 internet connectivity is available.
+
+Before `sudo dnf upgrade --refresh` or a Fedora release upgrade, back up guest
+configuration and any future workload data, and verify the backup can be read.
+This physical SSD has no automatic Parallels/Lima snapshot facility. For a full
+rollback point, shut the Pi down cleanly and make a verified offline SSD image to
+separate storage with enough capacity. Do not image a changing live filesystem.
+The prepared installer image restores initial access, not later data or node state.
+After an upgrade, verify SSH, network, SELinux, disk health and a fresh reboot.
+Review Fedora support before 2027-05-19 and check Tailscale's current support and
+security notices during maintenance.
+
+Monitor root capacity (`df -h /`), failed services (`systemctl --failed`), kernel
+USB/storage errors (`journalctl -k`) and clock sync (`timedatectl`). Tailscale node
+keys can expire: record the private expiry date locally, and renew through the
+owner account before access lapses; do not silently disable expiry. If access
+fails, first check power, Ethernet link, DHCP and IPv6; use direct Ethernet with
+trusted IPv6 SSH to distinguish boot failure from router failure.
+
+Retain generated preparation artifacts privately until boot/reboot verification,
+then remove owned staging within seven days or explicitly choose a protected
+recovery copy. Never delete unrelated Lima data or public/private keys. The
+current recovery artifacts remain retained; no cleanup was performed during this
+flash slice. Reimaging requires a newly verified candidate, fresh disk identity,
+new expiring plan and explicit erasure approval; it destroys later SSD data. For
+retirement, shut down cleanly, revoke the Pi node through Tailscale, remove its
+private access binding and host-key entries, and review secure SSD disposal.
+Preserve the host key itself because other machines use it.

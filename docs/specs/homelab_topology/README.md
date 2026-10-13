@@ -87,7 +87,7 @@ visuals and Text Equivalents whenever hosting, scope or trust boundaries change.
 ```mermaid
 flowchart TD
   accTitle: Personal homelab baseline
-  accDescr: Mac mini hosts Parallels guests and a personal Lima sandbox. Sandbox hosts three observed containers. MacBook Pro, HP and planned Pi are separate physical targets. Pi storage is planned. External providers are separate dependencies.
+  accDescr: Mac mini hosts Parallels guests and a personal Lima sandbox. Sandbox hosts three observed containers. MacBook Pro, HP and the boot-verified Pi are separate physical targets. Pi storage and administration are observed. External providers are separate dependencies.
   Mac[Mac mini] -->|hosts Parallels| Omarchy[Omarchy ARM: running]
   Mac -->|hosts Parallels| Fedora[Fedora VM: suspended]
   Mac -->|hosts Lima| Lima[personal-sandbox: running]
@@ -99,8 +99,8 @@ flowchart TD
   HP -->|hosts root-owned Podman| HBBS[RustDesk hbbs: running]
   HP -->|hosts root-owned Podman| HBBR[RustDesk hbbr: running]
   Router[Home router: relationships unverified]
-  Pi[Pi 400: planned headless server] -.->|planned system disk| SSD[Transcend SSD]
-  Mac -.->|planned bootstrap and administration| Pi
+  Pi[Pi 400: boot-verified Fedora server] -->|USB system disk| SSD[Transcend SSD]
+  Mac -->|trusted SSH administration| Pi
   External[External dependencies: Git hosting, Fedora sources, Tailscale]
   Mac -.->|consumes services| External
 ```
@@ -110,7 +110,7 @@ Parallels, and running personal-sandbox through Lima. The sandbox hosts running
 Atuin and healthy PostgreSQL and retains an exited schema-test container. MacBook
 Pro, HP, router and Pi are separate targets; their LAN links are not asserted.
 HP hosts running root-owned Podman containers for RustDesk hbbs and hbbr.
-Pi administration from Mac mini and SSD system-drive attachment are planned.
+Pi administration from Mac mini and SSD system-drive attachment are verified.
 Git hosting, Fedora sources and Tailscale are external services, not managed hosts.
 
 ```mermaid
@@ -310,3 +310,15 @@ checkout or overwrite unrelated local changes. Public declarations are source;
 private bindings are local runtime state and must never be added with chezmoi.
 As of this delivery, the primary source checkout remains unchanged; merge the
 reviewed draft PR before treating this branch as the long-term source authority.
+
+## Pi bootstrap observation update — 2026-10-12
+
+The owner-approved Pi deployment is active. USB boot, expanded SSD root,
+receipt-bound SSH identity and fresh reboot were verified. Tailscale enrollment
+and a further reboot verified MagicDNS key-based SSH access. The versioned
+inventory records the active Pi/SSD and observed attachment/administration edges;
+no workloads were assigned or moved. Private endpoint bindings and host keys
+stay in local owner-only files. Router IPv6 internet works; IPv4 DHCP lease
+exhaustion remains unresolved. The owner supplied a Huawei HG8245H interface
+view; this does not establish that it is the previously observed Tailscale router
+peer. Router peer identity and extender/client inventory need separate discovery.
