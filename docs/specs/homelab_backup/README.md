@@ -312,3 +312,17 @@ archive jobs remove only their own frozen staging generation. Before production
 restore, stop RustFS, retain its current tree and restore a selected complete
 generation privately; validate isolated S3 first and obtain approval before
 replacing live data. Never mix a new binary with older-format object metadata.
+
+
+## Forgejo recovery integration
+
+The private Git-hosting context adds complete frozen Forgejo SQLite, repositories,
+configuration, secrets, embedded SSH host keys and compatible binary to the same
+Borg archive. That writer is stopped cleanly and SQLite quick_check passes before
+copying; prior service state is restored before network transfer. Private client
+`include_forgejo` enrollment is explicit. The additional stop-post recovery hook
+never alters RustFS or administrative SSH. Signed Git and isolated recovered
+Forgejo verification must pass before its retention eligibility. Git-hosting owns
+its data/layout and exact recovery drill; archive/encryption/retention remain in
+this context. Earlier ordinary/RustFS-only archives remain compatible and are
+identified by absence of a Forgejo source locator.

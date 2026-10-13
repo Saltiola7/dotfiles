@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Explicit owner-operated private Forgejo provisioning; never print credentials."""
+import argparse
+import configparser
+import hashlib
+import json
+import lzma
+import os
+from pathlib import Path
+import platform
+import secrets
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.request
+
+VERSION='15.0.10'
+BINARY_SHA='be06bb887bef8a7901c6bdcea36023e55429ef7582a2797711b878a3af602e69'
+
+
+def ordinary(path: Path) -> None:
+    for p in (path,*path.parents):
+        if p.is_symlink(): raise ValueError('Refusing symlink Forgejo path')
+
+
+def verify_binary(path: Path) -> None:
+    ordinary(path)
+    with path.open('rb') as f:
+        if hashlib.file_digest(f,'sha256').hexdigest()!=BINARY_SHA: raise ValueError('Forgejo binary identity mismatch')
+
+
+def private_write(path: Path, content: str) -> None:
+    ordinary(path);path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+    fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    with os.fdopen(fd,'w') as f:f.write(content)
+
+
+def make_config(home: Path, domain: str, keys: dict) -> str:
+    if not domain.endswith('.ts.net') or any(c in domain for c in '\n\r /'): raise ValueError('Expected private tailnet DNS')
+    root=home/'.local/share/forgejo'
+    return f'''APP_NAME = Personal Forgejo
+RUN_USER = {home.name}
+RUN_MODE = prod
+WORK_PATH = {root}
+[server]
+HTTP_ADDR = 127.0.0.1
+HTTP_PORT = 3000
+DOMAIN = {domain}
+ROOT_URL = https://{domain}/
+SSH_DOMAIN = {domain}
+SSH_USER = {home.name}
+SSH_PORT = 2222
+SSH_LISTEN_HOST = 127.0.0.1
+SSH_LISTEN_PORT = 2222
+SSH_ROOT_PATH = {root}/ssh
+START_SSH_SERVER = true
+DISABLE_SSH = false
+LFS_START_SERVER = true
+LFS_JWT_SECRET = {keys['lfs']}
+APP_DATA_PATH = {root}/data
+[database]
+DB_TYPE = sqlite3
+PATH = {root}/data/forgejo.db
+[repository]
+ROOT = {root}/repositories
+[security]
+INSTALL_LOCK = true
+SECRET_KEY = {keys['secret']}
+INTERNAL_TOKEN = {keys['internal']}
+[service]
+DISABLE_REGISTRATION = true
+REQUIRE_SIGNIN_VIEW = true
+REGISTER_EMAIL_CONFIRM = false
+[session]
+COOKIE_SECURE = true
+[mailer]
+ENABLED = false
+[actions]
+ENABLED = false
+[packages]
+ENABLED = false
+[log]
+MODE = console
+LEVEL = warn
+'''
+
+
+def run(*args: str) -> None:
+    subprocess.run(args,check=True)
+
+
+def install(binary: Path, source: Path) -> None:
+    if os.getuid()==0 or platform.system()!='Linux' or platform.machine()!='aarch64': raise ValueError('Non-root Fedora ARM64 owner required')
+    if not shutil.which('git') or not shutil.which('git-lfs'): raise ValueError('Install Git and Git LFS prerequisites first')
+    verify_binary(binary)
+    home=Path.home();root=home/'.local/share/forgejo';target=home/'.local/bin/forgejo';unit=home/'.config/systemd/user/forgejo.service'
+    for p in (root,target,unit,source):ordinary(p)
+    config=root/'private/app.ini'
+    desired=(source/'forgejo.service').read_bytes()
+    if target.exists():verify_binary(target)
+    if unit.exists() and unit.read_bytes()!=desired:raise ValueError('Unknown existing Forgejo unit')
+    if root.exists() and not config.exists():raise ValueError('Existing Forgejo data needs explicit review')
+    if shutil.disk_usage(home).free<20*1024**3:raise ValueError('Insufficient Forgejo storage headroom')
+    route=json.loads(subprocess.check_output(['tailscale','serve','status','--json']))
+    mapping=route.get('TCP',{}).get('2222')
+    if mapping and mapping.get('TCPForward')!='127.0.0.1:2222':raise ValueError('Conflicting private Git route')
+    if not target.exists():
+        target.parent.mkdir(parents=True,exist_ok=True,mode=0o700);shutil.copy2(binary,target);target.chmod(0o700)
+    fresh=not config.exists()
+    if fresh:
+        for p in (root,root/'data',root/'repositories',root/'ssh',root/'private'):p.mkdir(parents=True,exist_ok=True,mode=0o700)
+        domain=json.loads(subprocess.check_output(['tailscale','status','--json']))['Self']['DNSName'].rstrip('.')
+        keys={key:subprocess.check_output([str(target),'generate','secret',kind],text=True).strip() for key,kind in [('secret','SECRET_KEY'),('internal','INTERNAL_TOKEN'),('lfs','JWT_SECRET')]}
+        private_write(config,make_config(home,domain,keys))
+        prefix=[str(target),'-w',str(root),'-c',str(config)]
+        r=subprocess.run(prefix+['migrate'],capture_output=True,check=True)
+        created=subprocess.run(prefix+['admin','user','create','--username',home.name,'--email','admin@localhost','--admin','--random-password','--random-password-length','32','--must-change-password'],capture_output=True,text=True,check=True)
+        private_write(root/'private/initial-admin.txt',created.stdout)
+    else:
+        if config.stat().st_mode&0o077 or config.stat().st_uid!=os.getuid():raise ValueError('Forgejo config must remain owner-private')
+    unit.parent.mkdir(parents=True,exist_ok=True,mode=0o700);unit.write_bytes(desired);unit.chmod(0o600)
+    run('systemd-analyze','--user','verify',str(unit));run('systemctl','--user','daemon-reload');run('systemctl','--user','enable','--now','forgejo.service')
+    for _ in range(100):
+        try:
+            urllib.request.urlopen('http://127.0.0.1:3000/api/healthz',timeout=2);break
+        except OSError:time.sleep(.3)
+    else:raise ValueError('Forgejo did not become healthy')
+    print('Forgejo installed privately; administrator enrollment is owner-private. Network and functional checks remain.')
+
+
+def fetch(binary: Path) -> None:
+    ordinary(binary)
+    if binary.exists():
+        verify_binary(binary)
+        return
+    url='https://code.forgejo.org/forgejo/forgejo/releases/download/v15.0.10/forgejo-15.0.10-linux-arm64.xz'
+    with urllib.request.urlopen(url,timeout=60) as response:
+        payload=response.read(64*1024**2+1)
+    if hashlib.sha256(payload).hexdigest()!='557f9f7b5730e898919e8388b8954845c421a7328643c42d388271c7b11df40c':
+        raise ValueError('Pinned signed release checksum mismatch')
+    value=lzma.decompress(payload)
+    if hashlib.sha256(value).hexdigest()!=BINARY_SHA:raise ValueError('Decompressed binary identity mismatch')
+    binary.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+    fd=os.open(binary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o700)
+    with os.fdopen(fd,'wb') as stream:stream.write(value)
+    print('Pinned signature-verified release identity fetched privately')
+
+
+def main() -> None:
+    os.umask(0o077)
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('plan','fetch','install','network'))
+    parser.add_argument('--binary',type=Path,default=Path.home()/'.local/state/homelab-git-hosting/staging/forgejo-15.0.10')
+    parser.add_argument('--source',type=Path,default=Path.home()/'.config/homelab-git-hosting');args=parser.parse_args()
+    if args.action=='fetch':fetch(args.binary)
+    elif args.action=='plan':verify_binary(args.binary);print('Verified Forgejo ARM64 LTS; SQLite, private web/Git, one CPU/768MiB cap; no writes.')
+    elif args.action=='install':install(args.binary,args.source)
+    else:
+        route=json.loads(subprocess.check_output(['tailscale','serve','status','--json']))
+        mapping=route.get('TCP',{}).get('2222')
+        if mapping and mapping.get('TCPForward')!='127.0.0.1:2222':raise ValueError('Conflicting Git route')
+        existing=route.get('Web',{})
+        if existing and not all(v.get('Handlers',{}).get('/',{}).get('Proxy')=='http://127.0.0.1:3000' for v in existing.values()):raise ValueError('Existing web forwarding requires review')
+        run('sudo','tailscale','serve','--bg','--https=443','http://127.0.0.1:3000')
+        if not mapping:run('sudo','tailscale','serve','--bg','--tcp=2222','tcp://127.0.0.1:2222')
+
+
+if __name__=='__main__':
+    try:main()
+    except (ValueError,OSError,subprocess.CalledProcessError):
+        print('Forgejo setup failed; prerequisites or private state need review. No credentials displayed.',file=sys.stderr);sys.exit(1)

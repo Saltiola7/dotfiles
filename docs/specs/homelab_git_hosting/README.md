@@ -88,3 +88,37 @@ trigger: hosting, data, credentials, deployment, backup or upgrade changes.
 Sources: [supported releases](https://forgejo.org/releases/),
 [binary installation and SQLite](https://forgejo.org/docs/v15.0/admin/installation/binary/),
 [release signatures](https://forgejo.org/download/).
+
+
+## Maintained interfaces and enrollment
+
+`pi-forgejo-setup fetch` downloads the fixed signed-release identity and verifies
+both compressed and decompressed SHA-256 values recorded in source. The release
+signature was separately verified in isolated GPG staging against the official
+published fingerprint before pinning those values. `plan` checks the binary;
+`install` requires Git/Git LFS and installs only matching/absent owner state.
+`network` explicitly requests private Tailscale HTTPS and embedded Git forwarding,
+preserving existing routes. It requires owner-entered sudo; ordinary chezmoi
+apply never enrolls credentials, activates network or restores data.
+
+Initial administrator output is stored privately in the service data tree;
+first login requires password change. `pi-forgejo-check` creates only a uniquely
+named temporary verification account/repository and identity, verifies signed
+Git push/clone, freezes the complete Forgejo generation to existing Borg, restores
+it into an isolated loopback service, compares repository bytes and privacy, then
+removes only those probe resources. Credentials and tokens remain in captured
+process memory or private files and never command arguments/output.
+
+Backup CLI provides `forgejo-plan`, `forgejo-enable`, `forgejo-recover` and
+`archive-check`. Explicit private `include_forgejo` enrollment triggers complete
+stopped capture. SQLite quick_check, clean exit, staging headroom and pinned
+binary identity gate promotion. The daily service's additional stop-post hook
+recovers only a recorded previously active Forgejo process. Retention additionally
+requires compatible `forgejo-restore-verified` evidence. Existing RustFS and Shared
+coverage stays intact. Earlier archives without a Forgejo source locator do not
+contain this recovery generation.
+
+After version upgrades, preserve the compatible binary and full data/configuration
+and repeat isolated restore proof before resuming retention. A binary downgrade
+cannot reverse SQLite migrations. Source data replacement always needs a separate
+operator-approved production recovery procedure.
