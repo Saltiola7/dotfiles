@@ -14,6 +14,14 @@ import sys
 import tempfile
 from urllib.parse import urlparse
 import ipaddress
+import hashlib
+import hmac
+import shutil
+import signal
+import socket
+import time
+import urllib.request
+import urllib.error
 
 
 def ordinary(path: Path) -> None:
@@ -149,6 +157,185 @@ def enroll_client(cfg: dict) -> None:
     subprocess.run(ssh + ["python3 -c " + shlex.quote(writer)], input=json.dumps(contents).encode(), check=True)
 
 
+RUSTFS_BINARY_SHA = "63845e580795d50f8958b74a1e908d5e2974855745c7b1163956b4b2aa1ba104"
+
+
+def file_hash(path: Path) -> str:
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def rustfs_control(*args: str) -> None:
+    subprocess.run(['systemctl', '--user', *args, 'rustfs.service'], check=True)
+
+
+def rustfs_active() -> bool:
+    state = subprocess.check_output(['systemctl', '--user', 'show', 'rustfs', '-p', 'ActiveState', '--value'], text=True).strip()
+    if state not in ('active', 'inactive'):
+        raise ValueError('RustFS service is not in a stable state')
+    return state == 'active'
+
+
+def rustfs_clean_stop() -> bool:
+    props = dict(line.split('=', 1) for line in subprocess.check_output(['systemctl', '--user', 'show', 'rustfs', '-p', 'ActiveState', '-p', 'MainPID', '-p', 'Result', '-p', 'ExecMainCode', '-p', 'ExecMainStatus'], text=True).splitlines())
+    return props == {'ActiveState': 'inactive', 'MainPID': '0', 'Result': 'success', 'ExecMainCode': '1', 'ExecMainStatus': '0'}
+
+
+def s3_request(root: Path, endpoint: str, method: str, bucket: str, key: str = '', payload: bytes = b'') -> bytes:
+    """Minimal signed S3 probe; credentials are read from owner-private files."""
+    access = (root / 'private/access-key').read_text().strip()
+    secret = (root / 'private/secret-key').read_text().strip()
+    uri = '/' + bucket + ('/' + key if key else '')
+    host = urlparse(endpoint).netloc
+    date = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    digest = hashlib.sha256(payload).hexdigest()
+    canonical_headers = f'host:{host}\nx-amz-content-sha256:{digest}\nx-amz-date:{date}\n'
+    signed = 'host;x-amz-content-sha256;x-amz-date'
+    canonical = '\n'.join([method, uri, '', canonical_headers, signed, digest])
+    scope = date[:8] + '/us-east-1/s3/aws4_request'
+    to_sign = 'AWS4-HMAC-SHA256\n' + date + '\n' + scope + '\n' + hashlib.sha256(canonical.encode()).hexdigest()
+    signing = ('AWS4' + secret).encode()
+    for value in (date[:8], 'us-east-1', 's3', 'aws4_request'):
+        signing = hmac.new(signing, value.encode(), hashlib.sha256).digest()
+    signature = hmac.new(signing, to_sign.encode(), hashlib.sha256).hexdigest()
+    request = urllib.request.Request(endpoint + uri, data=payload if method == 'PUT' else None, method=method, headers={'x-amz-date': date, 'x-amz-content-sha256': digest, 'Authorization': f'AWS4-HMAC-SHA256 Credential={access}/{scope}, SignedHeaders={signed}, Signature={signature}'})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        if method == 'HEAD':
+            return json.dumps({k: response.headers.get(k) for k in ('ETag', 'Content-Length', 'Content-Type')}, sort_keys=True).encode()
+        return response.read()
+
+
+def rustfs_ready(endpoint: str = 'http://127.0.0.1:9000') -> None:
+    for _ in range(100):
+        try:
+            with urllib.request.urlopen(endpoint + '/health/ready', timeout=2) as response:
+                if response.status == 200:
+                    return
+        except (OSError, urllib.error.HTTPError):
+            pass
+        time.sleep(0.3)
+    raise ValueError('RustFS readiness did not recover')
+
+
+def rustfs_plan() -> tuple[Path, Path, Path]:
+    home = Path.home()
+    data, binary, unit = home / '.local/share/rustfs', home / '.local/bin/rustfs', home / '.config/systemd/user/rustfs.service'
+    for path in (data, binary, unit, home / '.local/state/homelab-backup'):
+        ordinary(path)
+    for path in data.rglob('*'):
+        if path.is_symlink():
+            raise ValueError('Refusing symlink in RustFS capture')
+    if file_hash(binary) != RUSTFS_BINARY_SHA:
+        raise ValueError('RustFS binary identity changed; review backup compatibility')
+    content = unit.read_text()
+    if '--address 127.0.0.1:9000 ' not in content or '--console-address 127.0.0.1:9001 ' not in content:
+        raise ValueError('Unexpected RustFS service definition')
+    for path in (data / 'private/access-key', data / 'private/secret-key'):
+        if path.stat().st_uid != os.getuid() or path.stat().st_mode & 0o077:
+            raise ValueError('RustFS credentials must remain owner-private')
+    required = sum(p.stat().st_size for p in data.rglob('*') if p.is_file()) + binary.stat().st_size
+    if shutil.disk_usage(home).free < required * 2 + 20 * 1024**3:
+        raise ValueError('Insufficient capture and isolated-restore headroom')
+    return data, binary, unit
+
+
+def rustfs_recover() -> None:
+    pending = Path.home() / '.local/state/homelab-backup/rustfs-resume.json'
+    ordinary(pending)
+    if pending.exists():
+        record = read_config(pending)
+        if record != {'resume': True, 'unit': 'rustfs.service'}:
+            raise ValueError('Unknown pending RustFS recovery')
+        rustfs_control('start')
+        rustfs_ready()
+        pending.unlink()
+
+
+def rustfs_capture() -> Path:
+    data, binary, unit = rustfs_plan()
+    state = Path.home() / '.local/state/homelab-backup'
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    pending = state / 'rustfs-resume.json'
+    if pending.exists():
+        raise ValueError('Prior capture recovery pending; run rustfs-recover first')
+    active = rustfs_active()
+    generation = state / 'rustfs-snapshots' / ('capture-' + secrets.token_hex(12))
+    ordinary(generation)
+    generation.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if active:
+        private_write(pending, json.dumps({'resume': True, 'unit': 'rustfs.service'}))
+    try:
+        if active:
+            rustfs_control('stop')
+        if not rustfs_clean_stop():
+            raise ValueError('RustFS clean shutdown not confirmed; refusing capture')
+        generation.mkdir(mode=0o700)
+        shutil.copytree(data, generation / 'rustfs', symlinks=False)
+        shutil.copy2(binary, generation / 'rustfs-binary')
+        shutil.copy2(unit, generation / 'rustfs.service')
+        release = Path.home() / '.config/homelab-object-storage/release.json'
+        if release.is_file():
+            ordinary(release)
+            shutil.copy2(release, generation / 'release.json')
+        manifest = {'schema_version': 1, 'version': '1.0.1', 'binary_sha256': RUSTFS_BINARY_SHA, 'captured_at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'files': {str(p.relative_to(generation)): file_hash(p) for p in generation.rglob('*') if p.is_file()}}
+        private_write(generation / 'capture.json', json.dumps(manifest) + '\n')
+    finally:
+        if active:
+            rustfs_recover()
+    return generation
+
+
+def rustfs_restore_check(cfg: dict) -> None:
+    root = Path.home() / '.local/share/rustfs'
+    bucket = 'backup-proof-' + secrets.token_hex(12)
+    payload = secrets.token_bytes(4096)
+    s3_request(root, 'http://127.0.0.1:9000', 'PUT', bucket)
+    try:
+        s3_request(root, 'http://127.0.0.1:9000', 'PUT', bucket, 'proof.bin', payload)
+        metadata = s3_request(root, 'http://127.0.0.1:9000', 'HEAD', bucket, 'proof.bin')
+        name = archive(cfg, False)
+        receipt = json.loads((Path.home() / '.local/state/homelab-backup/last-success.json').read_text())
+        source = receipt['rustfs_source']
+        with tempfile.TemporaryDirectory(prefix='rustfs-borg-restore-') as target:
+            borg('extract', cfg['repository'] + '::' + name, source.lstrip('/'), env=client_env(cfg), cwd=Path(target))
+            restored = Path(target) / source.lstrip('/')
+            manifest = read_config(restored / 'capture.json')
+            if manifest['binary_sha256'] != RUSTFS_BINARY_SHA:
+                raise ValueError('Restored binary identity differs')
+            for relative, expected in manifest['files'].items():
+                path = restored / relative
+                ordinary(path)
+                if path.resolve().is_relative_to(restored.resolve()) is False or file_hash(path) != expected:
+                    raise ValueError('Restored capture bytes differ')
+            for port in (19000, 19001):
+                with socket.socket() as probe:
+                    probe.bind(('127.0.0.1', port))
+            test_unit = 'rustfs-restore-' + secrets.token_hex(8)
+            try:
+                subprocess.run(['systemd-run', '--user', '--unit=' + test_unit, '-p', 'CPUQuota=50%', '-p', 'MemoryMax=1G', '-p', 'MemorySwapMax=0', '-p', 'Environment=RUST_LOG=warn', '-p', 'UMask=0077', str(restored / 'rustfs-binary'), 'server', '--address', '127.0.0.1:19000', '--console-address', '127.0.0.1:19001', '--access-key-file', str(restored / 'rustfs/private/access-key'), '--secret-key-file', str(restored / 'rustfs/private/secret-key'), str(restored / 'rustfs/data')], check=True)
+                rustfs_ready('http://127.0.0.1:19000')
+                got = s3_request(restored / 'rustfs', 'http://127.0.0.1:19000', 'GET', bucket, 'proof.bin')
+                recovered_metadata = s3_request(restored / 'rustfs', 'http://127.0.0.1:19000', 'HEAD', bucket, 'proof.bin')
+                if recovered_metadata != metadata:
+                    raise ValueError('Restored object metadata differs')
+                if got != payload:
+                    raise ValueError('Restored S3 bytes differ')
+                try:
+                    urllib.request.urlopen('http://127.0.0.1:19000/' + bucket + '/proof.bin', timeout=5)
+                    raise ValueError('Anonymous restored object access allowed')
+                except urllib.error.HTTPError as error:
+                    if error.code != 403:
+                        raise
+            finally:
+                subprocess.run(['systemctl', '--user', 'stop', test_unit], check=True)
+        (Path.home() / '.local/state/homelab-backup/rustfs-restore-verified').write_text(RUSTFS_BINARY_SHA + '\n')
+        print('Encrypted RustFS capture restored; signed S3 bytes matched; anonymous access denied.')
+    finally:
+        s3_request(root, 'http://127.0.0.1:9000', 'DELETE', bucket, 'proof.bin')
+        s3_request(root, 'http://127.0.0.1:9000', 'DELETE', bucket)
+
+
+
 def archive(cfg: dict, retention: bool) -> str:
     sources = [Path(s) for s in cfg["sources"]]
     if not sources or sources[0] != Path.home() / "Shared":
@@ -158,6 +345,11 @@ def archive(cfg: dict, retention: bool) -> str:
         if not source.exists():
             raise ValueError("Required backup source is missing")
     env = client_env(cfg)
+    snapshot = None
+    if cfg.get('include_rustfs'):
+        subprocess.run(['borg', 'info', cfg['repository']], env=env, stdout=subprocess.DEVNULL, check=True)
+        snapshot = rustfs_capture()
+        sources.append(snapshot)
     name = "pi400-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
     locator = cfg["repository"] + "::" + name
     borg("create", "--compression", "zstd,3", locator, *map(str, sources), env=env)
@@ -166,9 +358,13 @@ def archive(cfg: dict, retention: bool) -> str:
     if retention:
         if not (state / "restore-verified").is_file():
             raise ValueError("Restore must pass before retention")
+        if cfg.get('include_rustfs') and (state / 'rustfs-restore-verified').read_text().strip() != RUSTFS_BINARY_SHA:
+            raise ValueError('RustFS restore must pass before retention')
         borg("prune", "--glob-archives", "pi400-*", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6", cfg["repository"], env=env)
         borg("compact", cfg["repository"], env=env)
-    (state / "last-success.json").write_text(json.dumps({"archive": name, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat()}) + "\n")
+    (state / "last-success.json").write_text(json.dumps({"archive": name, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "rustfs_source": str(snapshot) if snapshot else None}) + "\n")
+    if snapshot:
+        shutil.rmtree(snapshot)
     return name
 
 
@@ -192,9 +388,17 @@ def restore_check(cfg: dict) -> None:
 def main() -> None:
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("destination-plan", "destination-init", "enroll-client", "serve", "client-plan", "run", "restore-check"))
+    parser.add_argument("action", choices=("destination-plan", "destination-init", "enroll-client", "serve", "client-plan", "run", "restore-check", "rustfs-plan", "rustfs-recover", "rustfs-restore-check", "rustfs-enable"))
     parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args()
+    if args.action == 'rustfs-recover':
+        state = Path.home() / '.local/state/homelab-backup'
+        ordinary(state)
+        state.mkdir(parents=True, exist_ok=True, mode=0o700)
+        with (state / 'job.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            rustfs_recover()
+        return
     cfg = read_config(args.config)
     if args.action == "enroll-client":
         enroll_client(cfg)
@@ -211,6 +415,18 @@ def main() -> None:
             os.execv("/opt/homebrew/bin/borg", ["borg", "serve", "--restrict-to-repository", str(repo)])
         return
     client_env(cfg)
+    if args.action == 'rustfs-enable':
+        rustfs_plan()
+        cfg['include_rustfs'] = True
+        candidate = args.config.with_name('.client-' + secrets.token_hex(8))
+        private_write(candidate, json.dumps(cfg) + '\n')
+        candidate.replace(args.config)
+        print('Frozen RustFS coverage enabled; run isolated restore check before retention.')
+        return
+    if args.action == 'rustfs-plan':
+        rustfs_plan()
+        print('Pinned RustFS sources and full-copy headroom verified; no service change.')
+        return
     if args.action == "client-plan":
         print("Dedicated SSH repository, strict trust, 7/4/6 retention; no writes.")
         return
@@ -219,7 +435,14 @@ def main() -> None:
     state.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (state / "job.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        if args.action == "run":
+        def interrupted(signum, frame):
+            raise InterruptedError('Backup interrupted; service recovery required')
+        signal.signal(signal.SIGTERM, interrupted)
+        if args.action == 'rustfs-restore-check':
+            if not cfg.get('include_rustfs'):
+                raise ValueError('Enable frozen RustFS scope explicitly before its restore check')
+            rustfs_restore_check(cfg)
+        elif args.action == "run":
             name = archive(cfg, True)
             print("Backup completed:", name)
         else:

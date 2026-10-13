@@ -128,9 +128,10 @@ before upgrades; stop service and make a consistent object-data/credential backu
 first. Preserve prior binary and compatible metadata backup. Data-format rollback
 may require full restore; never downgrade newly migrated data blindly.
 
-Ordinary-file Borg job does not yet back up live object-store internals. Treat S3
-as development storage for reproducible objects until consistent object backup
-is verified. Retirement disables only this service/Serve route, revokes client
+The Borg job now captures stopped RustFS data, hidden metadata, credentials and
+pinned binary/configuration into a private frozen generation, then resumes S3
+before upload. Isolated encrypted restore and signed object byte/metadata checks
+passed. See the backup context for recovery requirements and schedule. Retirement disables only this service/Serve route, revokes client
 credentials and retains data until explicit disposal.
 
 Sources: [RustFS project](https://github.com/rustfs/rustfs),

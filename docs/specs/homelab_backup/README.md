@@ -171,7 +171,7 @@ service identities through explicit private enrollment after a rebuild.
 
 ## Consistent RustFS recovery extension
 
-Status: Discovery-ready; implementation and deployment have not started.
+Status: Implemented; encrypted full-data restore into isolated RustFS passed.
 `homelab_backup` owns frozen capture, encrypted archives and recovery evidence;
 `homelab_object_storage` retains exclusive ownership of live object internals.
 The operator requested consistent RustFS backups to the existing dedicated
@@ -180,8 +180,9 @@ replacement, hardware snapshot layer or workload move is required.
 
 ### Behavior and concrete interfaces
 
-Extend the maintained backup CLI with explicit `rustfs-plan`, frozen-capture and
-isolated restore verification. Integrate capture into the existing daily timer;
+The maintained backup CLI provides `rustfs-plan`, `rustfs-enable`,
+`rustfs-restore-check` and `rustfs-recover`. Capture is integrated into `run`
+when the private client binding enables `include_rustfs`. Integrate capture into the existing daily timer;
 retain ordinary Shared sources, the existing repository, encryption, restricted
 SSH identity, schedule and 7/4/6 retention. Do not directly archive live object
 internals while RustFS runs.
@@ -283,3 +284,31 @@ This supports the selected stop-and-copy design, but does not replace deployed
 shutdown/restore validation. No Tailscale route, router or host remote-session
 change is needed. If the service starts inactive without demonstrable clean
 shutdown state, capture refuses consistency rather than laundering crash state.
+
+
+### Deployment evidence and operator procedure
+
+The full encrypted generation restored into a separate loopback-only RustFS
+instance. Signed object bytes, ETag/content length/content type matched and
+anonymous retrieval returned 403. Original service readiness recovered; Samba
+remained active. Regression tests cover wrong disks, private configuration,
+conflicting SSH permissions, symlink capture rejection, failed clean-stop recovery
+and preserving an initially inactive service.
+
+On Pi, run `homelab-backup rustfs-plan --config` against the private client binding,
+then explicitly `rustfs-enable`, then `rustfs-restore-check`. Only after restore
+success enable the existing timer with the updated service's ExecStopPost recovery
+hook. Ordinary `run` now captures RustFS before encrypted archive creation.
+Inspect `last-success.json` for the archive and frozen source locator, and
+`rustfs-restore-verified` for the compatible binary identity. Earlier archives
+without a source locator contain ordinary files only.
+
+If a job is interrupted while RustFS is stopped, the scheduled stop-post hook
+acquires the same exclusive lock and resumes only its recorded previously active
+service. Manual SIGKILL requires `rustfs-recover`; pending recovery refuses a new
+capture. No hook starts a service that was already intentionally inactive.
+Capture failures retain incomplete owned generations for inspection; successful
+archive jobs remove only their own frozen staging generation. Before production
+restore, stop RustFS, retain its current tree and restore a selected complete
+generation privately; validate isolated S3 first and obtain approval before
+replacing live data. Never mix a new binary with older-format object metadata.
