@@ -116,7 +116,7 @@ def install(binary: Path, source: Path) -> None:
         private_write(config,make_config(home,domain,keys))
         prefix=[str(target),'-w',str(root),'-c',str(config)]
         r=subprocess.run(prefix+['migrate'],capture_output=True,check=True)
-        created=subprocess.run(prefix+['admin','user','create','--username',home.name,'--email','admin@localhost','--admin','--random-password','--random-password-length','32','--must-change-password'],capture_output=True,text=True,check=True)
+        created=subprocess.run(prefix+['admin','user','create','--username',home.name,'--email','admin@localhost.invalid','--admin','--random-password','--random-password-length','32','--must-change-password'],capture_output=True,text=True,check=True)
         private_write(root/'private/initial-admin.txt',created.stdout)
     else:
         if config.stat().st_mode&0o077 or config.stat().st_uid!=os.getuid():raise ValueError('Forgejo config must remain owner-private')

@@ -31,10 +31,11 @@ def trust(root: Path, port: int, target: Path) -> None:
     # Bind scanned public keys to keys generated in this owned Forgejo data tree.
     scanned=subprocess.check_output(['ssh-keyscan','-p',str(port),'-t','ed25519,rsa','127.0.0.1'],stderr=subprocess.DEVNULL,text=True)
     public=[]
-    for p in (root/'ssh').rglob('*'):
-        if p.is_file() and not p.name.endswith('.pub'):
-            r=subprocess.run(['ssh-keygen','-y','-f',str(p)],capture_output=True,text=True)
-            if r.returncode==0:public.append(' '.join(r.stdout.split()[:2]))
+    for directory in (root/'ssh',root/'data/ssh'):
+        for p in directory.rglob('*'):
+            if p.is_file() and not p.name.endswith('.pub'):
+                r=subprocess.run(['ssh-keygen','-y','-f',str(p)],capture_output=True,text=True)
+                if r.returncode==0:public.append(' '.join(r.stdout.split()[:2]))
     accepted=[line for line in scanned.splitlines() if ' '.join(line.split()[1:3]) in public]
     if not accepted:raise ValueError('Forgejo host key did not match owned source')
     target.write_text('\n'.join(accepted)+'\n');target.chmod(0o600)
@@ -65,7 +66,7 @@ def main() -> None:
         temp=Path(directory)
         try:
             # CLI produces secrets only into captured memory, never tools or process arguments.
-            subprocess.run(prefix(root)+['admin','user','create','--username',name,'--email',name+'@localhost','--admin','--random-password','--must-change-password=false'],check=True,capture_output=True)
+            subprocess.run(prefix(root)+['admin','user','create','--username',name,'--email',name+'@localhost.invalid','--admin','--random-password','--must-change-password=false'],check=True,capture_output=True)
             created=True
             token=subprocess.check_output(prefix(root)+['admin','user','generate-access-token','--username',name,'--token-name','isolated-recovery','--scopes','all','--raw'],text=True).strip()
             run('ssh-keygen','-q','-t','ed25519','-N','','-f',str(temp/'identity'))
