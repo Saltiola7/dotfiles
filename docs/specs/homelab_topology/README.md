@@ -302,7 +302,7 @@ PostgreSQL backup policy remains unverified and is an explicit follow-up.
 
 ### Administration Mac launch and update
 
-The installed CLI validated 17 targets and five dependency edges. Launch with
+The initial installed CLI validated 17 targets and five dependency edges. This update declares 20 targets and 11 dependency edges; apply the reviewed inventory to refresh local output. Launch with
 `~/.local/bin/homelab targets`, `~/.local/bin/homelab inspect pi400`, or
 `~/.local/bin/homelab topology`. It creates no network listeners or background
 jobs. The first slice shipped without a populated private endpoint overlay.
@@ -334,7 +334,7 @@ no workloads were assigned or moved. Private endpoint bindings and host keys
 stay in local owner-only files. Router IPv6 internet works; IPv4 DHCP lease
 exhaustion remains unresolved. The owner supplied a Huawei HG8245H interface
 view; this does not establish that it is the previously observed Tailscale router
-peer. Router peer identity and extender/client inventory need separate discovery.
+peer. Router peer identity remains unverified. The gateway and wired extender were subsequently inspected during DHCP recovery; unrelated client identities remain private.
 
 ## Network recovery and planned gateway
 
