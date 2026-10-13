@@ -33,6 +33,11 @@ dependency-gated bridge specified in
 It preserves personal target ownership while chaining the independently managed
 `dotfiles-ai` source after a normal full personal apply.
 
+The headless Fedora server profile is specified in
+[`features/fedora-server.md`](features/fedora-server.md). It reuses the portable
+terminal subset and keeps desktop, hardware, work credentials and AI ownership
+separate. Pi400 is the first deployment target; no workload is assigned.
+
 ## Domain
 
 Bounded context: shell authentication startup for interactive panes, agents, and status-bar plugins.
