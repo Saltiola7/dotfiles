@@ -8,8 +8,8 @@ not managed targets. Phones/tablets, workload movement, automatic scheduling and
 changes to running resources are non-goals for the first slice. This context owns
 identity and relationships; Raspberry Pi bootstrap consumes a declared target ID.
 Existing chezmoi and dotfiles-ai contexts retain configuration ownership.
-Engineering defaults are in PROFILE.md. Current delivery is local Discovery only;
-future inventory delivery is elevated risk. No implementation cycle is registered.
+Engineering defaults are in PROFILE.md. Delivery is an elevated-risk read-only CLI and declaration. DBSCTR cycle
+HOMELAB-TOPOLOGY-001 owns implementation in an isolated checkout.
 
 ## Domain and authoritative data
 
@@ -20,7 +20,7 @@ information locally. Observation records source, time, state and uncertainty.
 DeclaredTargetChanged and ObservationRecorded are distinct events; observations
 cannot silently rewrite declarations. The operator owns all personal declarations.
 
-The future versioned inventory is JSON using schema version 1. Each target ID is
+The versioned inventory is JSON using schema version 1. Each target ID is
 unique; hosting edges form an acyclic graph. External dependencies cannot become
 admin targets merely by being visible on Tailscale. Unknown fields remain null or
 explicitly unknown. Sources are declarations and bounded native runtime queries;
@@ -68,7 +68,7 @@ backups and service use need a bounded follow-up inventory. Work sandbox is excl
 - Given no assigned execution workload, target resolution reports unassigned;
   it does not infer a target from architecture, hostname or online state.
 
-Proposed CLI: `homelab validate`, `homelab topology`, `homelab targets`,
+CLI: `homelab validate`, `homelab topology`, `homelab targets`,
 `homelab inspect TARGET`. Mutation is not an inventory command. Observer outputs
 are bounded and redact private fields by default. No broad credential/configuration
 scraping is authorized. Physical boot failure requires explicit recovery handling.
@@ -137,26 +137,28 @@ are retained locally; only redacted status reaches public-safe output.
 
 ## Validation, operations and open decisions
 
-Required evidence: schema/acyclicity tests, public/private output separation,
+Validation covers schema/acyclicity tests, public/private output separation,
 unknown/unreachable handling, deterministic diagram/table parity, exact target
 resolution, and live read-only comparisons. Existing pytest and chezmoi isolation
-are selected authorities; no deployment tests have run for new tooling.
+are selected authorities. macOS and Omarchy isolated target installs passed;
+Mac host installation and CLI validation passed.
 HP virtualization inventory, router interfaces and backup/recovery ownership
 remain unknown. Stateful mounts in personal-sandbox have been observed. Architecture does not assign workloads.
-A refresh interval and operational target-selection interface will be finalized
-before implementation. No new public service or spend is authorized.
+Observations older than seven days are stale. `inspect TARGET` selects a stable
+logical ID exactly; it never launches an administration action. No new public service or spend is authorized.
 
 ## Gate Ledger
 
 | Gate | Applicability | Result |
 |---|---|---|
-| Domain, Behavior, Spec, Contract | required | pending; Discovery draft only |
-| Test, Refactor, Review/Integrate | required | not_run |
+| Domain, Behavior, Spec, Contract | required | passed |
+| Test | required | passed; 23 scoped tests |
+| Refactor, Review/Integrate | required | pending final closure |
 | Release | not_applicable: no packaged/hosted release | not_run |
-| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | not_run |
+| Deploy, Operate, Maintain/Retire | required for long-lived managed inventory | installed host verified; final evidence pending |
 
-No Gate Exceptions approved. Publication authority for private infrastructure
-metadata is a capability gap; candidate artifacts use public-safe logical data.
+No Gate Exceptions approved. Public source review and private-output omission
+tests cover this inventory boundary; there is no private-inventory publication.
 
 ## First implementation slice
 
@@ -184,6 +186,8 @@ scanner is introduced. Runtime observation limitations remain explicit.
 
 ```mermaid
 erDiagram
+  accTitle: Homelab declaration schema
+  accDescr: Targets have unique IDs, optional hosting parents, dependency edges, dated observations and private local bindings.
   TARGET ||--o{ TARGET : hosts
   TARGET ||--o{ EDGE : source
   TARGET ||--o{ EDGE : destination
@@ -223,3 +227,86 @@ is acyclic. Dependency edges reference existing source and destination targets.
 Observations reference target IDs separately from declarations. Optional private
 connection bindings resolve target IDs locally and are never exported publicly.
 This informative schema is owned by the inventory contract and changes with it.
+
+## Concrete command and data contract
+
+Install a standard-library Python 3.12+ executable at `~/.local/bin/homelab`
+and public-safe declarations at `~/.config/homelab/targets.json`. Global
+`--inventory PATH` overrides only the declaration input. Global `--bindings PATH`
+explicitly selects a private JSON overlay; it is never loaded implicitly.
+`inspect TARGET --private` is the only command allowed to display its selected
+binding. No command interprets a binding as code or starts subprocesses.
+
+Schema v1 has exactly `schema_version`, `targets`, `edges`, and `observations`.
+Targets have `id`, `kind`, `architecture`, `role`, `owner`, `lifecycle`,
+`parent_id`, `evidence_status`, and `notes`. Kinds are physical, vm, container,
+storage, external. Lifecycle is active, planned, retained, or retired.
+Architecture is arm64, x86_64, or unknown. Evidence is observed,
+owner_reported, planned, or unknown. Notes and role are reviewed public prose.
+Logical IDs use lowercase letters, numbers and hyphens; no endpoints are IDs.
+Edges have `source`, `target`, `type` (depends_on, attached_to, administered_by)
+and `status` (observed, declared, planned, unknown). Hosting uses parent_id.
+Observations have `target_id`, `source`, `observed_at` (timezone-aware ISO 8601)
+and `state` (running, suspended, healthy, exited, offline, unknown, unavailable).
+A timestamp is evidence freshness, not a claim that a resource still runs.
+
+Private overlay shape: `{"schema_version": 1, "bindings": {"TARGET":
+{"method": "ssh", "endpoint": "PRIVATE", "user": "OWNER"}}}`. Method is
+ssh, tailscale_ssh, local, parallels, or lima. Only endpoint, user and method
+are accepted; credentials and executable commands have no field. File must be
+regular, not a symlink, owned by the current user, and mode 0600 or stricter.
+Bindings reference existing targets. Default rendering does not display them;
+private inspection requires both an explicit file and `--private`.
+
+`validate` exits 0 with a count, `targets` emits a sorted tab-separated table,
+`topology` emits deterministic Mermaid plus an equivalent target and edge table,
+and `inspect` emits a public JSON record with hosting, dependencies, latest
+observation and freshness. Its workload assignment is always `unassigned` in
+this slice. Errors exit 2 with a generic reason, never raw input values. Unknown
+fields, duplicate JSON keys, unknown references, duplicate IDs, self/cyclic
+hosting, malformed timestamps and incompatible schemas fail before rendering.
+JSON files are bounded to 1 MiB. Mermaid labels are escaped; IDs are generated
+from sorted node indexes rather than injected from prose.
+
+## Delivery, operations and recovery
+
+The operator applies only the two inventory artifacts using chezmoi with this
+reviewed checkout as source. Omarchy's restrictive allowlist must include them;
+other profile behavior is unchanged. Tests render both macOS and Omarchy
+profiles in isolated directories. No whole-home apply or existing VM change.
+
+Run `homelab validate` after declaration edits; inspect timestamps before an
+administration decision. Refresh observations through explicit reviewed probes;
+this slice does not install an automatic collector. Older-than-seven-day and
+unavailable observations remain visible without deleting declarations. Restore
+these two managed files from a reviewed previous Git revision to roll back.
+Private bindings are locally backed up separately; a compromised endpoint or
+identity requires operator review and key/access revocation. Retiring a target
+requires explicit data retention and access decisions outside this CLI.
+
+Python runtime support follows the repository's >=3.12 requirement. No runtime
+third-party dependencies, listening sockets, extra services or paid resources.
+Review runtime security updates and upstream changes during routine dotfiles
+maintenance. Inventory recovery does not imply service-data backup: Atuin and
+PostgreSQL backup policy remains unverified and is an explicit follow-up.
+
+### Administration Mac launch and update
+
+The installed CLI validated 17 targets and five dependency edges. Launch with
+`~/.local/bin/homelab targets`, `~/.local/bin/homelab inspect pi400`, or
+`~/.local/bin/homelab topology`. It creates no network listeners or background
+jobs. The first slice deliberately has no private endpoint overlay populated.
+
+After reviewing a source update, apply only these artifacts:
+
+```sh
+chezmoi --source /path/to/reviewed/dotfiles apply --parent-dirs --exclude scripts \
+  ~/.local/bin/homelab ~/.config/homelab/targets.json
+~/.local/bin/homelab validate
+```
+
+Use a reviewed prior checkout as `--source` for rollback. Do not reset the primary
+checkout or overwrite unrelated local changes. Public declarations are source;
+private bindings are local runtime state and must never be added with chezmoi.
+As of this delivery, the primary source checkout remains unchanged; merge the
+reviewed draft PR before treating this branch as the long-term source authority.

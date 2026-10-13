@@ -34,6 +34,8 @@ apply-omarchy-theme.sh
 !.bashrc
 !.config/
 .config/*
+!.config/homelab/
+!.config/homelab/targets.json
 !.config/hypr/
 .config/hypr/*
 !.config/hypr/input.lua
@@ -78,6 +80,7 @@ apply-omarchy-theme.sh
 .local/*
 !.local/bin/
 .local/bin/*
+!.local/bin/homelab
 !.local/bin/omarchy-desk-setup
 !.local/bin/omarchy-rustdesk-setup
 !.local/bin/omarchy-rustdesk-firewall
