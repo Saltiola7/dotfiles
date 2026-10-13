@@ -263,3 +263,63 @@ hashes, host-key fingerprint and verification checks. Password and salted verifi
 are absent from the receipt. Physical boot remains unverified until the later
 flash/boot slice. Canonical sources are manifest, CLI and backend receipt contract;
 operator owns updates when policy or artifact interfaces change.
+
+
+## Flash and headless boot v1 contract
+
+This slice extends the maintained macOS CLI with explicit `flash-plan --output
+PREPARED_DIRECTORY --disk /dev/diskN --plan NEW_PRIVATE_FILE` and
+`flash --plan PRIVATE_FILE --approve-plan SHA256`. Creating a plan is read-only
+apart from its new private plan file. Chezmoi installs the command but never
+invokes it automatically. Root execution is requested only in the operator
+terminal, with sudo password hidden; no password belongs in chat or arguments.
+
+A FlashPlan binds schema version, logical target, verified prepared-image path,
+byte count and SHA-256, current external whole-disk identity, media name, exact
+capacity, USB attachment path, device node, and original disk-header fingerprint.
+It records a bounded expiry and its canonical digest. Serial numbers, connection
+endpoints and actual device identities remain local. The plan is immutable;
+changes to image, receipt, device or approval digest invalidate it. All ordinary
+host/internal disks, undersized targets, unexpected media and non-whole-disk
+nodes are rejected before any unmount or write. The fresh observed StoreJet
+must be selected explicitly; a remembered BSD disk number is not authority.
+
+Given a valid plan and matching approval, the command revalidates input and
+fresh disk identity, unmounts only that disk, and rechecks identity before
+opening its raw whole-disk node. It writes exactly the candidate image length,
+flushes writes, reads back that same byte range and compares SHA-256. It writes
+a private receipt only after verification succeeds, then ejects the target for
+physical handoff. Any failure is non-success; no automatic retry or alternative
+disk selection is allowed. Partial-write recovery is a new verified plan and
+reflash of the same reviewed target. There is no rollback of erased content;
+the owner reports no target data to preserve. All other disks and VMs remain
+untouched.
+
+Given the verified flash receipt, the owner connects the SSD and Ethernet to the
+Pi 400 and powers it on. The administrator discovers a candidate through local
+DNS/DHCP/router observations, requests only its public SSH host key, and compares
+its fingerprint with trusted preparation receipt before adding a dedicated
+private known-hosts entry. SSH never disables host checking. Initial-setup must
+be noninteractive, login must use the existing owner SSH key, and root/password
+SSH must remain disabled. Private keys stay on macOS.
+
+Headless success requires observed aarch64 Fedora identity, expected Pi board,
+USB-backed root filesystem, completed SELinux relabel, successful root-growth
+unit and disk capacity, enabled SSH/network services, and key-only login.
+Password-required sudo is verified privately in the owner's terminal. A fresh
+reboot must preserve SSH access and filesystem identity before completion.
+Tailscale enrollment is an explicit owner authentication step after local SSH;
+no reusable auth key is baked into image or public state. Physical USB boot
+firmware remains an unverified runtime prerequisite, not a readiness promise.
+If USB boot fails, diagnose Ethernet/power/firmware evidence and report the
+possible need for microSD recovery media; never purchase or alter another device.
+
+Validation uses failing boundary tests before implementation: internal/partition
+or wrong-media disk rejection, stale image/device/header/expiry/approval mismatch,
+partial write and readback mismatch, and no mutation on invalid input. A regular
+file simulation verifies streaming and readback without access to real disks.
+Configured Python 3.12–3.14 tests, chezmoi isolation, source review and real
+operator-authorized StoreJet verification cover deployment. Physical boot and
+fresh SSH/reboot evidence remain required, and failures cannot be converted to
+passes. The existing flow diagram and operation table cover flash/boot trust
+boundaries; this section is their canonical contract extension.
