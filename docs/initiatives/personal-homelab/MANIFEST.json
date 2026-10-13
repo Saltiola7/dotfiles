@@ -184,6 +184,42 @@
       "artifacts": [
         "docs/specs/homelab_topology/README.md"
       ]
+    },
+    {
+      "id": "INT-021",
+      "kind": "decision",
+      "text": "Pi is the always-on primary ordinary-folder file server with authenticated Samba access privately over Tailscale.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_file_storage/README.md"
+      ]
+    },
+    {
+      "id": "INT-022",
+      "kind": "requirement",
+      "text": "Store encrypted versioned Borg backups in a dedicated folder on the existing Mac-connected external disk, then verify existing Backblaze protection independently.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_backup/README.md"
+      ]
+    },
+    {
+      "id": "INT-023",
+      "kind": "constraint",
+      "text": "Preserve existing HP and Mac shares, backup repositories, services and disks; no formatting or source-data migration.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_backup/README.md"
+      ]
+    },
+    {
+      "id": "INT-024",
+      "kind": "decision",
+      "text": "Connected-only access is sufficient; offline synchronization and Baserow are deferred.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_file_storage/README.md"
+      ]
     }
   ],
   "contexts": [
@@ -196,9 +232,26 @@
     {
       "id": "raspberry_pi_bootstrap",
       "repository": "Saltiola7/dotfiles",
-      "status": "ready",
+      "status": "delivered",
       "depends_on": [
         "homelab_topology"
+      ]
+    },
+    {
+      "id": "homelab_file_storage",
+      "repository": "Saltiola7/dotfiles",
+      "status": "ready",
+      "depends_on": [
+        "homelab_topology",
+        "raspberry_pi_bootstrap"
+      ]
+    },
+    {
+      "id": "homelab_backup",
+      "repository": "Saltiola7/dotfiles",
+      "status": "discovering",
+      "depends_on": [
+        "homelab_file_storage"
       ]
     }
   ],
@@ -266,7 +319,7 @@
     {
       "id": "flash-pi-and-verify-boot",
       "context": "raspberry_pi_bootstrap",
-      "state": "ready",
+      "state": "delivered",
       "requirements": [
         "INT-009",
         "INT-010",
@@ -294,6 +347,48 @@
       ],
       "release_group": "flash-pi-and-verify-boot",
       "execution_owner": "build"
+    },
+    {
+      "id": "pi-private-samba",
+      "context": "homelab_file_storage",
+      "state": "ready",
+      "requirements": [
+        "INT-021",
+        "INT-024"
+      ],
+      "depends_on": [
+        "flash-pi-and-verify-boot"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_file_storage/PROFILE.md",
+        "docs/specs/homelab_file_storage/README.md",
+        "docs/specs/homelab_backup/PROFILE.md",
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md"
+      ],
+      "release_group": "pi-private-samba",
+      "execution_owner": "build"
+    },
+    {
+      "id": "pi-versioned-backup",
+      "context": "homelab_backup",
+      "state": "discovering",
+      "requirements": [
+        "INT-022",
+        "INT-023"
+      ],
+      "depends_on": [
+        "pi-private-samba"
+      ],
+      "artifacts": [
+        "docs/specs/homelab_backup/README.md",
+        "docs/specs/homelab_backup/PROFILE.md",
+        "docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md"
+      ],
+      "release_group": "pi-versioned-backup",
+      "execution_owner": "build"
     }
   ],
   "release_groups": [
@@ -316,7 +411,21 @@
       "members": [
         "flash-pi-and-verify-boot"
       ],
+      "state": "delivered"
+    },
+    {
+      "id": "pi-private-samba",
+      "members": [
+        "pi-private-samba"
+      ],
       "state": "ready"
+    },
+    {
+      "id": "pi-versioned-backup",
+      "members": [
+        "pi-versioned-backup"
+      ],
+      "state": "planning"
     }
   ]
 }

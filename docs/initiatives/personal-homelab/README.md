@@ -66,3 +66,17 @@ identity drift, require matching approval, verify readback and eject only its
 target. Physical handoff and sudo password entry remain owner-local steps.
 No disk has been written by this workflow, and USB boot remains unverified.
 This is critical risk; exact DBSCTR registration approval follows preflight.
+
+## Private storage extension
+
+The operator approved separate file-storage and backup contexts in dotfiles.
+Pi USB boot and fresh SSH/reboot verification have completed; earlier flash
+handoff text above is historical. `homelab_file_storage` owns private Samba and
+ordinary folders. `homelab_backup` owns encrypted versioned Borg recovery into
+a dedicated folder on the existing Mac-connected disk. The backup slice waits
+for source deployment and verified restricted transport/mount checks.
+
+RustFS installation for DVC is additionally requested; hosting selection remains
+pending and object-storage data must stay separate. Baserow is deferred. See
+`docs/specs/homelab_topology/STORAGE-DEPLOYMENT.md` for boundaries and prerequisites.
+No deployment is claimed by these declarations.
