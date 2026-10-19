@@ -68,8 +68,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install chezmoi
         run: |
-          curl -fsSL https://github.com/twpayne/chezmoi/releases/download/v2.69.4/chezmoi_2.69.4_linux_amd64.tar.gz -o /tmp/chezmoi.tgz
-          echo "5054cf09cb2993725f525c8bb6ec3ff8625489ecfc061e019c17e737e7c7057b  /tmp/chezmoi.tgz" | sha256sum -c -
+          curl -fsSL https://github.com/twpayne/chezmoi/releases/download/v2.73.0/chezmoi_2.73.0_linux_amd64.tar.gz -o /tmp/chezmoi.tgz
+          echo "b597729b687af4488a848240134cb633de8ca0f04e0d26d48f400ee2ac338ffa  /tmp/chezmoi.tgz" | sha256sum -c -
           tar -xzf /tmp/chezmoi.tgz -C /tmp chezmoi
           sudo install -m 0755 /tmp/chezmoi /usr/local/bin/chezmoi
       - name: Install dependencies

@@ -139,6 +139,9 @@ enforces a five-minute cooldown. Synergy's native supervisor replaces the core.
 An offline Linux client or a deliberately closed Synergy app does not trigger
 recovery. TLS, pairing, Pause, and login-screen settings remain owned by Synergy.
 
+Use chezmoi 2.73.0 or later; CI pins the version validated on this Mac.
+The scoped apply requires `--error-on-conflict` and the hook uses `shellQuote`.
+
 Apply only the five managed files and their activation hook:
 
 ```bash
