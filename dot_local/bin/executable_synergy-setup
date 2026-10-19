@@ -1,0 +1,113 @@
+#!/bin/bash
+# Activate only the Synergy files declared by chezmoi; never install or rewrite them.
+set -eu
+export LC_ALL=C
+umask 077
+
+label_login=dev.dotfiles.synergy-login
+label_recovery=dev.dotfiles.synergy-recovery
+state_dir="$HOME/Library/Application Support/dotfiles/synergy-recovery"
+agents_dir="$HOME/Library/LaunchAgents"
+bin_dir="$HOME/.local/bin"
+domain="gui/$(/usr/bin/id -u)"
+
+read_configuration() {
+    local extra=""
+    [[ -f "$1" ]] || return 1
+    {
+        IFS= read -r recovery_enabled && IFS= read -r app_path || return 1
+        if IFS= read -r extra; then return 1; fi
+    } <"$1"
+    case "$recovery_enabled" in true|false) ;; *) return 1;; esac
+    [[ "$app_path" == /*.app ]]
+}
+
+write_digest() {
+    local destination="$1" digest="$2" temporary
+    temporary=$(/usr/bin/mktemp "$state_dir/.hash.XXXXXX") || return 1
+    if ! /usr/bin/printf '%s\n' "$digest" >"$temporary" || ! /bin/mv -f "$temporary" "$destination"; then
+        /bin/rm -f "$temporary"
+        return 1
+    fi
+}
+
+load_agent() {
+    local label="$1" digest previous="" record="$state_dir/loaded-$1.sha256"
+    digest=$(/usr/bin/shasum -a 256 "$agents_dir/$label.plist")
+    digest=${digest%% *}
+    [[ ! -f "$record" ]] || IFS= read -r previous <"$record"
+    /bin/launchctl enable "$domain/$label"
+    if /bin/launchctl print "$domain/$label" >/dev/null 2>&1; then
+        [[ "$digest" != "$previous" ]] || return 0
+        /bin/launchctl bootout "$domain/$label"
+    fi
+    /bin/launchctl bootstrap "$domain" "$agents_dir/$label.plist"
+    write_digest "$record" "$digest"
+}
+
+verify_sampling() {
+    local attempt
+    # Only the LaunchAgent context establishes background sample permission.
+    /bin/rm -f "$state_dir/status"
+    /bin/launchctl kickstart "$domain/$label_recovery" || true
+    for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+        if [[ -f "$state_dir/status" ]] &&
+           /usr/bin/grep -q ' checked-no-deadlock context=launchd ' "$state_dir/status"; then break; fi
+        case "$attempt" in 4|7|10) /bin/launchctl kickstart "$domain/$label_recovery" 2>/dev/null || true;; esac
+        /bin/sleep 1
+    done
+    if [[ -f "$state_dir/status" ]]; then
+        /bin/cat "$state_dir/status"
+        if ! /usr/bin/grep -q ' checked-no-deadlock context=launchd ' "$state_dir/status"; then
+            echo 'LaunchAgent sampling has not yet verified a running core without this deadlock.'
+        fi
+    else
+        echo 'LaunchAgent sampling has not completed; inspect synergy-setup status before relying on recovery.'
+    fi
+}
+
+main() {
+    local operation="${1:-status}" label
+    if [[ "$(/usr/bin/uname -s)" != Darwin ]]; then echo "synergy-setup requires macOS" >&2; return 2; fi
+    if [[ $# -gt 1 || ( "$operation" != activate && "$operation" != status ) ]]; then
+        echo 'Usage: synergy-setup [activate|status]; manage files and enabled state with chezmoi apply' >&2
+        return 2
+    fi
+    if ! read_configuration "$HOME/.config/synergy-recovery/config"; then
+        echo 'Missing or invalid managed Synergy configuration; run chezmoi apply.' >&2
+        return 1
+    fi
+    if [[ "$operation" == status ]]; then
+        echo "Managed recovery enabled: $recovery_enabled"
+        for label in "$label_login" "$label_recovery"; do
+            if /bin/launchctl print "$domain/$label" >/dev/null 2>&1; then echo "$label: loaded"; else echo "$label: unloaded"; fi
+        done
+        [[ ! -f "$state_dir/status" ]] || /bin/cat "$state_dir/status"
+        return 0
+    fi
+    /bin/mkdir -p "$state_dir"
+    /bin/chmod 700 "$state_dir"
+    if [[ "$recovery_enabled" == false ]]; then
+        for label in "$label_login" "$label_recovery"; do
+            /bin/launchctl disable "$domain/$label" 2>/dev/null || true
+            /bin/launchctl bootout "$domain/$label" 2>/dev/null || true
+            /bin/rm -f "$state_dir/loaded-$label.sha256"
+        done
+        /bin/rm -f "$state_dir/pending"
+        echo 'Declarative Synergy login launch and recovery are disabled.'
+        return 0
+    fi
+    [[ -x "$app_path/Contents/MacOS/Synergy" && -x "$app_path/Contents/MacOS/synergy-service" &&
+       -x "$app_path/Contents/MacOS/synergy-core" ]] || {
+        echo "Synergy app executables not found at $app_path" >&2; return 1;
+    }
+    [[ -x "$bin_dir/synergy-recovery" ]] || { echo 'Missing managed recovery helper; run chezmoi apply.' >&2; return 1; }
+    for label in "$label_login" "$label_recovery"; do
+        [[ -f "$agents_dir/$label.plist" ]] || { echo "Missing managed $label.plist; run chezmoi apply." >&2; return 1; }
+        /usr/bin/plutil -lint "$agents_dir/$label.plist" >/dev/null
+    done
+    for label in "$label_login" "$label_recovery"; do load_agent "$label"; done
+    verify_sampling
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

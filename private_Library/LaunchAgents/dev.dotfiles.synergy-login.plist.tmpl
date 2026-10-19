@@ -1,0 +1,19 @@
+{{- $enabled := true -}}
+{{- if hasKey . "synergy_recovery_enabled" -}}
+{{- $enabled = .synergy_recovery_enabled -}}
+{{- end -}}
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>dev.dotfiles.synergy-login</string>
+<key>LimitLoadToSessionType</key><string>Aqua</string>
+<key>RunAtLoad</key><true/>
+<key>Disabled</key><{{ if $enabled }}false{{ else }}true{{ end }}/>
+<key>Umask</key><integer>63</integer>
+<key>ProgramArguments</key><array>
+<string>/usr/bin/open</string><string>-g</string><string>-a</string>
+<string>{{ default "/Applications/Synergy.app" (get . "synergy_app_path") | html }}</string>
+</array>
+<key>StandardOutPath</key><string>/dev/null</string>
+<key>StandardErrorPath</key><string>/dev/null</string>
+</dict></plist>

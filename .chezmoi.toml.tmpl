@@ -18,4 +18,8 @@ encryption = "age"
 {{ if eq $machineType "omarchy" }}
     waynergy_client_name = {{ default "omarchy" (get . "waynergy_client_name") | quote }}
 {{ end }}
+{{ if eq $machineType "mac-mini" }}
+    synergy_recovery_enabled = {{ if hasKey . "synergy_recovery_enabled" }}{{ .synergy_recovery_enabled }}{{ else }}true{{ end }}
+    synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
+{{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
