@@ -129,6 +129,55 @@ sleep before insertion.
 Option+letter navigation and Ctrl+Shift+Option+2 workspace selection
 retain their existing bindings.
 
+## Synergy recovery on Mac mini
+
+Chezmoi manages two current-user Aqua LaunchAgents for the Darwin `mac-mini`
+profile. One opens Synergy once at desktop login; the other checks its core
+every 60 seconds. Recovery requires two samples of the confirmed TLS cleanup
+deadlock in the same owned core, rechecks process identity before signals, and
+enforces a five-minute cooldown. Synergy's native supervisor replaces the core.
+An offline Linux client or a deliberately closed Synergy app does not trigger
+recovery. TLS, pairing, Pause, and login-screen settings remain owned by Synergy.
+
+Use chezmoi 2.73.0 or later; CI pins the version validated on this Mac.
+The scoped apply requires `--error-on-conflict` and the hook uses `shellQuote`.
+
+Apply only the five managed files and their activation hook:
+
+```bash
+synergy_source="$(chezmoi source-path)"
+chezmoi apply --error-on-conflict --parent-dirs --include=dirs,files,scripts --source-path \
+  "$synergy_source/dot_local/bin/executable_synergy-recovery" \
+  "$synergy_source/dot_local/bin/executable_synergy-setup" \
+  "$synergy_source/private_dot_config/synergy-recovery/private_config.tmpl" \
+  "$synergy_source/private_Library/LaunchAgents/dev.dotfiles.synergy-login.plist.tmpl" \
+  "$synergy_source/private_Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist.tmpl" \
+  "$synergy_source/run_onchange_after_load-synergy-launchagents.sh.tmpl"
+"$HOME/.local/bin/synergy-setup" status
+```
+
+Verify a fresh `checked-no-deadlock context=launchd` status with a current
+timestamp and core identity. A successful Terminal-only sample does not verify
+LaunchAgent sampling permissions. Desktop login, intentional quit, sleep/wake,
+reconnect, and an actual future deadlock require separate runtime validation.
+
+Local deployment on 2026-10-19 passed all 58 Synergy tests. Both Aqua jobs loaded;
+the activation check and the following automatic 60-second run produced fresh
+`checked-no-deadlock context=launchd` results for the same owned core. The recovery
+job exited with code 0, and the scoped chezmoi diff was empty. This verifies
+background sampling on this Mac, not the outstanding lifecycle scenarios above.
+
+The default is enabled for `mac-mini`. Set `synergy_recovery_enabled = false`
+under `[data]` in this Mac's chezmoi configuration and apply the same selection
+to unload and disable both jobs. Set it to `true` and apply to enable again.
+Override `synergy_app_path` for a nonstandard application location; the default
+is `/Applications/Synergy.app`. Other profiles do not receive these files.
+
+Private runtime observations and samples live under
+`~/Library/Application Support/dotfiles/synergy-recovery/`. Persistent desired
+configuration and job definitions live in this source. The SMB share is only
+a transfer mechanism and is not needed at runtime.
+
 ## Tests
 
 Unit tests for kitty workspace scripts (session serialization/deserialization):

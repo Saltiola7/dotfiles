@@ -1,0 +1,10 @@
+{{- $enabled := true -}}
+{{- if hasKey . "synergy_recovery_enabled" -}}
+{{- $enabled = .synergy_recovery_enabled -}}
+{{- end -}}
+{{- $app := default "/Applications/Synergy.app" (get . "synergy_app_path") -}}
+{{- if or (contains "\n" $app) (contains "\r" $app) -}}
+{{- fail "synergy_app_path must not contain newlines" -}}
+{{- end -}}
+{{ $enabled }}
+{{ $app }}
