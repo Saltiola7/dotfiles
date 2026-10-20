@@ -38,11 +38,11 @@
       "id": "pi400",
       "kind": "physical",
       "architecture": "arm64",
-      "role": "headless Fedora file and S3 development server",
+      "role": "headless Fedora file, S3 and Git server",
       "parent_id": null,
       "lifecycle": "active",
       "evidence_status": "observed",
-      "notes": "Fedora ARM64 with private Samba, capped RustFS 1.0.1 S3 development storage and daily encrypted Borg backup to Mac-connected disk. Authenticated file/DVC roundtrips, local backup restore and fresh startup verified. Cloud upload/restore and consistent object backup unverified.",
+      "notes": "Fedora ARM64 with private Samba, capped RustFS 1.0.1 and Forgejo 15.0.10 LTS. Authenticated file/DVC/Git roundtrips and encrypted isolated RustFS/Forgejo Borg restores passed. Daily frozen service-data backups target Mac-connected disk; cloud upload/restore unverified. Private Git web forwarding enrollment is operator-controlled.",
       "owner": "personal-dotfiles"
     },
     {

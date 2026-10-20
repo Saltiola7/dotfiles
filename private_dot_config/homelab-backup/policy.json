@@ -26,5 +26,16 @@
     ],
     "restore": "isolated signed S3 bytes and metadata match",
     "retention_requires_object_restore": true
+  },
+  "forgejo": {
+    "capture": "clean-stop-SQLite-check-private-copy-resume-before-upload",
+    "sources": [
+      "SQLite and journals",
+      "repositories and LFS",
+      "private configuration and embedded SSH host keys",
+      "compatible binary and service"
+    ],
+    "restore": "isolated private repository Git clone bytes and privacy match",
+    "retention_requires_forgejo_restore": true
   }
 }

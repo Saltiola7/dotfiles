@@ -19,6 +19,7 @@ import hmac
 import shutil
 import signal
 import socket
+import sqlite3
 import time
 import urllib.request
 import urllib.error
@@ -336,6 +337,63 @@ def rustfs_restore_check(cfg: dict) -> None:
 
 
 
+FORGEJO_BINARY_SHA='be06bb887bef8a7901c6bdcea36023e55429ef7582a2797711b878a3af602e69'
+
+
+def forgejo_ready() -> None:
+    for _ in range(100):
+        try:
+            with urllib.request.urlopen('http://127.0.0.1:3000/api/healthz',timeout=2) as r:
+                if r.status==200:return
+        except OSError:pass
+        time.sleep(.3)
+    raise ValueError('Forgejo readiness did not recover')
+
+
+def forgejo_recover() -> None:
+    pending=Path.home()/'.local/state/homelab-backup/forgejo-resume.json'
+    ordinary(pending)
+    if pending.exists():
+        if read_config(pending)!={'resume':True,'unit':'forgejo.service'}:raise ValueError('Unknown Forgejo recovery state')
+        subprocess.run(['systemctl','--user','start','forgejo.service'],check=True);forgejo_ready();pending.unlink()
+
+
+def forgejo_plan() -> tuple[Path,Path,Path]:
+    home=Path.home();root=home/'.local/share/forgejo';binary=home/'.local/bin/forgejo';unit=home/'.config/systemd/user/forgejo.service'
+    for p in (root,binary,unit,home/'.local/state/homelab-backup'):ordinary(p)
+    for p in root.rglob('*'):
+        if p.is_symlink():raise ValueError('Symlink Forgejo capture')
+    if file_hash(binary)!=FORGEJO_BINARY_SHA:raise ValueError('Forgejo binary identity changed')
+    config=root/'private/app.ini'
+    if config.stat().st_mode&0o077 or config.stat().st_uid!=os.getuid():raise ValueError('Forgejo config must remain private')
+    required=binary.stat().st_size+sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
+    if shutil.disk_usage(home).free<2*required+20*1024**3:raise ValueError('Insufficient Forgejo capture/restore headroom')
+    return root,binary,unit
+
+
+def forgejo_capture() -> Path:
+    root,binary,unit=forgejo_plan();state=Path.home()/'.local/state/homelab-backup';state.mkdir(parents=True,exist_ok=True,mode=0o700)
+    pending=state/'forgejo-resume.json'
+    if pending.exists():raise ValueError('Pending Forgejo recovery; recover first')
+    status=subprocess.check_output(['systemctl','--user','show','forgejo','-p','ActiveState','--value'],text=True).strip()
+    if status not in ('active','inactive'):raise ValueError('Forgejo service state is unstable')
+    active=status=='active';generation=state/'forgejo-snapshots'/('capture-'+secrets.token_hex(12));ordinary(generation);generation.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
+    if active:private_write(pending,json.dumps({'resume':True,'unit':'forgejo.service'}))
+    try:
+        if active:subprocess.run(['systemctl','--user','stop','forgejo'],check=True)
+        props=dict(line.split('=',1) for line in subprocess.check_output(['systemctl','--user','show','forgejo','-p','ActiveState','-p','MainPID','-p','Result','-p','ExecMainCode','-p','ExecMainStatus'],text=True).splitlines())
+        if props!={'ActiveState':'inactive','MainPID':'0','Result':'success','ExecMainCode':'1','ExecMainStatus':'0'}:raise ValueError('Forgejo clean stop unconfirmed')
+        with sqlite3.connect('file:'+str(root/'data/forgejo.db')+'?mode=ro',uri=True) as db:
+            if db.execute('PRAGMA quick_check').fetchone()!=('ok',):raise ValueError('Forgejo SQLite integrity failed')
+        generation.mkdir(mode=0o700);shutil.copytree(root,generation/'forgejo');shutil.copy2(binary,generation/'forgejo-binary');shutil.copy2(unit,generation/'forgejo.service')
+        manifest={'schema_version':1,'version':'15.0.10','binary_sha256':FORGEJO_BINARY_SHA,'captured_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'original_root':str(root),'files':{str(p.relative_to(generation)):file_hash(p) for p in generation.rglob('*') if p.is_file()}}
+        private_write(generation/'capture.json',json.dumps(manifest)+'\n')
+    finally:
+        if active:forgejo_recover()
+    return generation
+
+
+
 def archive(cfg: dict, retention: bool) -> str:
     sources = [Path(s) for s in cfg["sources"]]
     if not sources or sources[0] != Path.home() / "Shared":
@@ -346,10 +404,14 @@ def archive(cfg: dict, retention: bool) -> str:
             raise ValueError("Required backup source is missing")
     env = client_env(cfg)
     snapshot = None
+    forgejo_snapshot = None
     if cfg.get('include_rustfs'):
         subprocess.run(['borg', 'info', cfg['repository']], env=env, stdout=subprocess.DEVNULL, check=True)
         snapshot = rustfs_capture()
         sources.append(snapshot)
+    if cfg.get('include_forgejo'):
+        subprocess.run(['borg','info',cfg['repository']],env=env,stdout=subprocess.DEVNULL,check=True)
+        forgejo_snapshot=forgejo_capture();sources.append(forgejo_snapshot)
     name = "pi400-" + datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%f")
     locator = cfg["repository"] + "::" + name
     borg("create", "--compression", "zstd,3", locator, *map(str, sources), env=env)
@@ -360,11 +422,15 @@ def archive(cfg: dict, retention: bool) -> str:
             raise ValueError("Restore must pass before retention")
         if cfg.get('include_rustfs') and (state / 'rustfs-restore-verified').read_text().strip() != RUSTFS_BINARY_SHA:
             raise ValueError('RustFS restore must pass before retention')
+        if cfg.get('include_forgejo') and (state/'forgejo-restore-verified').read_text().strip()!=FORGEJO_BINARY_SHA:
+            raise ValueError('Forgejo restore must pass before retention')
         borg("prune", "--glob-archives", "pi400-*", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6", cfg["repository"], env=env)
         borg("compact", cfg["repository"], env=env)
-    (state / "last-success.json").write_text(json.dumps({"archive": name, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "rustfs_source": str(snapshot) if snapshot else None}) + "\n")
+    (state / "last-success.json").write_text(json.dumps({"archive": name, "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(), "rustfs_source": str(snapshot) if snapshot else None, "forgejo_source": str(forgejo_snapshot) if forgejo_snapshot else None}) + "\n")
     if snapshot:
         shutil.rmtree(snapshot)
+    if forgejo_snapshot:
+        shutil.rmtree(forgejo_snapshot)
     return name
 
 
@@ -388,16 +454,16 @@ def restore_check(cfg: dict) -> None:
 def main() -> None:
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("destination-plan", "destination-init", "enroll-client", "serve", "client-plan", "run", "restore-check", "rustfs-plan", "rustfs-recover", "rustfs-restore-check", "rustfs-enable"))
+    parser.add_argument("action", choices=("destination-plan", "destination-init", "enroll-client", "serve", "client-plan", "run", "restore-check", "rustfs-plan", "rustfs-recover", "rustfs-restore-check", "rustfs-enable", "forgejo-plan", "forgejo-recover", "forgejo-enable", "archive-check"))
     parser.add_argument("--config", type=Path, required=True)
     args = parser.parse_args()
-    if args.action == 'rustfs-recover':
+    if args.action in ('rustfs-recover','forgejo-recover'):
         state = Path.home() / '.local/state/homelab-backup'
         ordinary(state)
         state.mkdir(parents=True, exist_ok=True, mode=0o700)
         with (state / 'job.lock').open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            rustfs_recover()
+            (rustfs_recover if args.action=='rustfs-recover' else forgejo_recover)()
         return
     cfg = read_config(args.config)
     if args.action == "enroll-client":
@@ -415,16 +481,16 @@ def main() -> None:
             os.execv("/opt/homebrew/bin/borg", ["borg", "serve", "--restrict-to-repository", str(repo)])
         return
     client_env(cfg)
-    if args.action == 'rustfs-enable':
-        rustfs_plan()
-        cfg['include_rustfs'] = True
+    if args.action in ('rustfs-enable','forgejo-enable'):
+        (rustfs_plan if args.action=='rustfs-enable' else forgejo_plan)()
+        cfg['include_rustfs' if args.action=='rustfs-enable' else 'include_forgejo'] = True
         candidate = args.config.with_name('.client-' + secrets.token_hex(8))
         private_write(candidate, json.dumps(cfg) + '\n')
         candidate.replace(args.config)
         print('Frozen RustFS coverage enabled; run isolated restore check before retention.')
         return
-    if args.action == 'rustfs-plan':
-        rustfs_plan()
+    if args.action in ('rustfs-plan','forgejo-plan'):
+        (rustfs_plan if args.action=='rustfs-plan' else forgejo_plan)()
         print('Pinned RustFS sources and full-copy headroom verified; no service change.')
         return
     if args.action == "client-plan":
@@ -442,6 +508,8 @@ def main() -> None:
             if not cfg.get('include_rustfs'):
                 raise ValueError('Enable frozen RustFS scope explicitly before its restore check')
             rustfs_restore_check(cfg)
+        elif args.action == 'archive-check':
+            print('Checked archive:',archive(cfg,False))
         elif args.action == "run":
             name = archive(cfg, True)
             print("Backup completed:", name)
