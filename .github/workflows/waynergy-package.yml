@@ -1,0 +1,43 @@
+name: Waynergy package
+
+on:
+  push:
+    paths:
+      - ".github/workflows/waynergy-package.yml"
+      - "private_dot_config/omarchy-host/waynergy-package/**"
+      - "dot_local/bin/executable_omarchy-waynergy-install"
+      - "dot_local/bin/executable_omarchy-waynergy-test"
+  pull_request:
+    paths:
+      - ".github/workflows/waynergy-package.yml"
+      - "private_dot_config/omarchy-host/waynergy-package/**"
+      - "dot_local/bin/executable_omarchy-waynergy-install"
+      - "dot_local/bin/executable_omarchy-waynergy-test"
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    container: archlinux:base
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Install build dependencies
+        # Arch's rolling image requires a full upgrade before adding packages.
+        run: pacman -Syu --noconfirm --needed base-devel git meson ninja wayland libxkbcommon libretls
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Build package and run C regression checks
+        # makepkg validates source checksums and runs check() without installing
+        # the resulting package. No compositor or Synergy server is required.
+        run: |
+          useradd --create-home builder
+          install -d -o builder -g builder /tmp/waynergy-package
+          cp -a private_dot_config/omarchy-host/waynergy-package/. /tmp/waynergy-package/
+          chown -R builder:builder /tmp/waynergy-package
+          runuser -u builder -- bash -c 'cd /tmp/waynergy-package && makepkg --cleanbuild --check --noconfirm'
