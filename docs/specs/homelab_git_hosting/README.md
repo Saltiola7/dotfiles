@@ -160,8 +160,8 @@ Reject redirects, unexpected status/body, oversized responses, invalid TLS,
 timeouts and malformed names. Do not read service secrets or print response
 bodies, private URLs, tokens or provider errors. No proxy environment, forced
 issuance, retry loop, network reset, certificate deletion or privileged action
-is part of this command. Each request has a ten-second timeout; bound response
-bodies to 64 KiB. A bounded request failure returns a nonzero result with safe
+is part of this command. Each request has a ten-second socket timeout (not a strict total runtime
+deadline); bound response bodies to 64 KiB. A bounded request failure returns a nonzero result with safe
 recovery guidance. A fresh installation may need a later check while Tailscale
 finishes initial issuance; a successful Serve configuration write is not readiness.
 
