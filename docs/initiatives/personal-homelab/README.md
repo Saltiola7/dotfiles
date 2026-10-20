@@ -100,3 +100,12 @@ pi-rustfs-consistent-backup slice add frozen capture, original service-state
 recovery and isolated object restoration. Context boundaries remain approved;
 no hardware, repository or external service migration is included. Launch awaits
 exact preflight approval under DBSCTR V3 revision 3.29.
+
+
+## Approved private Git-hosting context
+
+The operator approved homelab_git_hosting in dotfiles and requested Forgejo on
+Pi when capacity permits. Current Pi measurements permit initial small private
+Git hosting. Existing five contexts retain ownership. INT-027 and the independent
+pi-private-forgejo slice declare capped native ARM64 Forgejo LTS, SQLite, private
+access and consistent recovery. No existing repositories are moved.

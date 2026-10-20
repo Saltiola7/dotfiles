@@ -1,0 +1,2 @@
+# Unified-diff payloads preserve upstream context indentation and CRLF bytes.
+private_dot_config/omarchy-host/waynergy-package/*.patch whitespace=-blank-at-eol,-space-before-tab,cr-at-eol

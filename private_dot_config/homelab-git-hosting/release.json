@@ -1,0 +1,8 @@
+{
+  "version": "15.0.10",
+  "architecture": "linux-arm64",
+  "binary_sha256": "be06bb887bef8a7901c6bdcea36023e55429ef7582a2797711b878a3af602e69",
+  "compressed_sha256": "557f9f7b5730e898919e8388b8954845c421a7328643c42d388271c7b11df40c",
+  "signing_fingerprint": "EB114F5E6C0DC2BCDD183550A4B61A2DC5923710",
+  "url": "https://code.forgejo.org/forgejo/forgejo/releases/download/v15.0.10/forgejo-15.0.10-linux-arm64.xz"
+}

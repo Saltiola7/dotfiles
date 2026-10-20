@@ -191,6 +191,7 @@ docs/
 .config/espanso/
 .config/espanso/**
 tests/
+.gitattributes
 pyproject.toml
 uv.lock
 .venv/
@@ -254,3 +255,12 @@ Shared/Backup-Recovery/
 .config/autostart/chatgpt.desktop
 .config/autostart/kitty.desktop
 {{ end }}
+
+# Private native Git hosting belongs to headless Fedora only.
+{{ if ne .machine_type "fedora-server" }}
+.local/bin/pi-forgejo-setup
+.local/bin/pi-forgejo-check
+.config/homelab-git-hosting/
+{{ end }}
+.local/share/forgejo/
+.config/homelab-git-hosting/client.json
