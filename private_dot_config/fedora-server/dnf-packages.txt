@@ -16,4 +16,5 @@ atuin
 zoxide
 curl
 tar
+gzip
 coreutils

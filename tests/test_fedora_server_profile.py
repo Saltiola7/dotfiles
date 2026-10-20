@@ -79,3 +79,18 @@ def test_explicit_pi_role_owns_public_service_inputs_only(tmp_path):
         '--config-format', 'toml', '--override-data', json.dumps(values),
         'managed', '--include', 'scripts'], text=True, capture_output=True)
     assert r.returncode == 0 and not r.stdout.strip(), r.stderr
+
+
+def test_pi_service_packages_are_explicit_and_generic_server_excludes_them(tmp_path):
+    role = ROOT / 'private_dot_config/fedora-server/pi-packages.txt'
+    assert role.is_file()
+    packages = set(role.read_text().splitlines())
+    assert {'samba', 'samba-client', 'policycoreutils-python-utils', 'borgbackup', 'borgmatic', 'git-lfs'} <= packages
+    r = chezmoi(tmp_path, 'managed', '--include', 'files,symlinks')
+    assert '.config/fedora-server/pi-packages.txt' not in r.stdout.splitlines()
+    # Explicit role input works before chezmoi itself is installed.
+    r = subprocess.run(['bash', str(ROOT/'dot_local/bin/executable_fedora-server-setup'),
+        '--plan', '--manifest', str(ROOT/'private_dot_config/fedora-server/dnf-packages.txt'),
+        '--role-manifest', str(role)], text=True, capture_output=True)
+    assert r.returncode == 0, r.stderr
+    assert packages <= set(r.stdout.splitlines())

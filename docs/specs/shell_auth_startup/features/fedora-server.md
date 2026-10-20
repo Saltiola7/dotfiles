@@ -47,6 +47,9 @@ or AI runtime is silently assigned by selecting this profile. An additional expl
 `homelab_target=pi400` opt-in manages only the public Samba, Borg, RustFS and
 Forgejo helpers, unit inputs and release manifests. It does not execute enrollment,
 reset passwords, replace private runtime configuration or change hardware settings.
+The explicit role adds a separate signed Fedora service-package manifest. The
+package helper consumes it only when present or explicitly passed with
+`--role-manifest`; generic servers do not receive Samba/Borg/Git LFS prerequisites.
 Generic Fedora servers retain only the terminal baseline. Service setup remains
 explicit through the bounded-context helpers and their private local enrollment.
 

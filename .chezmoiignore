@@ -286,6 +286,7 @@ Shared/Backup-Recovery/
 !.local/bin/fedora-server-setup
 {{ if eq (default "" (get . "homelab_target")) "pi400" }}
 # Explicit service role: public inputs/helpers only; private enrollment stays local.
+!.config/fedora-server/pi-packages.txt
 !.local/bin/homelab-backup
 !.local/bin/pi-samba-setup
 !.local/bin/pi-samba-check

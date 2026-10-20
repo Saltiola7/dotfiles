@@ -2,21 +2,31 @@
 # Explicit package setup; never a chezmoi apply hook.
 set -euo pipefail
 manifest="$HOME/.config/fedora-server/dnf-packages.txt"
+role_manifest="$HOME/.config/fedora-server/pi-packages.txt"
+role_required=false
 mode=install
 while (($#)); do
   case "$1" in
     --plan) mode=plan; shift ;;
     --manifest) [[ $# -ge 2 ]] || exit 2; manifest=$2; shift 2 ;;
-    *) printf 'Usage: fedora-server-setup [--plan] [--manifest PATH]\n' >&2; exit 2 ;;
+    --role-manifest) [[ $# -ge 2 ]] || exit 2; role_manifest=$2; role_required=true; shift 2 ;;
+    *) printf 'Usage: fedora-server-setup [--plan] [--manifest PATH] [--role-manifest PATH]\n' >&2; exit 2 ;;
   esac
 done
 [[ -f "$manifest" && ! -L "$manifest" ]] || { echo 'Missing regular package manifest.' >&2; exit 2; }
+manifests=("$manifest")
+if [[ "$role_required" == true || -e "$role_manifest" || -L "$role_manifest" ]]; then
+  [[ -f "$role_manifest" && ! -L "$role_manifest" ]] || { echo 'Missing regular role package manifest.' >&2; exit 2; }
+  manifests+=("$role_manifest")
+fi
 packages=()
+for package_manifest in "${manifests[@]}"; do
 while IFS= read -r package || [[ -n "$package" ]]; do
   [[ -z "$package" || "$package" == \#* ]] && continue
   [[ "$package" =~ ^[a-z0-9][a-z0-9+._-]*$ ]] || { echo 'Invalid package name.' >&2; exit 2; }
   packages+=("$package")
-done < "$manifest"
+done < "$package_manifest"
+done
 ((${#packages[@]})) || { echo 'Empty package plan.' >&2; exit 2; }
 if [[ "$mode" == plan ]]; then
   printf '%s\n' "${packages[@]}"

@@ -1,0 +1,7 @@
+samba
+samba-client
+policycoreutils
+policycoreutils-python-utils
+borgbackup
+borgmatic
+git-lfs

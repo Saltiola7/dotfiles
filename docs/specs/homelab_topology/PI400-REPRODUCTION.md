@@ -30,9 +30,11 @@ repository into `~/.local/share/chezmoi`, then run the declared installer:
 
 ```sh
 bash ~/.local/share/chezmoi/dot_local/bin/executable_fedora-server-setup \
-  --manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/dnf-packages.txt --plan
+  --manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/dnf-packages.txt \
+  --role-manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/pi-packages.txt --plan
 bash ~/.local/share/chezmoi/dot_local/bin/executable_fedora-server-setup \
-  --manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/dnf-packages.txt
+  --manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/dnf-packages.txt \
+  --role-manifest ~/.local/share/chezmoi/private_dot_config/fedora-server/pi-packages.txt
 ```
 
 The second command asks for the owner's sudo password. It installs signed Fedora
@@ -68,6 +70,9 @@ sources have disjoint managed leaf targets before applying them.
 
 ## Service enrollment and recovery
 
+The explicit Pi package manifest covers Samba/SELinux, Borg and Git LFS prerequisites.
+Keep Tailscale enrollment from image bootstrap. Enable owner user-service persistence
+explicitly with `sudo loginctl enable-linger "$USER"`; ordinary apply does not change it.
 Follow the existing file-storage, backup, object-storage and Git-hosting specs in
 that order. Public inputs are source-owned; enrollment is explicit and must not
 reset credentials on each apply. Preserve private client configuration and keys
