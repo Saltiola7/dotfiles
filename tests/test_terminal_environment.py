@@ -26,7 +26,7 @@ def text(path):
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
     config = text(".chezmoi.toml.tmpl")
-    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy)" "macbook"' in config
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/fedora-server)" "macbook"' in config
     assert "macbook/mac-mini/lmsh" in config
     assert "atuin_sync_address" in config
     assert '{{ if eq $machineType "mac-mini" }}' in config
@@ -39,12 +39,12 @@ def test_lmsh_profile_is_portable_and_excludes_credentials():
     bashrc = text("dot_bashrc.tmpl")
     for tool in ("atuin", "zoxide", "starship"):
         assert f"command -v {tool}" in bashrc
-    assert '{{ if eq .machine_type "lmsh" -}}' in bashrc
+    assert '{{ if or (eq .machine_type "lmsh") (eq .machine_type "fedora-server") -}}' in bashrc
     assert "[ -t 0 ]" in bashrc
 
     profile = text("dot_common_profile.tmpl")
     assert 'export ATUIN_DATA_DIR="{{ .chezmoi.homeDir }}/.local/share/atuin"' in profile
-    assert '{{ if eq .machine_type "lmsh" -}}' in profile
+    assert '{{ if or (eq .machine_type "lmsh") (eq .machine_type "fedora-server") -}}' in profile
     lmsh, macos = profile.split("{{ else -}}", 1)
     assert "/opt/homebrew" not in lmsh
     assert "ATUIN_DATA_DIR" in lmsh

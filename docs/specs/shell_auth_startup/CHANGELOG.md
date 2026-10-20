@@ -1,5 +1,16 @@
 # Shell Auth Startup Changelog
 
+## 2026-10-19 — Headless Fedora and explicit Pi role
+
+- Added terminal-only Fedora ARM64 package/setup and shell profile, without tmux.
+- Added explicit Pi service-input ownership while keeping private enrollment,
+  desktop applications and hardware settings outside the generic server role.
+- Documented independent dotfiles-ai native Codex ownership, repeat apply,
+  consistent backup, upgrades and offline SSD recovery.
+- Pi deployment repeated cleanly; both sources have disjoint managed leaves,
+  baseline tools and fresh SSH login pass, and native Codex binary/login/sessions
+  remain unchanged. Hosted CI and final delivery remain private cycle evidence.
+
 ## 2026-09-05 - Dual-Source Force Boundary
 
 - Reopened bridge readiness after live deployment found a source-owned AI target

@@ -29,14 +29,14 @@ def test_symlink_data_refused(tmp_path):
     outside=tmp_path/'outside';outside.mkdir();link=tmp_path/'forgejo';link.symlink_to(outside)
     with pytest.raises(ValueError,match='symlink'):load().ordinary(link)
 
-@pytest.mark.parametrize('profile,allowed',[('fedora-server',True),('mac-mini',False),('macbook',False),('omarchy',False)])
-def test_managed_forgejo_targets_and_runtime_isolation(tmp_path,profile,allowed):
+@pytest.mark.parametrize('profile,target,allowed',[('fedora-server','pi400',True),('fedora-server','',False),('mac-mini','',False),('macbook','',False),('omarchy','',False)])
+def test_managed_forgejo_targets_and_runtime_isolation(tmp_path,profile,target,allowed):
     import shutil,json,subprocess
     source=tmp_path/'source';source.mkdir()
     for relative in ['.chezmoiignore','dot_local/bin/executable_pi-forgejo-setup','dot_local/bin/executable_pi-forgejo-check','private_dot_config/homelab-git-hosting/forgejo.service','private_dot_config/homelab-git-hosting/release.json']:
         dst=source/relative;dst.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(ROOT/relative,dst)
     runtime=source/'dot_local/share/forgejo/private/app.ini';runtime.parent.mkdir(parents=True);runtime.write_text('synthetic runtime secret')
-    r=subprocess.run(['chezmoi','--source',str(source),'--config','/dev/null','--config-format','toml','--override-data',json.dumps({'machine_type':profile}),'--persistent-state',str(tmp_path/'state.db'),'managed','--include','files'],capture_output=True,text=True)
+    r=subprocess.run(['chezmoi','--source',str(source),'--config','/dev/null','--config-format','toml','--override-data',json.dumps({'machine_type':profile,'homelab_target':target}),'--persistent-state',str(tmp_path/'state.db'),'managed','--include','files'],capture_output=True,text=True)
     assert r.returncode==0,r.stderr
     targets=set(r.stdout.splitlines())
     assert ('.local/bin/pi-forgejo-setup' in targets)==allowed

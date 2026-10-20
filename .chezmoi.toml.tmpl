@@ -1,6 +1,6 @@
 {{- $name := promptStringOnce . "name" "Your full name" "" -}}
 {{- $email := promptStringOnce . "email" "Your email address" "" -}}
-{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy)" "macbook" -}}
+{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/fedora-server)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
 sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}{{ .chezmoi.sourceDir | quote }}{{ end }}
@@ -23,3 +23,6 @@ encryption = "age"
     synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
 {{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
+{{ if eq $machineType "fedora-server" }}
+    homelab_target = {{ default "" (get . "homelab_target") | quote }}
+{{ end }}
