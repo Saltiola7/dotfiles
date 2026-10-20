@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kitty
+Comment=Open Kitty at desktop login
+Exec=kitty
+TryExec=kitty
+Icon=kitty
+Terminal=false
+StartupNotify=true

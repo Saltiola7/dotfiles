@@ -245,3 +245,12 @@ Shared/Backup-Recovery/
 .local/lib/pi-bootstrap/
 .config/pi-bootstrap/
 {{ end }}
+
+# Open the primary remote desk applications at Omarchy desktop login.
+{{ if eq .machine_type "omarchy" }}
+!.config/autostart/chatgpt.desktop
+!.config/autostart/kitty.desktop
+{{ else }}
+.config/autostart/chatgpt.desktop
+.config/autostart/kitty.desktop
+{{ end }}

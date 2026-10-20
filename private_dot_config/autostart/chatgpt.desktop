@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ChatGPT
+Comment=Open ChatGPT at desktop login
+Exec=chatgpt
+TryExec=chatgpt
+Icon=chatgpt
+Terminal=false
+StartupNotify=true

@@ -105,6 +105,14 @@ The Omarchy `.bashrc` preserves the packaged shell integrations and routes
 Codex, OpenCode, Herdr and Worktrunk to their user-local managed commands,
 including after Mise updates PATH. Open a new terminal after applying it.
 
+### Desktop login applications
+
+The `omarchy` profile manages XDG autostart entries for ChatGPT and Kitty under
+`~/.config/autostart/`. The desktop opens each installed application at login
+using its normal launcher. `TryExec` skips an application if it is unavailable.
+These entries use the existing graphical session startup and are excluded from
+other machine profiles.
+
 ### Input-sharing experiment
 
 Run `omarchy-desk-setup input` in a terminal to install `synergy3-bin` and
@@ -177,7 +185,7 @@ chezmoi apply --error-on-conflict --parent-dirs --include=dirs,files,scripts --s
 
 Verify a fresh `checked-no-deadlock context=launchd` status with a current
 timestamp and core identity. A successful Terminal-only sample does not verify
-LaunchAgent sampling permissions. A laptop reboot, fresh Mac desktop login,
+LaunchAgent sampling permissions. Fresh Mac desktop login,
 intentional app quit, sleep/wake, and automatic recovery from another actual
 deadlock still require runtime validation.
 
@@ -189,6 +197,9 @@ and the scoped chezmoi diff was empty. These Mac changes merged in
 A controlled restart of Linux release `0.0.17-4` also passed a 45.237-second
 observation with continuing traffic in both directions. The user confirmed
 pointer movement, typing and text clipboard in both directions afterward.
+The subsequent laptop reboot also passed: Waynergy started automatically with
+the graphical session, connected to the Mac, and maintained 45.263 seconds of
+bidirectional traffic with zero restarts. The user confirmed input worked.
 
 The default is enabled for `mac-mini`. Set `synergy_recovery_enabled = false`
 under `[data]` in this Mac's chezmoi configuration and apply the same selection
