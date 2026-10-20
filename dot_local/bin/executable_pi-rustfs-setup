@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+"""Explicit private RustFS installation; never emit credentials."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import secrets
+import shutil
+import subprocess
+import sys
+import zipfile
+
+VERSION = "1.0.1"
+SHA256 = "1dcfb6ae59702b8e90394157e57450ed219515a1cc63525f730d4e120e9be7b9"
+
+
+def ordinary_path(path: Path) -> None:
+    for candidate in (path, *path.parents):
+        if candidate.is_symlink():
+            raise ValueError("Refusing symlink storage path")
+
+
+def verify_archive(path: Path) -> None:
+    ordinary_path(path)
+    with path.open("rb") as stream:
+        if hashlib.file_digest(stream, "sha256").hexdigest() != SHA256:
+            raise ValueError("Release checksum mismatch")
+
+
+def secret_file(path: Path) -> None:
+    ordinary_path(path)
+    if path.exists():
+        if not path.is_file() or path.stat().st_mode & 0o077 or path.stat().st_uid != os.getuid():
+            raise ValueError("Existing credential is not owner-private")
+        return
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w") as stream:
+        stream.write(secrets.token_hex(24) + "\n")
+
+
+def run(*args: str) -> None:
+    subprocess.run(args, check=True)
+
+
+def install(archive: Path, source: Path, home: Path) -> None:
+    if os.getuid() == 0 or platform.system() != "Linux" or platform.machine() != "aarch64":
+        raise ValueError("Requires non-root Fedora ARM64 owner")
+    if 'ID=fedora' not in Path("/etc/os-release").read_text():
+        raise ValueError("Requires Fedora")
+    verify_archive(archive)
+    ordinary_path(source)
+    data = home / ".local/share/rustfs"
+    binary = home / ".local/bin/rustfs"
+    for path in (data, binary, home / ".config/systemd/user/rustfs.service"):
+        ordinary_path(path)
+    if shutil.disk_usage(home).free < 20 * 1024**3:
+        raise ValueError("Insufficient disk headroom")
+    if binary.exists():
+        version = subprocess.check_output([str(binary), "--version"], text=True)
+        if not version.startswith("rustfs " + VERSION + "\n"):
+            raise ValueError("Refusing to replace an unknown RustFS binary")
+    route = json.loads(subprocess.check_output(["tailscale", "serve", "status", "--json"]))
+    mapping = route.get("TCP", {}).get("9000")
+    if mapping and mapping.get("TCPForward") != "127.0.0.1:9000":
+        raise ValueError("Refusing an incompatible Serve route")
+    unit = home / ".config/systemd/user/rustfs.service"
+    unit.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    content = (source / "rustfs.service").read_bytes()
+    if unit.exists() and unit.read_bytes() != content:
+        legacy = content.replace(b"--console-address 127.0.0.1:9001 ", b"")
+        if unit.read_bytes() != legacy:
+            raise ValueError("Existing service differs; review before replacing")
+        backup = home / ".local/state/homelab-object-storage/backups"
+        ordinary_path(backup)
+        backup.mkdir(parents=True, exist_ok=True, mode=0o700)
+        (backup / ("rustfs.service-" + secrets.token_hex(8))).write_bytes(legacy)
+    for path in (data, data / "data", data / "private", binary.parent):
+        path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    for name in ("access-key", "secret-key"):
+        secret_file(data / "private" / name)
+    candidate = binary.with_name(".rustfs.new")
+    if candidate.exists():
+        raise ValueError("Existing installation candidate must be reviewed")
+    with zipfile.ZipFile(archive) as bundle:
+        payload = bundle.getinfo("rustfs")
+        if payload.file_size > 512 * 1024**2:
+            raise ValueError("Unexpected binary size")
+        with bundle.open(payload) as src, candidate.open("xb") as dst:
+            shutil.copyfileobj(src, dst)
+    candidate.chmod(0o700)
+    candidate.replace(binary)
+    unit.write_bytes(content)
+    unit.chmod(0o600)
+    run("systemd-analyze", "--user", "verify", str(unit))
+    run("systemctl", "--user", "daemon-reload")
+    run("systemctl", "--user", "enable", "--now", "rustfs.service")
+    run("systemctl", "--user", "restart", "rustfs.service")
+    run("systemctl", "--user", "is-active", "rustfs.service")
+    if not mapping:
+        run("sudo", "tailscale", "serve", "--bg", "--tcp=9000", "tcp://127.0.0.1:9000")
+    print("RustFS installed; credentials retained privately. Functional checks remain required.")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", choices=("plan", "install"))
+    parser.add_argument("--archive", type=Path, default=Path.home() / ".local/state/homelab-object-storage/staging/rustfs-1.0.1.zip")
+    parser.add_argument("--source", type=Path, default=Path.home() / ".config/homelab-object-storage")
+    args = parser.parse_args()
+    os.umask(0o077)
+    if args.action == "plan":
+        verify_archive(args.archive)
+        print("Verified RustFS 1.0.1 ARM64; private S3, separate object data, 2GiB/one CPU limits.")
+    else:
+        install(args.archive, args.source, Path.home())
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, OSError, subprocess.CalledProcessError) as error:
+        print(f"RustFS setup failed: {error}", file=sys.stderr)
+        sys.exit(1)

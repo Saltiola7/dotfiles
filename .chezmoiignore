@@ -119,6 +119,14 @@ Library/LaunchAgents/com.mgm.aws-sso-login.plist
 .local/bin/aws-sso-refresh
 .local/bin/fedora-parallels
 {{ end }}
+{{ if or (ne .chezmoi.os "darwin") (ne .machine_type "mac-mini") }}
+.config/synergy-recovery/
+Library/LaunchAgents/dev.dotfiles.synergy-login.plist
+Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist
+.local/bin/synergy-recovery
+.local/bin/synergy-setup
+load-synergy-launchagents.sh
+{{ end }}
 {{ if ne .machine_type "fedora-workstation" }}
 .config/sway/
 .config/waybar/
@@ -197,6 +205,39 @@ graphify-out/
 # Backup secrets and recovery material are private runtime state.
 .config/omarchy-backup/
 Shared/Backup-Recovery/
+.config/homelab-backup/client.json
+.config/homelab-backup/destination.json
+.config/homelab-backup/recovery/
+.config/homelab-backup/passphrase
+.config/homelab-backup/identity/
+
+{{ if and (ne .machine_type "fedora-server") (ne .machine_type "mac-mini") }}
+.config/homelab-backup/
+.local/bin/homelab-backup
+{{ end }}
+{{ if ne .machine_type "mac-mini" }}
+.local/bin/homelab-borg-serve
+{{ end }}
+
+{{ if ne .machine_type "fedora-server" }}
+.config/homelab-file-storage/
+.local/bin/pi-samba-setup
+.local/bin/pi-samba-check
+.local/bin/pi-rustfs-setup
+.config/homelab-object-storage/rustfs.service
+.config/homelab-object-storage/release.json
+{{ end }}
+
+{{ if and (ne .machine_type "fedora-server") (ne .machine_type "mac-mini") }}
+.local/bin/pi-rustfs-check
+.local/bin/pi-rustfs-client-setup
+.local/bin/pi400-dvc
+.config/homelab-object-storage/
+{{ end }}
+
+# Runtime object data and authentication are not provisioning source.
+.local/share/rustfs/
+.config/homelab-object-storage/client.json
 
 # Image preparation belongs to macOS administration profiles only.
 {{ if and (ne .machine_type "mac-mini") (ne .machine_type "macbook") }}

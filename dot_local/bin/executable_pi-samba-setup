@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# Explicit owner-run provisioning; secrets are entered only into sudo/smbpasswd.
+set -euo pipefail
+mode=plan
+share_home="$HOME"
+source_dir="${XDG_CONFIG_HOME:-$HOME/.config}/homelab-file-storage"
+while (($#)); do
+  case "$1" in
+    --plan) mode=plan; shift ;;
+    --configure) mode=configure; shift ;;
+    --home) [[ $# -ge 2 ]] || exit 2; share_home="$2"; shift 2 ;;
+    --source) [[ $# -ge 2 ]] || exit 2; source_dir="$2"; shift 2 ;;
+    *) printf 'Unknown option: %s\n' "$1" >&2; exit 2 ;;
+  esac
+done
+[[ -d "$share_home" && ! -L "$share_home" ]] || { echo 'Home must be an existing ordinary directory.' >&2; exit 1; }
+[[ ! -L "$share_home/Shared" ]] || { echo 'Refusing symlink share.' >&2; exit 1; }
+[[ ! -e "$share_home/Shared" || -d "$share_home/Shared" ]] || { echo 'Share path is not a directory.' >&2; exit 1; }
+printf 'Plan: owner-only Shared folder, loopback SMB through tailscale0:445 via Tailscale Serve, SELinux enforcing; preserve existing data.\n'
+[[ "$mode" == configure ]] || exit 0
+[[ "$share_home" == "$HOME" && "$EUID" -ne 0 ]] || { echo 'Run as the intended owner using the real home.' >&2; exit 1; }
+. /etc/os-release
+[[ "$ID" == fedora && "$(uname -m)" == aarch64 ]] || { echo 'Requires Fedora ARM64.' >&2; exit 1; }
+owner="$(id -un)"
+[[ "$owner" =~ ^[a-z_][a-z0-9_-]*$ ]] || exit 1
+[[ "$share_home" =~ ^/home/[a-z_][a-z0-9_-]*$ ]] || { echo 'Unexpected home path.' >&2; exit 1; }
+[[ "$(getenforce)" == Enforcing ]] || { echo 'Requires SELinux enforcing.' >&2; exit 1; }
+[[ -e /sys/class/net/tailscale0 ]] || { echo 'Tailscale interface missing.' >&2; exit 1; }
+for name in testparm semanage restorecon smbpasswd pdbedit tailscale python3; do command -v "$name" >/dev/null; done
+tailscale serve status --json | python3 -c '
+import json,sys
+d=json.load(sys.stdin)
+route=d.get("TCP",{}).get("445")
+if route and route.get("TCPForward") != "127.0.0.1:445":
+    sys.exit("Refusing to replace existing Tailscale TCP 445 route")
+'
+for file in smb.conf tailscale.conf; do
+  [[ -f "$source_dir/$file" && ! -L "$source_dir/$file" ]] || exit 1
+done
+[[ ! -e "$share_home/Shared" || "$(stat -c %u "$share_home/Shared")" == "$UID" ]] || { echo 'Existing share has different owner.' >&2; exit 1; }
+stage="$(mktemp -d)"
+trap 'rm -rf -- "$stage"' EXIT
+sed -e "s|@HOME@|$share_home|g" -e "s|@OWNER@|$owner|g" "$source_dir/smb.conf" > "$stage/smb.conf"
+testparm -s "$stage/smb.conf" >/dev/null
+sudo -v
+if [[ ! -d "$share_home/Shared" ]]; then mkdir -m 0700 "$share_home/Shared"; fi
+backup="/var/lib/homelab-file-storage/backups/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+sudo install -d -m 0700 "$backup"
+if sudo test -e /etc/samba/smb.conf; then sudo cp -a /etc/samba/smb.conf "$backup/smb.conf"; fi
+if sudo test -e /etc/systemd/system/smb.service.d/tailscale.conf; then
+  sudo cp -a /etc/systemd/system/smb.service.d/tailscale.conf "$backup/tailscale.conf"
+fi
+# A missing exact mapping is added; an existing mapping is modified idempotently.
+rule="$share_home/Shared(/.*)?"
+if sudo semanage fcontext -l -C | awk '{print $1}' | grep -Fxq "$rule"; then
+  sudo semanage fcontext -m -t samba_share_t "$rule"
+else
+  sudo semanage fcontext -a -t samba_share_t "$rule"
+fi
+sudo restorecon -R "$share_home/Shared"
+sudo install -m 0644 "$stage/smb.conf" /etc/samba/smb.conf
+sudo install -d -m 0755 /etc/systemd/system/smb.service.d
+sudo install -m 0644 "$source_dir/tailscale.conf" /etc/systemd/system/smb.service.d/tailscale.conf
+sudo testparm -s /etc/samba/smb.conf >/dev/null
+if ! sudo pdbedit -L | cut -d: -f1 | grep -Fxq "$owner"; then
+  printf 'Enter a separate SMB password privately; do not send it in chat.\n'
+  sudo smbpasswd -a "$owner"
+fi
+sudo systemctl daemon-reload
+sudo systemctl enable --now smb.service
+sudo systemctl restart smb.service
+sleep 2
+sudo systemctl is-active smb.service
+sudo tailscale serve --bg --tcp=445 tcp://127.0.0.1:445
+printf 'Configuration backup: %s\nAuthenticated client checks remain required.\n' "$backup"

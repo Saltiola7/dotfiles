@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# Owner enters SMB credentials privately; only an isolated test file is touched.
+set -euo pipefail
+stage="$(mktemp -d)"
+trap 'rm -rf -- "$stage"' EXIT
+name=".pi-samba-check-$(basename "$stage").txt"
+printf 'Pi Samba roundtrip %s\n' "$name" > "$stage/source"
+address="$(tailscale ip -4)"
+owner="$(id -un)"
+smbclient "//$address/Shared" -U "$owner" -c "put $stage/source $name; get $name $stage/restored; del $name"
+cmp "$stage/source" "$stage/restored"
+test ! -e "$HOME/Shared/$name"
+echo 'Authenticated SMB upload/download matched; isolated test file removed.'
