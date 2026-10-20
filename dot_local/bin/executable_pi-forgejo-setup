@@ -8,13 +8,16 @@ import lzma
 import os
 from pathlib import Path
 import platform
+import re
 import secrets
 import shutil
 import socket
+import ssl
 import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 
 VERSION='15.0.10'
 BINARY_SHA='be06bb887bef8a7901c6bdcea36023e55429ef7582a2797711b878a3af602e69'
@@ -148,25 +151,74 @@ def fetch(binary: Path) -> None:
     print('Pinned signature-verified release identity fetched privately')
 
 
+class HttpsReadinessError(ValueError):
+    """Safe readiness failure; no private provider response or URL in output."""
+
+
+class NoHttpsRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise HttpsReadinessError('HTTPS readiness failed: redirects are not allowed.')
+
+
+def https_check() -> None:
+    """Check trusted tailnet HTTPS once, without changing routes or reading secrets."""
+    try:
+        state=json.loads(subprocess.check_output(['tailscale','status','--json'],stderr=subprocess.DEVNULL,timeout=10))
+        domain=state['Self']['DNSName']
+        if not isinstance(domain,str): raise ValueError('Invalid node name')
+        domain=domain.removesuffix('.')
+        label=r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?'
+        if len(domain)>253 or not re.fullmatch(label+r'\.'+label+r'\.ts\.net',domain):
+            raise ValueError('Invalid node name')
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),
+            urllib.request.HTTPSHandler(context=ssl.create_default_context()),NoHttpsRedirect())
+        base='https://'+domain
+        for path,kind in (('/api/healthz','health'),('/user/login','login'),('/api/v1/user','denied')):
+            try:
+                with opener.open(base+path,timeout=10) as response:
+                    if kind=='denied' or response.status!=200: raise ValueError('Unexpected HTTP status')
+                    body=response.read(65537)
+                    if len(body)>65536: raise ValueError('Oversized readiness response')
+                    content_type=response.headers.get('Content-Type','').split(';')[0].strip().lower()
+                    if kind=='health':
+                        value=json.loads(body)
+                        if content_type!='application/json' or not isinstance(value,dict) or value.get('status')!='pass':
+                            raise ValueError('Unhealthy application')
+                    elif content_type!='text/html' or not body: raise ValueError('Login page unavailable')
+            except urllib.error.HTTPError as error:
+                error.close()
+                if kind!='denied' or error.code not in (401,403): raise
+    except (ValueError,OSError,KeyError,TypeError,subprocess.SubprocessError):
+        raise HttpsReadinessError('HTTPS readiness failed. Keep TLS verification enabled; inspect private Forgejo/Tailscale logs and retry once after provider recovery.') from None
+    print('Trusted HTTPS health/login passed; anonymous user API denied. Owner first login remains separate.')
+
+
+def network() -> None:
+    route=json.loads(subprocess.check_output(['tailscale','serve','status','--json']))
+    mapping=route.get('TCP',{}).get('2222')
+    if mapping and mapping.get('TCPForward')!='127.0.0.1:2222':raise ValueError('Conflicting Git route')
+    existing=route.get('Web',{})
+    if existing and not all(v.get('Handlers',{}).get('/',{}).get('Proxy')=='http://127.0.0.1:3000' for v in existing.values()):raise ValueError('Existing web forwarding requires review')
+    run('sudo','tailscale','serve','--bg','--https=443','http://127.0.0.1:3000')
+    if not mapping:run('sudo','tailscale','serve','--bg','--tcp=2222','tcp://127.0.0.1:2222')
+    https_check()
+
+
 def main() -> None:
     os.umask(0o077)
-    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('plan','fetch','install','network'))
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=('plan','fetch','install','network','https-check'))
     parser.add_argument('--binary',type=Path,default=Path.home()/'.local/state/homelab-git-hosting/staging/forgejo-15.0.10')
     parser.add_argument('--source',type=Path,default=Path.home()/'.config/homelab-git-hosting');args=parser.parse_args()
     if args.action=='fetch':fetch(args.binary)
     elif args.action=='plan':verify_binary(args.binary);print('Verified Forgejo ARM64 LTS; SQLite, private web/Git, one CPU/768MiB cap; no writes.')
     elif args.action=='install':install(args.binary,args.source)
-    else:
-        route=json.loads(subprocess.check_output(['tailscale','serve','status','--json']))
-        mapping=route.get('TCP',{}).get('2222')
-        if mapping and mapping.get('TCPForward')!='127.0.0.1:2222':raise ValueError('Conflicting Git route')
-        existing=route.get('Web',{})
-        if existing and not all(v.get('Handlers',{}).get('/',{}).get('Proxy')=='http://127.0.0.1:3000' for v in existing.values()):raise ValueError('Existing web forwarding requires review')
-        run('sudo','tailscale','serve','--bg','--https=443','http://127.0.0.1:3000')
-        if not mapping:run('sudo','tailscale','serve','--bg','--tcp=2222','tcp://127.0.0.1:2222')
+    elif args.action=='https-check':https_check()
+    else:network()
 
 
 if __name__=='__main__':
     try:main()
+    except HttpsReadinessError as error:
+        print(str(error),file=sys.stderr);sys.exit(1)
     except (ValueError,OSError,subprocess.CalledProcessError):
         print('Forgejo setup failed; prerequisites or private state need review. No credentials displayed.',file=sys.stderr);sys.exit(1)
