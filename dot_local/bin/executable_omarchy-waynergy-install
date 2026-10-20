@@ -17,7 +17,10 @@ build_root="${XDG_CACHE_HOME:-$HOME/.cache}/omarchy-waynergy"
 mkdir -p "$build_root"
 build_dir=$(mktemp -d "$build_root/build.XXXXXX")
 trap 'rm -rf -- "$build_dir"' EXIT
-cp "$recipe/PKGBUILD" "$recipe/close-config-files.patch" "$recipe/config-fd-test.c" "$build_dir/"
+cp "$recipe/PKGBUILD" "$recipe/close-config-files.patch" \
+  "$recipe/fatal-timeouts.patch" "$recipe/tls-handshake.patch" "$recipe/config-fd-test.c" \
+  "$recipe/network-recovery-test.c" "$recipe/clipboard-handshake.patch" \
+  "$recipe/clipboard-handshake-test.c" "$build_dir/"
 cd "$build_dir"
 makepkg --cleanbuild --noconfirm
 package_path=$(makepkg --packagelist)

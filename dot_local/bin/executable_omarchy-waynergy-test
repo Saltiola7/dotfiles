@@ -19,6 +19,6 @@ if [[ -f "$paired_cert" && ! -e "$cert_dir/cert" ]]; then
   mkdir -p "$cert_dir"
   ln -s "$paired_cert" "$cert_dir/cert"
 fi
-# Exit on a stalled connection so systemd replaces the client and its clipboard
-# helpers instead of reusing a possibly damaged connection state.
+# The managed package classifies poll, idle and TLS handshake timeouts as fatal,
+# so systemd replaces the client and clipboard helpers after its five-second delay.
 exec waynergy --host "$1" --backend wlr --enable-crypto --enable-tofu --loglevel info --fatal-timeout
