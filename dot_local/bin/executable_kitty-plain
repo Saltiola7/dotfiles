@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Keep Kitty's native shell selection and explicit command arguments.
+exec /usr/bin/kitty --override shell=. "$@"

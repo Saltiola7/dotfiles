@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Start the default Herdr server without replacing an existing session."""
+
+import errno
+import os
+from pathlib import Path
+import socket
+import sys
+import time
+
+
+def listening(path):
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+        connection.settimeout(0.5)
+        try:
+            connection.connect(str(path))
+        except OSError as error:
+            if error.errno in (errno.ENOENT, errno.ECONNREFUSED):
+                return False
+            raise
+    return True
+
+
+def main():
+    # No API requests, pane inspection, or session mutations: transport probes only.
+    directory = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "herdr"
+    api = directory / "herdr.sock"
+    client = directory / "herdr-client.sock"
+    if sys.argv[1:] == ["--check-not-running"]:
+        # ExecCondition exit 1 skips the unit and preserves an unmanaged server.
+        return 1 if listening(api) else 0
+    if sys.argv[1:] == ["--wait-ready"]:
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            try:
+                # The client socket is created after session restoration. Avoid
+                # filling the API listener's backlog while it is still loading.
+                if listening(client) and listening(api):
+                    return 0
+            except (TimeoutError, BlockingIOError):
+                pass
+            time.sleep(0.05)
+        print("Herdr did not create its listening sockets within sixty seconds", file=sys.stderr)
+        return 1
+    if sys.argv[1:]:
+        print("Usage: omarchy-herdr-server [--check-not-running|--wait-ready]", file=sys.stderr)
+        return 2
+    for binary in (Path.home() / ".local/bin/herdr", Path("/usr/bin/herdr")):
+        if os.access(binary, os.X_OK):
+            os.execv(str(binary), [str(binary), "server"])
+    print("Herdr is not installed; install it before starting herdr.service", file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -53,6 +53,10 @@ map cmd+alt+. layout_action rotate
 map cmd+alt+, layout_action rotate 180
 
 {{ if eq .machine_type "omarchy" -}}
+# Default launches attach to Herdr; explicit commands still run directly.
+shell "$HOME/.local/bin/omarchy-herdr-shell"
+# Ctrl+Shift+Alt+Enter opens a plain shell pane beside Herdr.
+map kitty_mod+alt+enter launch --type=window --cwd=current /usr/bin/bash
 # Mac muscle memory when using the Mac keyboard through Waynergy.
 map super+t new_tab_with_cwd
 map super+n new_os_window_with_cwd

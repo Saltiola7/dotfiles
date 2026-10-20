@@ -9,8 +9,21 @@ Shared input is working with installed Linux release `waynergy-omarchy 0.0.17-4`
 After the Mac deployment, a controlled Linux client restart passed a
 45.237-second observation with continuing traffic in both directions. The user
 confirmed pointer movement, typing and text clipboard in both directions.
-A laptop reboot, fresh Mac desktop login, sleep/wake, deliberate app quit and
+The subsequent laptop reboot passed automatic Waynergy startup and reconnection,
+with 45.263 seconds of bidirectional traffic and zero service restarts. The user
+confirmed input worked after login. Fresh Mac desktop login, sleep/wake, deliberate app quit and
 automatic recovery from another actual deadlock remain unverified.
+
+The Omarchy profile also manages ChatGPT and Kitty desktop-login startup through
+`~/.config/autostart/chatgpt.desktop` and `kitty.desktop`. Each uses its installed
+launcher, and `TryExec` skips an unavailable app. These entries are excluded from
+other profiles.
+
+Herdr starts as a separate user service, and normal Kitty launches attach to it.
+`kitty-plain` or the **Kitty (Plain)** application opens a direct shell;
+**Ctrl+Shift+Alt+Enter** opens a direct Kitty pane. Existing servers are preserved.
+These additions still need a fresh login check; current-session deployment and
+targeted launcher/service validation are recorded in the pull request.
 
 The Linux service retries connections and starts a fresh client five seconds
 after a fatal timeout or process exit. Release 4 consistently classifies polling,

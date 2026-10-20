@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Kitty (Plain)
+Comment=Open a shell directly without Herdr
+Exec=kitty-plain
+TryExec=kitty
+Icon=kitty
+Terminal=false
+StartupNotify=true
+Categories=System;TerminalEmulator;

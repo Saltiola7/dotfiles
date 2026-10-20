@@ -1,0 +1,22 @@
+[Unit]
+Description=Persistent Herdr terminal server
+After=graphical-session.target
+ConditionFileIsExecutable=|%h/.local/bin/herdr
+ConditionFileIsExecutable=|/usr/bin/herdr
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=exec
+UnsetEnvironment=HERDR_ENV HERDR_SESSION HERDR_SOCKET_PATH HERDR_CLIENT_SOCKET_PATH HERDR_CONFIG_PATH
+ExecCondition=%h/.local/bin/omarchy-herdr-server --check-not-running
+ExecStart=%h/.local/bin/omarchy-herdr-server
+ExecStartPost=%h/.local/bin/omarchy-herdr-server --wait-ready
+WorkingDirectory=%h
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=75
+TimeoutStopSec=15
+
+[Install]
+WantedBy=graphical-session.target
