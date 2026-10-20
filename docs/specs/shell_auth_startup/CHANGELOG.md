@@ -7,7 +7,9 @@
   desktop applications and hardware settings outside the generic server role.
 - Documented independent dotfiles-ai native Codex ownership, repeat apply,
   consistent backup, upgrades and offline SSD recovery.
-- Deployment and hosted CI outcomes remain in the private cycle evidence.
+- Pi deployment repeated cleanly; both sources have disjoint managed leaves,
+  baseline tools and fresh SSH login pass, and native Codex binary/login/sessions
+  remain unchanged. Hosted CI and final delivery remain private cycle evidence.
 
 ## 2026-09-05 - Dual-Source Force Boundary
 

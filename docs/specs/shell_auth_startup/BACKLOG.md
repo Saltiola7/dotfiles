@@ -8,6 +8,7 @@ None.
 
 | id | outcome | completed | commit |
 | --- | --- | --- | --- |
+| FEDORA-SERVER-001 | Explicit headless Fedora terminal profile and Pi service-input role; separate native AI ownership | 2026-10-19 | `f35b541`, `8f17ac3` |
 | AUTH-020-transfer-opencode-package-ownership | Delegated the OpenCode CLI formula to dotfiles-ai while preserving the desktop cask and local wrapper precedence | 2026-08-27 | `080e64f`, `25bcdfa` |
 | AUTH-019-yazi-terminal-file-manager | Installed Yazi with portable cwd wrappers, pinned Fedora arm64 binaries, and locked Catppuccin Mocha on both Macs and both managed guests | 2026-08-26 | `5a4a345`, `9aa14a9` |
 | AUTH-018-marimo-theme-source-root | Made the Mac mini external checkout authoritative, preserved the retired home clone's unique work, and applied pinned Catppuccin Mocha to marimo | 2026-08-26 | `03ad052`, `65a8283`, `59b9066` |
