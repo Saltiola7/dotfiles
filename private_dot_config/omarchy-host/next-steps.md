@@ -5,29 +5,48 @@ private files, or an actual remote-control test.
 
 ## Keyboard and Synergy
 
-Fully quit and reopen Synergy on the Mac if Omarchy stops responding. The Linux
-Waynergy service reconnects automatically and starts a fresh client five seconds
-after a fatal timeout or process exit. The launcher starts this managed service
-instead of a second client; the helper also refuses concurrent instances.
-It has recently connected and then
-timed out waiting for traffic; subsequent TLS handshakes were reset by the Mac.
-Restarting the Mac application restored access previously. This remains an
-unresolved reliability problem, so don't treat the desktop trial as complete.
-An additional local fault was confirmed: the stock Waynergy 0.0.17 configuration
-readers leaked open fingerprint files until the process exhausted its descriptor
-limit. The managed `waynergy-omarchy` package closes those files. Its build checks
-20,000 reads under a 256-descriptor limit; the unpatched build fails this test.
-Rebuild/install with `omarchy-waynergy-install` in Kitty. The pinned source,
-checksums, patch, package recipe and regression test are managed by chezmoi.
-The package provides Waynergy and replaces the unpatched AUR package.
+Shared input is working with installed Linux release `waynergy-omarchy 0.0.17-4`.
+After the Mac deployment, a controlled Linux client restart passed a
+45.237-second observation with continuing traffic in both directions. The user
+confirmed pointer movement, typing and text clipboard in both directions.
+A laptop reboot, fresh Mac desktop login, sleep/wake, deliberate app quit and
+automatic recovery from another actual deadlock remain unverified.
 
-Mac-side automatic recovery still needs setup on the Mac. Confirm Synergy's
-login/background settings, then use its connection logs to distinguish a stopped
-server from one that is running but rejecting reconnections. A LaunchAgent could
-restart the affected Synergy component after sustained failures, with a cooldown
-and saved diagnostic logs. It must not restart merely because Omarchy is asleep,
-offline, or logged out. A process-existence or open-port check alone cannot detect
-the TLS-reset failure observed here. Keep TLS encryption enabled.
+The Linux service retries connections and starts a fresh client five seconds
+after a fatal timeout or process exit. Release 4 consistently classifies polling,
+idle-traffic and TLS handshake timeouts for `--fatal-timeout`, retains the existing
+ten-second deadline, retries temporary TLS readiness results, and cancels pending
+alarms before restart. Clipboard commands wait for initial `CIAK` while retaining
+queued text; geometry waits for the greeting, and reconnects reset protocol state.
+The launcher uses this managed service, and the helper refuses concurrent clients.
+
+Investigation confirmed two separate defects: stock Waynergy could send
+clipboard or geometry messages before handshake completion, and the Mac's
+Synergy 3.8.4 core deadlocked during TLS cleanup. Its sampled threads waited in
+`freeSSL -> removeSocket` and `secureWrite` on the TLS mutex, matching
+[Deskflow #10121](https://github.com/deskflow/deskflow/issues/10121).
+Linux retries cannot release that server lock. The Linux handshake fix removes
+a reproduced protocol violation; it does not change the Mac server's lock ordering.
+Keep TLS enabled.
+
+The package also retains the fix for fingerprint-file descriptor leaks. Its
+checks exercise 20,000 configuration reads under a 256-descriptor limit, ten
+network recovery cases and five handshake ordering cases. Chezmoi manages the
+source pin, checksums, patches, recipe, installer and regression tests.
+Rebuild/install in Kitty with `omarchy-waynergy-install`; use `--build-only` to
+verify without installing. The package replaces the unpatched AUR Waynergy.
+
+Mac recovery is deployed through the `mac-mini` chezmoi profile, merged in
+[PR #42](https://github.com/Saltiola7/dotfiles/pull/42) as `fe9f1f4`.
+All 58 tests passed on the Mac, both Aqua LaunchAgents loaded, and the scheduled
+background sample at 17:58:01 local reported
+`checked-no-deadlock context=launchd`; the scoped chezmoi diff was empty.
+The login job opens Synergy once; the recovery job requires two matching samples
+of the same owned core before signaling it, with a five-minute cooldown.
+Synergy's native service replaces the core. An offline Linux client is not a
+recovery trigger. Inspect `~/.local/bin/synergy-setup status`; declarative opt-out
+is `[data].synergy_recovery_enabled = false` followed by chezmoi apply.
+The SMB transfer is complete and is not a runtime dependency.
 
 Test your ZSA's @ key in a ChatGPT message field, a Zen text field, and Kitty.
 It should insert @. Test Option+N/E/I/O navigation and Cmd+C/V afterward.

@@ -1,8 +1,8 @@
-# Locally maintained leak fix; pin upstream and keep secrets outside this recipe.
+# Locally maintained fixes; pin upstream and keep secrets outside this recipe.
 pkgname=waynergy-omarchy
 pkgver=0.0.17
-pkgrel=1
-pkgdesc='Waynergy with configuration file descriptor leak fixes'
+pkgrel=4
+pkgdesc='Waynergy with configuration, protocol handshake and timeout recovery fixes'
 arch=('x86_64')
 url='https://github.com/r-c-f/waynergy'
 license=('MIT')
@@ -13,13 +13,22 @@ conflicts=('waynergy')
 optdepends=('wl-clipboard: Clipboard synchronization support')
 options=('!debug')
 source=("waynergy-$pkgver.tar.gz::https://github.com/r-c-f/waynergy/archive/refs/tags/v$pkgver.tar.gz"
-        'close-config-files.patch' 'config-fd-test.c')
+        'close-config-files.patch' 'config-fd-test.c'
+        'fatal-timeouts.patch' 'network-recovery-test.c' 'tls-handshake.patch'
+        'clipboard-handshake.patch' 'clipboard-handshake-test.c')
 sha256sums=('b8b2d12588cabfe161ce21a5cd898f06bdfd55c0106ecd4a26c8628aafeff990'
-            '27ccac341691d4237e8971aee4d3d8e135a4e03f9b5acebc6a48f6c101b4f5e0' '91d287a5499a5ca276b6dc9f182b9588f963163e084d4addf03c094f610c5fb0')
+            '27ccac341691d4237e8971aee4d3d8e135a4e03f9b5acebc6a48f6c101b4f5e0' '91d287a5499a5ca276b6dc9f182b9588f963163e084d4addf03c094f610c5fb0'
+            '3891b9de8cd7e0db2fab48b6cbbda6ac6d8cd0622d2b7b95b21ffae0f788e321'
+            '928712a3b386a4e582b2c15fefb8fe6fe28ec06df933ad72ce109eafab3b1dc7'
+            'cf284e59265e7ab2f37ec4b48b91c24e2806214c74b0f823514da05297c36fdc'
+            '53bad2651f42088f85b8380548d8ecda41c564653511b9b76c734fca4cea0405' 'c8a19d8ffcf57ab0757d5d28619c957b3316c2162f529f03942d76d74a23fe46')
 
 prepare() {
     cd "$srcdir/waynergy-$pkgver"
     patch -Np1 < "$srcdir/close-config-files.patch"
+    patch -Np1 < "$srcdir/fatal-timeouts.patch"
+    patch -Np1 < "$srcdir/tls-handshake.patch"
+    patch -Np1 < "$srcdir/clipboard-handshake.patch"
 }
 
 build() {
@@ -35,6 +44,19 @@ check() {
        "$srcdir/config-fd-test.c" src/config.c src/os.c src/log.c \
        -Wl,--gc-sections -o config-fd-test
     ./config-fd-test
+    # Exercise the real polling, TLS, protocol and signal paths at the unchanged
+    # production timeout, without connecting to the Mac or a compositor.
+    cc -D_GNU_SOURCE -DUSYNERGY_LITTLE_ENDIAN -Iinclude -Ibuild/protocol/libclient_protos.a.p \
+       "$srcdir/network-recovery-test.c" src/net.c src/uSynergy.c src/sig.c \
+       src/ssp.c src/config.c src/os.c src/log.c \
+       -Wl,--wrap=tls_handshake -ltls -lcrypto -o network-recovery-test
+    ./network-recovery-test
+    # Enforce HelloBack/DINF/CIAK before clipboard traffic, using real protocol,
+    # clipboard and polling code with synthetic text over local socketpairs.
+    cc -D_GNU_SOURCE -DUSYNERGY_LITTLE_ENDIAN -Iinclude -Ibuild/protocol/libclient_protos.a.p \
+       "$srcdir/clipboard-handshake-test.c" src/net.c src/clip.c src/uSynergy.c src/sig.c \
+       src/ssp.c src/config.c src/os.c src/log.c -ltls -o clipboard-handshake-test
+    ./clipboard-handshake-test
 }
 
 package() {

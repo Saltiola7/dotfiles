@@ -1,0 +1,83 @@
+--- a/src/net.c
++++ b/src/net.c
+@@ -103,8 +103,18 @@
+ 			logErr("tls_connect error: %s", tls_error(snet_ctx->tls_ctx));
+ 			return false;
+ 		}
+-		if (tls_handshake(snet_ctx->tls_ctx)) {
+-			logErr("tls_handshake error: %s", tls_error(snet_ctx->tls_ctx));
++		int handshake_result = TLS_WANT_POLLIN;
++		do {
++			sigHandleRun();
++			if (sigAlarmTimedOut) break;
++			handshake_result = tls_handshake(snet_ctx->tls_ctx);
++		} while (!sigAlarmTimedOut &&
++			(handshake_result == TLS_WANT_POLLIN || handshake_result == TLS_WANT_POLLOUT));
++		sigHandleRun();
++		if (handshake_result || sigAlarmTimedOut) {
++			const char *error = tls_error(snet_ctx->tls_ctx);
++			logErr("TLS handshake failed (result %d, alarm %d): %s",
++				handshake_result, (int)sigAlarmTimedOut, error ? error : "no TLS error");
+ 			return false;
+ 		}
+ 		if (!(peer_hash = tls_peer_cert_hash(snet_ctx->tls_ctx))) {
+@@ -270,14 +280,32 @@
+ 	alarm(USYNERGY_IDLE_TIMEOUT/1000);
+ 	if (snet_ctx->tls_ctx) {
+ 		do {
++			sigHandleRun();
++			if (sigAlarmTimedOut) {
++				*out_len = -1;
++				break;
++			}
+ 			*out_len = tls_read(snet_ctx->tls_ctx, buf, max_len);
+-		} while (*out_len == TLS_WANT_POLLIN || *out_len == TLS_WANT_POLLOUT);
++		} while (!sigAlarmTimedOut &&
++			(*out_len == TLS_WANT_POLLIN || *out_len == TLS_WANT_POLLOUT));
+ 	} else {
+ 		*out_len = read(snet_ctx->fd, buf, max_len);
+ 	}
++	int read_errno = errno;
+ 	alarm(0);
++	sigHandleRun();
+ 	if (*out_len < 1) {
+-		logErr("Synergy receive timed out");
++		if (snet_ctx->tls_ctx) {
++			/* libtls clears errno; capture its error before tls_close replaces it. */
++			const char *error = tls_error(snet_ctx->tls_ctx);
++			logErr("TLS receive %s (result %d, alarm %d): %s",
++				*out_len == 0 ? "closed by peer" : "failed", *out_len,
++				(int)sigAlarmTimedOut, error ? error : "no TLS error");
++		} else {
++			logErr("Socket receive %s (result %d, alarm %d): %s",
++				*out_len == 0 ? "closed by peer" : "failed", *out_len,
++				(int)sigAlarmTimedOut, *out_len == 0 ? "EOF" : strerror(read_errno));
++		}
+ 		snet_ctx->syn_ctx->m_lastError = USYNERGY_ERROR_TIMEOUT;
+ 		return false;
+ 	}
+@@ -321,8 +349,11 @@
+ 	if (snet_ctx->fd == -1)
+ 		return false;
+ 	if (snet_ctx->tls_ctx) {
+-		if (tls_close(snet_ctx->tls_ctx)) {
+-			logErr("tls_close error: %s", snet_ctx->tls_ctx);
++		int close_result = tls_close(snet_ctx->tls_ctx);
++		if (close_result) {
++			const char *error = tls_error(snet_ctx->tls_ctx);
++			logErr("TLS close failed (result %d): %s",
++				close_result, error ? error : "no TLS error");
+ 		}
+ 		free(snet_ctx->tls_hash);
+ 		snet_ctx->tls_hash = NULL;
+--- a/src/sig.c
++++ b/src/sig.c
+@@ -17,6 +17,8 @@
+ static char **argv_reexec;
+ static void cleanup(enum sigExitStatus status)
+ {
++	/* One-shot alarms survive exec; a fresh process owns its own deadlines. */
++	alarm(0);
+ 	/* stop clipboard monitors */
+ 	for (int i = 0; i < 2; ++i) {
+ 		if (clipMonitorPid[i] != -1) {

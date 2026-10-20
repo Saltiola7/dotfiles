@@ -1,0 +1,75 @@
+--- a/include/sig.h
++++ b/include/sig.h
+@@ -17,6 +17,8 @@
+ 
+ extern volatile sig_atomic_t sigDoExit;
+ extern volatile sig_atomic_t sigDoRestart;
++/* Set by SIGALRM; network code consumes it outside the signal handler. */
++extern volatile sig_atomic_t sigAlarmTimedOut;
+ void Exit(enum sigExitStatus status);
+ void Restart(enum sigExitStatus status);
+ /* exit or restart, for situations like wayland protocol errors beyond our
+--- a/src/sig.c
++++ b/src/sig.c
+@@ -9,6 +9,7 @@
+ 
+ volatile sig_atomic_t sigDoExit = 0;
+ volatile sig_atomic_t sigDoRestart = 0;
++volatile sig_atomic_t sigAlarmTimedOut = 0;
+ extern struct wlContext wlContext;
+ extern uSynergyContext synContext;
+ extern struct synNetContext synNetContext;
+@@ -62,6 +63,7 @@
+ 	int level;
+ 	switch (sig) {
+ 		case SIGALRM:
++			sigAlarmTimedOut = 1;
+ 			logOutSig(LOG_ERR, "Alarm timeout encountered -- probably disconnecting");
+ 			break;
+ 		case SIGTERM:
+--- a/src/net.c
++++ b/src/net.c
+@@ -156,9 +156,19 @@
+ 	synNetDisconnect(snet_ctx);
+ 	for (h = hostinfo; h; h = h->ai_next) {
+ 		/* catch connection timeouts */
++		sigAlarmTimedOut = 0;
+ 		alarm(USYNERGY_IDLE_TIMEOUT/1000);
+ 		ret = syn_connect_setup(snet_ctx, h);
+ 		alarm(0);
++
++		if (sigAlarmTimedOut) {
++			/* A stalled TCP/TLS setup must reach the same fatal-timeout
++			 * check as a failed receive, rather than retrying forever. */
++			syn_ctx->m_lastError = USYNERGY_ERROR_TIMEOUT;
++			ret = false;
++			synNetDisconnect(snet_ctx);
++			break;
++		}
+ 
+ 		if (ret) {
+ 			syn_ctx->m_lastMessageTime = syn_ctx->m_getTimeFunc();
+@@ -225,6 +235,7 @@
+ 		}
+ 		if ((syn_ctx->m_getTimeFunc() - syn_ctx->m_lastMessageTime) > USYNERGY_IDLE_TIMEOUT) {
+ 			logErr("Synergy timeout encountered -- disconnecting");
++			syn_ctx->m_lastError = USYNERGY_ERROR_TIMEOUT;
+ 			synNetDisconnect(snet_ctx);
+ 			return;
+ 		}
+@@ -244,6 +255,7 @@
+ 	}
+ 	if (!ret) {
+ 		logErr("Poll timeout encountered -- disconnecting synergy");
++		syn_ctx->m_lastError = USYNERGY_ERROR_TIMEOUT;
+ 		synNetDisconnect(snet_ctx);
+ 	}
+ 	sigHandleRun();
+@@ -254,6 +266,7 @@
+ static bool syn_recv(uSynergyCookie cookie, uint8_t *buf, int max_len, int *out_len)
+ {
+ 	struct synNetContext *snet_ctx = cookie;
++	sigAlarmTimedOut = 0;
+ 	alarm(USYNERGY_IDLE_TIMEOUT/1000);
+ 	if (snet_ctx->tls_ctx) {
+ 		do {
