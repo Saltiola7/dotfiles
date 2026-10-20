@@ -113,6 +113,22 @@ using its normal launcher. `TryExec` skips an application if it is unavailable.
 These entries use the existing graphical session startup and are excluded from
 other machine profiles.
 
+Herdr also starts in the background through the managed `herdr.service` user
+unit. It waits for the graphical environment, leaves an existing server alone,
+and keeps running when Kitty closes. The unit is not stopped with the graphical
+session; its lifetime still depends on the user systemd manager. The installed
+user-local Herdr takes precedence over the distribution binary.
+
+Ordinary Kitty windows, tabs and panes attach to Herdr by default. Explicit
+commands such as `kitty -- bash` still run directly. For a plain shell, launch
+**Kitty (Plain)** from the application menu or run `kitty-plain`. Inside Kitty,
+**Ctrl+Shift+Alt+Enter** opens a plain shell pane. The dispatcher preserves the
+real `$SHELL`, forwards shell/environment queries, and avoids nested Herdr.
+
+Apply with `chezmoi apply`; its scoped change hook reloads the user manager and
+starts Herdr when a graphical session is active. The managed target symlink
+enables subsequent logins.
+
 ### Input-sharing experiment
 
 Run `omarchy-desk-setup input` in a terminal to install `synergy3-bin` and

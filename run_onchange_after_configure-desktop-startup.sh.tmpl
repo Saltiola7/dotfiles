@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+{{ if eq .machine_type "omarchy" -}}
+# Reload when the unit or its transport-only readiness checks change.
+# {{ include "private_dot_config/systemd/user/herdr.service" | sha256sum }}
+# {{ include "dot_local/bin/executable_omarchy-herdr-server" | sha256sum }}
+set -euo pipefail
+systemctl --user daemon-reload
+if systemctl --user is-active --quiet graphical-session.target; then
+    systemctl --user start herdr.service
+fi
+{{ end -}}

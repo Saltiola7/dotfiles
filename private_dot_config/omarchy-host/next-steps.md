@@ -19,6 +19,12 @@ The Omarchy profile also manages ChatGPT and Kitty desktop-login startup through
 launcher, and `TryExec` skips an unavailable app. These entries are excluded from
 other profiles.
 
+Herdr starts as a separate user service, and normal Kitty launches attach to it.
+`kitty-plain` or the **Kitty (Plain)** application opens a direct shell;
+**Ctrl+Shift+Alt+Enter** opens a direct Kitty pane. Existing servers are preserved.
+These additions still need a fresh login check; current-session deployment and
+targeted launcher/service validation are recorded in the pull request.
+
 The Linux service retries connections and starts a fresh client five seconds
 after a fatal timeout or process exit. Release 4 consistently classifies polling,
 idle-traffic and TLS handshake timeouts for `--fatal-timeout`, retains the existing

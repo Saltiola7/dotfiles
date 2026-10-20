@@ -251,9 +251,24 @@ Shared/Backup-Recovery/
 {{ if eq .machine_type "omarchy" }}
 !.config/autostart/chatgpt.desktop
 !.config/autostart/kitty.desktop
+!.config/systemd/user/herdr.service
+!.config/systemd/user/graphical-session.target.wants/
+!.config/systemd/user/graphical-session.target.wants/herdr.service
+!.local/bin/omarchy-herdr-server
+!.local/bin/omarchy-herdr-shell
+!.local/bin/kitty-plain
+!.local/share/applications/kitty-plain.desktop
+!configure-desktop-startup.sh
 {{ else }}
 .config/autostart/chatgpt.desktop
 .config/autostart/kitty.desktop
+.config/systemd/user/herdr.service
+.config/systemd/user/graphical-session.target.wants/herdr.service
+.local/bin/omarchy-herdr-server
+.local/bin/omarchy-herdr-shell
+.local/bin/kitty-plain
+.local/share/applications/kitty-plain.desktop
+configure-desktop-startup.sh
 {{ end }}
 
 # Private native Git hosting belongs to headless Fedora only.

@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Kitty's default interactive child; explicit commands keep their normal shell.
+set -euo pipefail
+
+login_shell="${SHELL:-/bin/bash}"
+if (( $# > 0 )) || [[ ${HERDR_ENV:-} == 1 || ! -t 0 || ! -t 1 ]]; then
+  exec "$login_shell" "$@"
+fi
+
+herdr_binary="$HOME/.local/bin/herdr"
+if [[ ! -x "$herdr_binary" ]]; then
+  herdr_binary="/usr/bin/herdr"
+fi
+if [[ ! -x "$herdr_binary" ]]; then
+  echo 'Herdr is unavailable; opening a plain shell.' >&2
+  exec "$login_shell"
+fi
+
+# Serialize desktop-login and terminal starts through the same managed unit.
+if ! systemctl --user start herdr.service; then
+  echo 'Herdr background service could not start; opening a plain shell.' >&2
+  exec "$login_shell"
+fi
+exec "$herdr_binary"
