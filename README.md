@@ -400,3 +400,10 @@ the live configuration, use that command with
 `add ~/.config/espanso/config ~/.config/espanso/match` to save it,
 then refresh the encrypted recovery backup. A private Git remote can be added
 later; never push this source to the public dotfiles repository.
+
+## Headless Fedora / Pi400
+
+The `fedora-server` profile manages shared terminal tools without desktop or
+hardware configuration. Explicit `homelab_target=pi400` additionally manages public
+homelab service inputs; private enrollment and data remain local. Dotfiles-ai owns
+the separate native Linux Codex role. Follow the [reproduction and recovery runbook](docs/specs/homelab_topology/PI400-REPRODUCTION.md).
