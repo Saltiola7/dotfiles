@@ -146,3 +146,13 @@ Enrollment is an explicit owner-sudo step and does not reset other Serve routes.
 The operator retrieves initial administrator enrollment from its owner-private
 file and changes the password during first login; credentials are never posted
 in chat. Add client public SSH keys through Forgejo; keep private keys on clients.
+
+## Current HTTPS verification limitation
+
+The post-recovery Git/Borg drill passes, but the tailnet certificate provider
+currently returns an invalid ACME order. HTTPS forwarding configuration alone does
+not prove usable HTTPS. Preserve TLS verification, secure cookies, closed
+registration and existing data while investigating provider/DNS recovery. Do not
+expose the loopback HTTP listener publicly, enable Funnel, disable certificate
+checks or change administrator credentials as a workaround. Owner first browser
+login remains pending until a valid certificate and authenticated UI check pass.
