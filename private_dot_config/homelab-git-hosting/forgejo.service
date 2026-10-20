@@ -1,0 +1,19 @@
+[Unit]
+Description=Private personal Forgejo Git hosting
+After=network-online.target
+
+[Service]
+ExecStart=%h/.local/bin/forgejo -w %h/.local/share/forgejo -c %h/.local/share/forgejo/private/app.ini web
+WorkingDirectory=%h/.local/share/forgejo
+UMask=0077
+NoNewPrivileges=yes
+CPUQuota=100%
+MemoryHigh=384M
+MemoryMax=768M
+MemorySwapMax=0
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=120
+
+[Install]
+WantedBy=default.target

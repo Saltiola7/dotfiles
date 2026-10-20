@@ -117,3 +117,17 @@ def test_previously_inactive_rustfs_not_started(tmp_path, monkeypatch):
     snap=module.rustfs_capture()
     assert (snap/'capture.json').is_file()
     assert not calls
+
+
+def test_forgejo_failed_stop_recovers_without_copy(tmp_path,monkeypatch):
+    module=load();monkeypatch.setattr(module.Path,'home',lambda:tmp_path)
+    monkeypatch.setattr(module,'forgejo_plan',lambda:(tmp_path/'root',tmp_path/'binary',tmp_path/'unit'))
+    calls=[]
+    def output(args,**kw):
+        return 'active\n' if args[-1]=='--value' else 'ActiveState=inactive\nMainPID=0\nResult=timeout\nExecMainCode=2\nExecMainStatus=9\n'
+    monkeypatch.setattr(module.subprocess,'check_output',output)
+    monkeypatch.setattr(module.subprocess,'run',lambda args,**kw:calls.append(args))
+    monkeypatch.setattr(module,'forgejo_ready',lambda:None)
+    with pytest.raises(ValueError,match='clean stop'):module.forgejo_capture()
+    assert ['systemctl','--user','start','forgejo.service'] in calls
+    assert not list(tmp_path.rglob('capture.json'))

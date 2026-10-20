@@ -351,3 +351,10 @@ Mac-connected backup disk is an observed storage target; its dependency edge
 represents Pi backup only, not a requirement for Pi boot or file serving.
 Encrypted Borg archive/restore and daily timer catch-up passed. Offsite upload
 and consistent object-store recovery remain separate unverified obligations.
+
+
+Private Git hosting on Pi is declared by homelab_git_hosting and runs as native
+Forgejo 15 LTS with SQLite, separate from Samba and RustFS. It is a workload on
+the existing Pi target, not an additional VM/container. Signed Git and isolated
+Forgejo Borg recovery passed. Backup dependency continues to represent recovery
+storage, not boot availability; private bindings remain local.
