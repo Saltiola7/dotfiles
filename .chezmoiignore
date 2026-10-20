@@ -274,4 +274,31 @@ Shared/Backup-Recovery/
 .local/bin/*
 !.local/bin/homelab
 !.local/bin/fedora-server-setup
+{{ if eq (default "" (get . "homelab_target")) "pi400" }}
+# Explicit service role: public inputs/helpers only; private enrollment stays local.
+!.local/bin/homelab-backup
+!.local/bin/pi-samba-setup
+!.local/bin/pi-samba-check
+!.local/bin/pi-rustfs-setup
+!.local/bin/pi-rustfs-check
+!.local/bin/pi-forgejo-setup
+!.local/bin/pi-forgejo-check
+!.config/homelab-backup/
+.config/homelab-backup/*
+!.config/homelab-backup/policy.json
+!.config/homelab-backup/pi-backup.service
+!.config/homelab-backup/pi-backup.timer
+!.config/homelab-file-storage/
+.config/homelab-file-storage/*
+!.config/homelab-file-storage/smb.conf
+!.config/homelab-file-storage/tailscale.conf
+!.config/homelab-object-storage/
+.config/homelab-object-storage/*
+!.config/homelab-object-storage/release.json
+!.config/homelab-object-storage/rustfs.service
+!.config/homelab-git-hosting/
+.config/homelab-git-hosting/*
+!.config/homelab-git-hosting/release.json
+!.config/homelab-git-hosting/forgejo.service
+{{ end }}
 {{ end }}

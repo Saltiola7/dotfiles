@@ -61,3 +61,21 @@ def test_other_profiles_exclude_server_tools(tmp_path):
             '--include','files,symlinks'],text=True,capture_output=True)
         assert r.returncode==0,r.stderr
         assert 'fedora-server' not in r.stdout
+
+
+def test_explicit_pi_role_owns_public_service_inputs_only(tmp_path):
+    values = {'machine_type': 'fedora-server', 'homelab_target': 'pi400'}
+    r = subprocess.run(['chezmoi', '--source', str(ROOT), '--config', '/dev/null',
+        '--config-format', 'toml', '--override-data', json.dumps(values),
+        'managed', '--include', 'files,symlinks'], text=True, capture_output=True)
+    assert r.returncode == 0, r.stderr
+    paths = set(r.stdout.splitlines())
+    assert EXPECTED <= paths
+    assert {'.local/bin/homelab-backup', '.local/bin/pi-samba-setup',
+            '.local/bin/pi-rustfs-setup', '.config/homelab-backup/policy.json'} <= paths
+    assert not any(x.endswith(('client.json', 'destination.json', 'app.ini', 'auth.json')) for x in paths)
+    assert not any(x.startswith(('.ssh/', '.codex/', '.local/share/rustfs/')) for x in paths)
+    r = subprocess.run(['chezmoi', '--source', str(ROOT), '--config', '/dev/null',
+        '--config-format', 'toml', '--override-data', json.dumps(values),
+        'managed', '--include', 'scripts'], text=True, capture_output=True)
+    assert r.returncode == 0 and not r.stdout.strip(), r.stderr

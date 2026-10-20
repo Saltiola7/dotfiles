@@ -23,3 +23,6 @@ encryption = "age"
     synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
 {{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
+{{ if eq $machineType "fedora-server" }}
+    homelab_target = {{ default "" (get . "homelab_target") | quote }}
+{{ end }}

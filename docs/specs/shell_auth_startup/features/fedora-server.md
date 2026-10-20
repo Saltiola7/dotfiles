@@ -43,7 +43,12 @@ remain unchanged. Disable unattended Atuin synchronization on the server until
 owner sign-in is explicitly performed. History/auth state remains host-local.
 Private initialization data uses the owner's existing identity without publishing
 it. Fedora release support and architecture are checked on deployment. No workload
-or AI runtime is silently assigned by selecting this profile.
+or AI runtime is silently assigned by selecting this profile. An additional explicit
+`homelab_target=pi400` opt-in manages only the public Samba, Borg, RustFS and
+Forgejo helpers, unit inputs and release manifests. It does not execute enrollment,
+reset passwords, replace private runtime configuration or change hardware settings.
+Generic Fedora servers retain only the terminal baseline. Service setup remains
+explicit through the bounded-context helpers and their private local enrollment.
 
 ## Validation, rollout and recovery
 
