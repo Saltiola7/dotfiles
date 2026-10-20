@@ -1,0 +1,99 @@
+--- a/include/uSynergy.h
++++ b/include/uSynergy.h
+@@ -354,6 +354,7 @@
+ 	const char* 						m_implementation; /*implementation of the protocol -- usually "Synergy" or "Barrier" */
+ 	bool					m_connected;									/* Is our socket connected? */
+ 	bool					m_hasReceivedHello;								/* Have we received a 'Hello' from the server? */
++	bool                    m_handshakeComplete; /* Initial screen information acknowledged by the server */
+ 	bool 					m_infoCurrent; /* whether we've gotten an acknowledge from our information message */
+ 	bool 					m_resChanged; /* whether we've had a screen resolution change or not */
+ 	bool					m_isCaptured;									/* Is Synergy active (i.e. this client is receiving input messages?) */
+--- a/src/uSynergy.c
++++ b/src/uSynergy.c
+@@ -133,6 +133,8 @@
+ {
+ 	context->m_connected		= false;
+ 	context->m_hasReceivedHello = false;
++	context->m_infoCurrent = false;
++	context->m_handshakeComplete = false;
+ 	context->m_isCaptured		= false;
+ 	context->m_receiveOfs = 0;
+ 	context->m_replyCur			= context->m_replyBuffer + 4;
+@@ -164,6 +166,20 @@
+ }
+ 
+ 
++/* Clipboard commands are valid only after the initial DINF/CIAK exchange. */
++static void sSendClipboardGrab(uSynergyContext *context, enum uSynergyClipboardId id)
++{
++	if (!context->m_connected || !context->m_hasReceivedHello || !context->m_handshakeComplete)
++		return;
++	if (!(sAddString(context, "CCLP") &&
++	      sAddUInt8(context, id) &&
++	      sAddUInt32(context, context->m_sequenceNumber))) {
++		REPLY_ERROR();
++	}
++	sSendReply(context);
++}
++
++
+ /* mouse callbacks */
+ static void sSendMouseWheelCallback(uSynergyContext *context, int16_t x, int16_t y)
+ {
+@@ -238,6 +254,8 @@
+ **/
+ void uSynergySendClipboard(uSynergyContext *context, int id, uint32_t len, const unsigned char *text)
+ {
++	if (!context->m_connected || !context->m_hasReceivedHello || !context->m_handshakeComplete)
++		return;
+ 	char buffer[128];
+ 	int pos;
+ 	uint32_t chunk_len;
+@@ -387,6 +405,14 @@
+ 	{
+ 		//		kMsgCInfoAck		= "CIAK"
+ 		context->m_infoCurrent = true;
++		if (!context->m_handshakeComplete) {
++			context->m_handshakeComplete = true;
++			/* Retain and announce local clipboard changes queued during setup. */
++			for (int id = 0; id < 2; ++id) {
++				if (context->m_clipGrabbed[id])
++					sSendClipboardGrab(context, id);
++			}
++		}
+ 		return;
+ 	}
+ 	else if (!strcmp(pkt_id, "CROP"))
+@@ -850,6 +876,8 @@
+ 				Exit(SES_ERROR_SYN);
+ 			}
+ 		}
++		/* Every new transport starts a fresh protocol handshake. */
++		sSetDisconnected(context, context->m_lastError);
+ 		if (context->m_connectFunc(context->m_cookie)) {
+ 			context->m_connected = true;
+ 		} else {
+@@ -924,13 +952,7 @@
+ 	buf = buf_add_int32(buf, USYNERGY_CLIPBOARD_FORMAT_TEXT); //type, text only for now
+ 	buf = buf_add_int32(buf, len); //length of actual data
+ 	memmove(buf, data, len);
+-	/* send CCLP  -- CCLP%1i%4i */
+-	if (!(sAddString(context, "CCLP") &&
+-	      sAddUInt8(context, id) &&
+-	      sAddUInt32(context, context->m_sequenceNumber))) {
+-		REPLY_ERROR();
+-	}
+-	sSendReply(context);
++	sSendClipboardGrab(context, id);
+ }
+ 
+ /* Update resolution */
+@@ -938,7 +960,7 @@
+ {
+ 	context->m_clientWidth = width;
+ 	context->m_clientHeight = height;
+-	if (context->m_connected) {
++	if (context->m_connected && context->m_hasReceivedHello) {
+ 		logDbg("Sending DINF to update screen resolution");
+ 		/* send information update */
+ 		uint16_t x = 0, y = 0, warp = 0;

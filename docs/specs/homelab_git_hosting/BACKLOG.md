@@ -1,5 +1,7 @@
 # Backlog
 
+- Resolve Tailscale ACME certificate issuance and verify HTTPS before owner browser login.
+
 - Complete owner first login/password change and add desired client public keys.
 - Review LTS security updates before support expiry; repeat isolated restore after upgrades.
 - Benchmark meaningful repository/LFS growth and concurrent service memory pressure.

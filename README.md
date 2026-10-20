@@ -117,6 +117,25 @@ Chezmoi masks the native `synergy-3.service` and hides its desktop autostart,
 so it cannot compete with Waynergy or repeatedly start an unsupported portal client.
 Set `[data].waynergy_server` in chezmoi to override the default Mac LAN address,
 and `waynergy_client_name` to match the Mac screen name.
+
+Managed release `waynergy-omarchy 0.0.17-4` retains the fingerprint-file descriptor
+fix and makes polling, idle-traffic and TLS handshake timeouts honor
+`--fatal-timeout`. Systemd then starts a fresh client after five seconds. The
+ten-second timeout is unchanged; TLS retries temporary library readiness results
+within that deadline, and restart cancels any pending alarm. Receive diagnostics
+distinguish peer closure, TLS errors and alarm expiry.
+Clipboard commands wait for the initial screen-information acknowledgement
+(`CIAK`), preserving queued text. Geometry updates wait for the server greeting,
+and each new connection resets protocol state. This prevents normal local
+updates from interrupting the initial handshake.
+
+Chezmoi manages the pinned source, checksums, patches and C regression tests under
+`~/.config/omarchy-host/waynergy-package`. Run `omarchy-waynergy-install` in Kitty
+to rebuild, install and restart the managed service, or add `--build-only` to
+verify the package without installing it. Package checks cover 20,000 configuration
+reads under a 256-descriptor limit, ten network recovery cases and five handshake
+ordering cases, without requiring the Mac or a compositor.
+
 Verify screen-edge switching, Finnish symbols and modifiers on both keyboards.
 Waynergy supports text clipboard; image clipboard is not available through this
 client. Images and files can use SMB/LocalSend.
@@ -158,14 +177,18 @@ chezmoi apply --error-on-conflict --parent-dirs --include=dirs,files,scripts --s
 
 Verify a fresh `checked-no-deadlock context=launchd` status with a current
 timestamp and core identity. A successful Terminal-only sample does not verify
-LaunchAgent sampling permissions. Desktop login, intentional quit, sleep/wake,
-reconnect, and an actual future deadlock require separate runtime validation.
+LaunchAgent sampling permissions. A laptop reboot, fresh Mac desktop login,
+intentional app quit, sleep/wake, and automatic recovery from another actual
+deadlock still require runtime validation.
 
-Local deployment on 2026-10-19 passed all 58 Synergy tests. Both Aqua jobs loaded;
-the activation check and the following automatic 60-second run produced fresh
-`checked-no-deadlock context=launchd` results for the same owned core. The recovery
-job exited with code 0, and the scoped chezmoi diff was empty. This verifies
-background sampling on this Mac, not the outstanding lifecycle scenarios above.
+Mac deployment on 2026-10-19 passed all 58 Synergy tests. Both Aqua jobs loaded;
+the scheduled 60-second run at 17:58:01 local produced a fresh
+`checked-no-deadlock context=launchd` result. The recovery job exited with code 0,
+and the scoped chezmoi diff was empty. These Mac changes merged in
+[PR #42](https://github.com/Saltiola7/dotfiles/pull/42) as `fe9f1f4`.
+A controlled restart of Linux release `0.0.17-4` also passed a 45.237-second
+observation with continuing traffic in both directions. The user confirmed
+pointer movement, typing and text clipboard in both directions afterward.
 
 The default is enabled for `mac-mini`. Set `synergy_recovery_enabled = false`
 under `[data]` in this Mac's chezmoi configuration and apply the same selection
