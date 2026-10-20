@@ -1,0 +1,15 @@
+#!/bin/bash
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+set -eu
+# Recovery helper: {{ include "dot_local/bin/executable_synergy-recovery" | sha256sum }}
+# Activation helper: {{ include "dot_local/bin/executable_synergy-setup" | sha256sum }}
+# Login job: {{ include "private_Library/LaunchAgents/dev.dotfiles.synergy-login.plist.tmpl" | sha256sum }}
+# Recovery job: {{ include "private_Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist.tmpl" | sha256sum }}
+# Configuration: {{ include "private_dot_config/synergy-recovery/private_config.tmpl" | sha256sum }}
+{{- $enabled := true }}
+{{- if hasKey . "synergy_recovery_enabled" }}{{ $enabled = .synergy_recovery_enabled }}{{ end }}
+# Render context: {{ printf "%t\n%s\n%s" $enabled (default "/Applications/Synergy.app" (get . "synergy_app_path")) .chezmoi.homeDir | sha256sum }}
+exec {{ printf "%s/.local/bin/synergy-setup" .chezmoi.homeDir | shellQuote }} activate
+{{ else -}}
+exit 0
+{{ end -}}
