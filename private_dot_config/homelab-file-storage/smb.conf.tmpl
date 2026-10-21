@@ -1,0 +1,5 @@
+{{- range .samba.catalog.shares -}}
+{{- if eq .id "pi400" -}}
+{{ template "samba.conf" (dict "policy" .policy "home" "@HOME@" "owner" "@OWNER@") -}}
+{{- end -}}
+{{- end -}}

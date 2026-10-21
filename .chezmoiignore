@@ -337,3 +337,13 @@ configure-desktop-startup.sh
 !.config/homelab-git-hosting/forgejo.service
 {{ end }}
 {{ end }}
+
+# SMB passwords stay with native authentication; endpoints are private runtime metadata.
+.config/samba/private-connections.json
+{{ if not (and (eq .chezmoi.os "darwin") (or (eq .machine_type "mac-mini") (eq .machine_type "macbook"))) }}
+.config/samba/shares.json
+.local/bin/smb-shares
+.local/lib/smb_shares/
+Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
+load-smb-reconnect.sh
+{{ end }}

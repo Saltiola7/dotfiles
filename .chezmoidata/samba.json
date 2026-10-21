@@ -1,0 +1,30 @@
+{
+  "samba": {
+    "catalog": {
+      "schema_version": 1,
+      "shares": [
+        {
+          "id": "pi400",
+          "share": "Shared",
+          "policy": "tailscale-only",
+          "reconnect": true,
+          "deployment": "verified"
+        },
+        {
+          "id": "hp-envy",
+          "share": "Shared",
+          "policy": "private-lan-and-tailscale",
+          "reconnect": true,
+          "deployment": "verified"
+        },
+        {
+          "id": "omarchy-arm",
+          "share": "Shared",
+          "policy": "private-lan-and-tailscale",
+          "reconnect": false,
+          "deployment": "unverified"
+        }
+      ]
+    }
+  }
+}

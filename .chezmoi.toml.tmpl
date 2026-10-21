@@ -22,6 +22,9 @@ encryption = "age"
     synergy_recovery_enabled = {{ if hasKey . "synergy_recovery_enabled" }}{{ .synergy_recovery_enabled }}{{ else }}true{{ end }}
     synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
 {{ end }}
+{{ if and (eq .chezmoi.os "darwin") (or (eq $machineType "mac-mini") (eq $machineType "macbook")) }}
+    smb_reconnect_enabled = {{ if hasKey . "smb_reconnect_enabled" }}{{ .smb_reconnect_enabled }}{{ else }}true{{ end }}
+{{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
 {{ if eq $machineType "fedora-server" }}
     homelab_target = {{ default "" (get . "homelab_target") | quote }}

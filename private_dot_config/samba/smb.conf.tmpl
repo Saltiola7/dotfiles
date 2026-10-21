@@ -1,20 +1,6 @@
-[global]
-    server role = standalone server
-    security = user
-    map to guest = Never
-    server min protocol = SMB2
-    smb ports = 445
-    disable netbios = yes
-    load printers = no
-    printing = bsd
-    printcap name = /dev/null
-    disable spoolss = yes
-
-[Shared]
-    path = {{ .chezmoi.homeDir }}/Shared
-    browseable = yes
-    read only = no
-    guest ok = no
-    valid users = {{ .chezmoi.username }}
-    create mask = 0600
-    directory mask = 0700
+{{- $root := . -}}
+{{- range .samba.catalog.shares -}}
+{{- if eq .id "hp-envy" -}}
+{{ template "samba.conf" (dict "policy" .policy "home" $root.chezmoi.homeDir "owner" $root.chezmoi.username) -}}
+{{- end -}}
+{{- end -}}
