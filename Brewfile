@@ -127,7 +127,6 @@ cask "sf-symbols"
 cask "clickhouse"
 cask "kindavim"
 cask "kitty"
-cask "lm-studio"
 cask "ngrok"
 cask "obsidian"
 cask "opencode-desktop"
@@ -137,7 +136,6 @@ cask "rustdesk"
 cask "signal"
 cask "speedify"
 cask "tailscale-app"
-cask "zed"
 mas "Affinity Designer", id: 824171161
 mas "Affinity Photo", id: 824183456
 mas "Amphetamine", id: 937984704
