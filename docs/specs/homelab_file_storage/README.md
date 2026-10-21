@@ -1,28 +1,27 @@
 # Private homelab file storage
 
-Status: Implemented and deployed. Authenticated file roundtrip, denied access,
-SELinux enforcement and fresh startup verified. Git delivery is pending.
+Status: Existing Pi Samba is deployed and delivered. Authenticated file
+roundtrip, denied access, SELinux enforcement, fresh startup and macOS Finder
+access have been verified. Centralization and client reconnect are the next
+scoped change; see SAMBA-RECONNECT.md.
 
 ## Intent and ownership
 
 The Pi is the always-on primary file server. Store ordinary folders accessible
 directly by local tools and expose them through authenticated SMB over Tailscale.
 Connected-only access is sufficient. No web drive, offline synchronization,
-public sharing, data migration, disk formatting or existing HP/Mac share changes
-are included. Personal dotfiles owns declarations; secrets are private runtime
-state. Backup and topology retain independent ownership.
+public sharing, data migration or disk formatting are included. Shared policy
+centralization and macOS client reconnection are governed by SAMBA-RECONNECT.md;
+existing HP exposure and existing files must be preserved. Personal dotfiles
+owns declarations; secrets are private runtime state. Backup and topology retain independent ownership.
 
 ## Engineering Profile
 
-Internal infrastructure; operator-owned. Fedora ARM64, Samba, systemd and SELinux
-enforcing. Cloud and Security modules apply; risk elevated. Configuration is
-declared in chezmoi with explicit privileged setup, never implicit apply hooks.
-Authority: isolated chezmoi rendering, scoped pytest, Samba testparm, actual
-authenticated SMB read/write and denied-access checks. Release is not applicable
-because no package is published. All kernel, review, deploy, operate and
-maintenance gates are required and pending.
+The committed PROFILE.md owns runtime, module, risk and validation defaults.
+The Samba reconnect extension adds macOS client automation and centralizes
+existing server policy without changing current network exposure.
 
-## Behaviors and contracts
+## Existing Pi behaviors and contracts
 
 - Given an authenticated owner on the tailnet, when creating or editing a file,
   the same ordinary file is accessible directly on the Pi.
@@ -72,7 +71,7 @@ Rollback restores backed-up configuration and disables only the new service;
 never delete user files. Observe disk free space, service health and backup age.
 Retirement requires independent recovery verification and explicit data disposal.
 
-## Maintained interfaces and observations
+## Existing Pi interfaces and observations
 
 Managed source consists of `~/.config/homelab-file-storage/smb.conf`, the
 `tailscale.conf` systemd drop-in, `~/.local/bin/pi-samba-setup` and
@@ -99,7 +98,9 @@ Runtime observations: Samba 4.24.7 serves loopback; Tailscale forwards TCP 445.
 Authenticated browsing and file roundtrip passed; anonymous share access was
 denied, physical LAN access was refused and SELinux remained enforcing.
 Fresh system startup validation passed. No throughput claim is made from the
-small functional roundtrip. Phone and Finder UI behavior is not yet verified.
+small functional roundtrip. Finder connected as the owner, and distinct SMB
+upload/download files matched on macOS and Pi; test files were removed. Phone
+UI behavior remains unverified.
 
 ## Update and recovery procedure
 
