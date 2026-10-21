@@ -225,3 +225,11 @@ def test_missing_native_credentials_return_status_without_ui(m, inputs, monkeypa
     monkeypatch.setattr(m,'tailnet',lambda:('Running',[{'DNSName':'pi.example.ts.net.','Online':True,'TailscaleIPs':['100.90.1.2']}]))
     monkeypatch.setattr(m,'probe_peer',lambda *_:True)
     assert m.worker('pi400',inputs)=={'status':'needs-login'}
+
+
+def test_foreign_owner_mount_is_preserved_and_never_reused_or_duplicated(m, inputs, monkeypatch):
+    foreign={'url':'smb://owner@pi.example.ts.net/Shared','mountpoint':'/Volumes/Shared-1','owner':os.getuid()+1}
+    fake=SimpleNamespace(mounted_shares=lambda:[foreign],mount_share=lambda *_:pytest.fail('foreign mount must not be replaced'))
+    monkeypatch.setattr(m,'native_adapter',lambda:fake)
+    monkeypatch.setattr(m,'tailnet',lambda:pytest.fail('conflict must stop before network or mount'))
+    assert m.worker('pi400',inputs)=={'status':'identity-conflict'}

@@ -86,6 +86,7 @@ class FakeLibraries:
         for index, row in enumerate(self.rows):
             self.table[index].f_fstypename = row.get('type', 'smbfs').encode()
             self.table[index].f_mntonname = row['mountpoint'].encode()
+            self.table[index].f_mntfromname = row.get('source', '').encode()
             self.table[index].f_owner = row.get('owner', 501)
         ctypes.cast(output, ctypes.POINTER(ctypes.POINTER(self.module.StatFS)))[0] = self.table
         return len(self.rows)
@@ -175,12 +176,16 @@ def test_mount_inventory_uses_cached_table_and_native_identity(monkeypatch):
     libraries.rows = [
         {'type': 'apfs', 'mountpoint': '/'},
         {'mountpoint': '/Volumes/Shared'},
-        {'mountpoint': '/Volumes/Other', 'owner': 502},
+        {'mountpoint': '/Volumes/Other', 'owner': 502,
+         'source': '//example@other.example.ts.net/Shared'},
     ]
     libraries.url_for_mount['/Volumes/Shared'] = 'smb://example@pi.example.ts.net/Shared'
     assert libraries.native().mounted_shares() == [{
         'url': 'smb://example@pi.example.ts.net/Shared',
         'mountpoint': '/Volumes/Shared', 'owner': 501,
+    }, {
+        'url': 'smb://example@other.example.ts.net/Shared',
+        'mountpoint': '/Volumes/Other', 'owner': 502,
     }]
     assert libraries.libc.getmntinfo.calls[0][1] == 2  # MNT_NOWAIT
     assert len(libraries.netfs.NetFSCopyURLForRemountingVolume.calls) == 1
@@ -205,3 +210,33 @@ def test_failed_mount_table_does_not_claim_no_existing_shares():
     libraries = FakeLibraries(module)
     with pytest.raises(RuntimeError):
         libraries.native().mounted_shares()
+
+
+def test_foreign_owner_mount_uses_only_cached_identity(monkeypatch):
+    module = load_module()
+    monkeypatch.setattr(module.os, 'getuid', lambda: 501)
+    libraries = FakeLibraries(module)
+    libraries.rows = [{'mountpoint': '/Volumes/Shared-1', 'owner': 0,
+                       'source': '//example@pi.example.ts.net/Shared'}]
+    assert libraries.native().mounted_shares() == [{
+        'url': 'smb://example@pi.example.ts.net/Shared',
+        'mountpoint': '/Volumes/Shared-1', 'owner': 0,
+    }]
+    assert not libraries.netfs.NetFSCopyURLForRemountingVolume.calls
+    assert not libraries.cf.CFURLCreateFromFileSystemRepresentation.calls
+
+
+@pytest.mark.parametrize('source', ['', 'missing', '//server/',
+                                    '//example:secret@server/Shared',
+                                    '//server/Shared?password=secret',
+                                    '//server/Shared#secret'])
+def test_foreign_owner_identity_failure_is_safe_and_never_queries_path(monkeypatch, source):
+    module = load_module()
+    monkeypatch.setattr(module.os, 'getuid', lambda: 501)
+    libraries = FakeLibraries(module)
+    libraries.rows = [{'mountpoint': '/Volumes/Shared', 'owner': 0,
+                       'source': source}]
+    with pytest.raises(RuntimeError) as error:
+        libraries.native().mounted_shares()
+    assert 'secret' not in str(error.value)
+    assert not libraries.netfs.NetFSCopyURLForRemountingVolume.calls

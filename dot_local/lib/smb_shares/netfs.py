@@ -27,6 +27,20 @@ class StatFS(ctypes.Structure):
     ]
 
 
+def _validated_identity(text: str) -> str:
+    """Accept credential-free SMB identity, never returning malformed URL text."""
+    try:
+        url = urlsplit(text)
+        valid = (url.scheme == 'smb' and url.hostname and url.password is None
+                 and url.path not in ('', '/') and not url.query and not url.fragment
+                 and not any(ord(char) < 32 or ord(char) == 127 for char in text))
+    except ValueError:
+        valid = False
+    if not valid:
+        raise RuntimeError('Native SMB identity unavailable')
+    return text
+
+
 class Native:
     """Lazily bind system libraries; injectable libraries support boundary tests."""
     def __init__(self, *, core_foundation=None, netfs=None, libc=None,
@@ -97,22 +111,19 @@ class Native:
             if not server_url:
                 raise RuntimeError('Native SMB identity unavailable')
             text = self._text(self.cf.CFURLGetString(server_url))
-            try:
-                url = urlsplit(text)
-                valid = (url.scheme == 'smb' and url.hostname and url.password is None
-                         and url.path not in ('', '/') and not url.query and not url.fragment)
-            except ValueError:
-                valid = False
-            if not valid:
-                raise RuntimeError('Native SMB identity unavailable')
-            return text
+            return _validated_identity(text)
         finally:
             if server_url:
                 self.cf.CFRelease(server_url)
             self.cf.CFRelease(local_url)
 
     def mounted_shares(self) -> list[dict]:
-        """Return own-user SMB identities, failing closed on unknown identities."""
+        """Return SMB identities, including foreign mounts for conflict checks.
+
+        Foreign-owner identities come only from cached kernel metadata: callers
+        must treat them as conflicts, never as usable user mounts. Their paths
+        are not queried through NetFS or accessed on disk.
+        """
         table = ctypes.POINTER(StatFS)()
         count = self.getmntinfo(ctypes.byref(table), 2)  # MNT_NOWAIT: cached mount metadata
         if count <= 0 or count > 65536 or not table:
@@ -121,7 +132,7 @@ class Native:
         mounts = []
         for index in range(count):
             row = table[index]
-            if row.f_fstypename != b'smbfs' or row.f_owner != os.getuid():
+            if row.f_fstypename != b'smbfs':
                 continue
             try:
                 path = row.f_mntonname.decode('utf-8')
@@ -129,9 +140,20 @@ class Native:
                 raise RuntimeError('Native SMB identity unavailable') from None
             if not path.startswith('/'):
                 raise RuntimeError('Native SMB identity unavailable')
-            mounts.append((path, int(row.f_owner)))
-        return [{'url': self._mount_url(path), 'mountpoint': path, 'owner': owner}
-                for path, owner in mounts]
+            owner = int(row.f_owner)
+            source = None
+            if owner != os.getuid():
+                try:
+                    source = row.f_mntfromname.decode('utf-8')
+                except UnicodeError:
+                    raise RuntimeError('Native SMB identity unavailable') from None
+                if not source.startswith('//'):
+                    raise RuntimeError('Native SMB identity unavailable')
+                source = _validated_identity('smb:' + source)
+            mounts.append((path, owner, source))
+        return [{'url': source if source is not None else self._mount_url(path),
+                 'mountpoint': path, 'owner': owner}
+                for path, owner, source in mounts]
 
     def mount_share(self, host: str, user: str, share: str) -> int:
         """Request default-placement NoUI mounting with system-managed credentials."""
