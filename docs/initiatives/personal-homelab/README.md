@@ -109,3 +109,16 @@ Pi when capacity permits. Current Pi measurements permit initial small private
 Git hosting. Existing five contexts retain ownership. INT-027 and the independent
 pi-private-forgejo slice declare capped native ARM64 Forgejo LTS, SQLite, private
 access and consistent recovery. No existing repositories are moved.
+
+## Central Samba policy and macOS reconnect extension
+
+The operator requests centralized Samba configurations including Omarchy and
+automatic Pi and HP Omarchy share reconnection from macOS when Tailscale is
+available. INT-028 and the independent samba-centralization-reconnect slice
+extend the existing
+homelab_file_storage context. Its SAMBA-RECONNECT.md contract preserves current
+Pi and Omarchy access boundaries, data and installed provisioning paths; native
+Keychain authentication remains private. Pi and HP Omarchy are default
+automatic client targets. The Omarchy ARM guest
+remains manual and unverified. No router/Tailscale disruption is included.
+Exact launch registration follows a fresh receipt and preflight.

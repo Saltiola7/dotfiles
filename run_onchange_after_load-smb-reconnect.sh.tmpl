@@ -1,0 +1,9 @@
+{{ if and (eq .chezmoi.os "darwin") (or (eq .machine_type "mac-mini") (eq .machine_type "macbook")) -}}
+#!/usr/bin/env bash
+set -euo pipefail
+{{ if and (hasKey . "smb_reconnect_enabled") (not .smb_reconnect_enabled) -}}
+"$HOME/.local/bin/smb-shares" disable
+{{ else -}}
+"$HOME/.local/bin/smb-shares" enable
+{{ end -}}
+{{ end -}}

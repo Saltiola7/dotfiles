@@ -1,0 +1,383 @@
+#!/usr/bin/env python3
+"""Private, noninteractive SMB reconnect. Python 3.12+, macOS native NetFS."""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import ipaddress
+import json
+import os
+from pathlib import Path
+import plistlib
+import re
+import shutil
+import socket
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import unquote, urlsplit
+
+MAX_BYTES = 65536
+LABEL = 'dev.dotfiles.smb-reconnect'
+SAFE = {'mounted', 'manual', 'unbound', 'offline', 'tailscale-unavailable',
+        'unknown-peer', 'unreachable', 'needs-login', 'mount-failed', 'timeout',
+        'identity-unavailable', 'identity-conflict', 'native-unavailable'}
+ID = re.compile(r'[a-z][a-z0-9-]{0,63}\Z')
+USER = re.compile(r'[a-z_][a-z0-9_-]{0,31}\Z')
+SHARE = re.compile(r'[A-Za-z0-9][A-Za-z0-9 _-]{0,63}\Z')
+
+
+class Invalid(ValueError):
+    """Messages are fixed classes; never include private input or native output."""
+
+
+def require(condition, message='invalid configuration'):
+    if not condition:
+        raise Invalid(message)
+
+
+def unique(pairs):
+    out = {}
+    for key, value in pairs:
+        require(key not in out, 'duplicate field')
+        out[key] = value
+    return out
+
+
+def load_json(path, private=False):
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid(), 'unsafe configuration file')
+        require(info.st_mode & (0o177 if private else 0o022) == 0, 'unsafe configuration permissions')
+        raw = stream.read(MAX_BYTES + 1)
+    require(len(raw) <= MAX_BYTES, 'configuration too large')
+    return json.loads(raw, object_pairs_hook=unique)
+
+
+def load_catalog(path):
+    d = load_json(path)
+    require(isinstance(d, dict) and set(d) == {'schema_version', 'shares'})
+    require(type(d['schema_version']) is int and d['schema_version'] == 1)
+    require(isinstance(d['shares'], list) and 0 < len(d['shares']) <= 16)
+    ids = set()
+    for row in d['shares']:
+        require(isinstance(row, dict) and set(row) == {'id','share','policy','reconnect','deployment'})
+        require(isinstance(row['id'], str) and ID.fullmatch(row['id']) and row['id'] not in ids)
+        ids.add(row['id'])
+        require(isinstance(row['share'], str) and SHARE.fullmatch(row['share']))
+        require(row['policy'] in ('tailscale-only', 'private-lan-and-tailscale'))
+        require(type(row['reconnect']) is bool and row['deployment'] in ('verified','unverified'))
+        require(not row['reconnect'] or row['deployment'] == 'verified')
+    return d['shares']
+
+
+def normal_host(value):
+    require(isinstance(value, str) and 0 < len(value) <= 253, 'invalid host')
+    value = value.lower().removesuffix('.')
+    try:
+        return str(ipaddress.ip_address(value))
+    except ValueError:
+        labels = value.split('.')
+        require(all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', x) for x in labels), 'invalid host')
+        return value
+
+
+def load_bindings(path, catalog):
+    try:
+        d = load_json(path, private=True)
+    except FileNotFoundError:
+        return {}
+    require(isinstance(d, dict) and set(d) == {'schema_version','bindings'})
+    require(type(d['schema_version']) is int and d['schema_version'] == 1)
+    require(isinstance(d['bindings'], dict))
+    ids = {x['id'] for x in catalog}
+    for key, row in d['bindings'].items():
+        require(key in ids and isinstance(row, dict) and set(row) == {'host','user','aliases'})
+        row['host'] = normal_host(row['host'])
+        require(isinstance(row['user'], str) and USER.fullmatch(row['user']), 'invalid user')
+        require(isinstance(row['aliases'], list) and len(row['aliases']) <= 8)
+        row['aliases'] = [normal_host(x) for x in row['aliases']]
+        require(len(row['aliases']) == len(set(row['aliases'])))
+    return d['bindings']
+
+
+def private_dir(path):
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = path.lstat()
+    require(stat.S_ISDIR(info.st_mode) and info.st_uid == os.getuid()
+            and info.st_mode & 0o022 == 0, 'unsafe state directory')
+
+
+def write_json(path, data):
+    private_dir(path.parent)
+    if path.exists() or path.is_symlink():
+        info = path.lstat()
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and info.st_mode & 0o177 == 0, 'unsafe private destination')
+    fd, temporary = tempfile.mkstemp(prefix='.smb-shares-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(data, stream, sort_keys=True)
+            stream.write('\n')
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def find_mount(rows, binding, share):
+    hosts = {binding['host'], *binding['aliases']}
+    matches = []
+    for row in rows:
+        require(isinstance(row, dict) and set(row) == {'url','mountpoint','owner'}, 'unknown mount identity')
+        require(isinstance(row['url'], str) and isinstance(row['mountpoint'], str), 'unknown mount identity')
+        u = urlsplit(row['url'])
+        require(u.scheme == 'smb' and u.password is None and not u.query and not u.fragment
+                and u.port in (None,445) and u.hostname is not None, 'unknown mount identity')
+        host = normal_host(u.hostname)
+        if host in hosts and unquote(u.path) == '/'+share:
+            require(row['owner'] == os.getuid() and unquote(u.username or '') == binding['user'], 'mount identity conflict')
+            require(row['mountpoint'].startswith('/Volumes/') and '\n' not in row['mountpoint'], 'unknown mount identity')
+            matches.append(row['mountpoint'])
+    require(len(matches) <= 1, 'mount identity conflict')
+    return matches[0] if matches else None
+
+
+def native_adapter():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'lib'))
+    from smb_shares import netfs
+    return netfs
+
+
+def tailnet():
+    binary = shutil.which('tailscale')
+    if not binary:
+        return 'Unavailable', []
+    try:
+        p = subprocess.run([binary, 'status', '--json'], capture_output=True, timeout=5)
+        if p.returncode or len(p.stdout) > 1024*1024:
+            return 'Unavailable', []
+        d = json.loads(p.stdout)
+        peers = d.get('Peer', {})
+        if not isinstance(peers, dict):
+            return 'Unavailable', []
+        return d.get('BackendState'), list(peers.values())
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return 'Unavailable', []
+
+
+def find_peer(host, peers):
+    found = []
+    for peer in peers:
+        if not isinstance(peer, dict):
+            continue
+        try:
+            names = {normal_host(x) for x in peer.get('TailscaleIPs', [])}
+            if peer.get('DNSName'):
+                names.add(normal_host(peer['DNSName']))
+            if host in names:
+                found.append(peer)
+        except Invalid:
+            continue
+    return found[0] if len(found) == 1 else None
+
+
+def probe_peer(host, peer):
+    allowed = {str(ipaddress.ip_address(x)) for x in peer.get('TailscaleIPs', [])}
+    try:
+        addresses = socket.getaddrinfo(host, 445, type=socket.SOCK_STREAM)
+        if not addresses or not all(str(ipaddress.ip_address(x[4][0])) in allowed for x in addresses):
+            return False
+        # One bounded address per family; a v6 failure must not block usable v4.
+        seen = set()
+        for family, kind, protocol, _, address in addresses:
+            if family in seen:
+                continue
+            seen.add(family)
+            with socket.socket(family, kind, protocol) as connection:
+                connection.settimeout(2)
+                try:
+                    connection.connect(address)
+                    return True
+                except OSError:
+                    continue
+    except (OSError, ValueError):
+        pass
+    return False
+
+
+def worker(target, args):
+    catalog = load_catalog(args.catalog)
+    row = next((x for x in catalog if x['id'] == target), None)
+    require(row is not None, 'unknown target')
+    if not row['reconnect']:
+        return {'status':'manual'}
+    binding = load_bindings(args.bindings, catalog).get(target)
+    if not binding:
+        return {'status':'unbound'}
+    try:
+        adapter = native_adapter()
+        rows = adapter.mounted_shares()
+        if find_mount(rows, binding, row['share']):
+            return {'status':'mounted'}
+    except Invalid:
+        return {'status':'identity-conflict'}
+    except (OSError, RuntimeError, ValueError):
+        return {'status':'identity-unavailable'}
+    state, peers = tailnet()
+    if state != 'Running':
+        return {'status':'tailscale-unavailable'}
+    peer = find_peer(binding['host'], peers)
+    if peer is None:
+        return {'status':'unknown-peer'}
+    if peer.get('Online') is not True:
+        return {'status':'offline'}
+    if not probe_peer(binding['host'], peer):
+        return {'status':'unreachable'}
+    try:
+        code = adapter.mount_share(binding['host'], binding['user'], row['share'])
+        if code:
+            return {'status':'needs-login' if code in (13,80) else 'mount-failed'}
+        return {'status':'mounted' if find_mount(adapter.mounted_shares(), binding, row['share']) else 'identity-unavailable'}
+    except Invalid:
+        return {'status':'identity-conflict'}
+    except (OSError, RuntimeError, ValueError):
+        return {'status':'native-unavailable'}
+
+
+def call_worker(target, args):
+    command = [sys.executable, str(Path(__file__).resolve()), '--catalog', str(args.catalog),
+               '--bindings', str(args.bindings), '_worker', target]
+    try:
+        p = subprocess.run(command, capture_output=True, timeout=20)
+        if p.returncode or len(p.stdout) > MAX_BYTES:
+            return {'status':'native-unavailable'}
+        result = json.loads(p.stdout)
+        require(isinstance(result, dict) and set(result) == {'status'}
+                and isinstance(result['status'], str) and result['status'] in SAFE)
+        return result
+    except subprocess.TimeoutExpired:
+        return {'status':'timeout'}
+    except (OSError, ValueError):
+        return {'status':'native-unavailable'}
+
+
+def reconnect(args):
+    catalog = load_catalog(args.catalog)
+    bindings = load_bindings(args.bindings, catalog)
+    private_dir(args.state_dir)
+    fd = os.open(args.state_dir/'lock', os.O_RDWR|os.O_CREAT|os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as lock:
+        info = os.fstat(lock.fileno())
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and info.st_mode & 0o177 == 0, 'unsafe lock file')
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {'status':'busy'}
+        shares = {}
+        for row in catalog:
+            target = row['id']
+            if not row['reconnect']:
+                status = 'manual'
+            elif target not in bindings:
+                status = 'unbound'
+            else:
+                status = call_worker(target, args)['status']
+            shares[target] = status
+        result = {'schema_version':1, 'checked_at':int(time.time()), 'shares':shares}
+        write_json(args.state_dir/'status.json', result)
+        return result
+
+
+def saved_status(args):
+    catalog = load_catalog(args.catalog)
+    try:
+        result = load_json(args.state_dir/'status.json', private=True)
+    except FileNotFoundError:
+        return {'status':'not-run'}
+    require(isinstance(result, dict) and set(result) == {'schema_version','checked_at','shares'}, 'invalid saved status')
+    require(type(result['schema_version']) is int and result['schema_version'] == 1, 'invalid saved status')
+    require(type(result['checked_at']) is int and result['checked_at'] > 0, 'invalid saved status')
+    require(isinstance(result['shares'], dict) and set(result['shares']) == {x['id'] for x in catalog}, 'invalid saved status')
+    require(all(isinstance(x, str) and x in SAFE for x in result['shares'].values()), 'invalid saved status')
+    return result
+
+
+def activate(enabled):
+    home = Path.home()
+    path = home/'Library/LaunchAgents'/f'{LABEL}.plist'
+    # A managed user job only: never operate on system or third-party labels.
+    fd = os.open(path, os.O_RDONLY|os.O_NOFOLLOW)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        require(stat.S_ISREG(info.st_mode) and info.st_uid == os.getuid()
+                and info.st_mode & 0o022 == 0, 'unsafe launch agent')
+        data = plistlib.loads(stream.read(MAX_BYTES+1))
+    require(data.get('Label') == LABEL and data.get('ProgramArguments') == [str(home/'.local/bin/smb-shares'),'reconnect'], 'unexpected launch agent')
+    domain = f'gui/{os.getuid()}'
+    service = f'{domain}/{LABEL}'
+    def call(*parts):
+        return subprocess.run(['/bin/launchctl', *parts], capture_output=True, timeout=10)
+    if enabled:
+        require(not data.get('Disabled', False), 'reconnect disabled in declaration')
+        require(call('enable', service).returncode == 0, 'launch activation failed')
+        if call('print', service).returncode:
+            require(call('bootstrap', domain, str(path)).returncode == 0, 'launch activation failed')
+    else:
+        require(call('disable', service).returncode == 0, 'launch deactivation failed')
+        call('bootout', service)
+    return {'status':'enabled' if enabled else 'disabled'}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--catalog', type=Path, default=Path.home()/'.config/samba/shares.json')
+    parser.add_argument('--bindings', type=Path, default=Path.home()/'.config/samba/private-connections.json')
+    parser.add_argument('--state-dir', type=Path, default=Path.home()/'.local/state/smb-shares')
+    sub = parser.add_subparsers(dest='action', required=True)
+    for action in ('plan','status','reconnect','enable','disable'):
+        sub.add_parser(action)
+    b = sub.add_parser('bind')
+    b.add_argument('target'); b.add_argument('--host', required=True); b.add_argument('--user', required=True)
+    b.add_argument('--alias-host', action='append', default=[])
+    w = sub.add_parser('_worker', help=argparse.SUPPRESS); w.add_argument('target')
+    args = parser.parse_args()
+    try:
+        if args.action in ('enable','disable','reconnect','_worker'):
+            require(sys.platform == 'darwin', 'requires macOS')
+        if args.action == 'reconnect':
+            result = reconnect(args)
+        elif args.action == '_worker':
+            result = worker(args.target, args)
+        elif args.action in ('enable','disable'):
+            result = activate(args.action == 'enable')
+        elif args.action == 'status':
+            result = saved_status(args)
+        else:
+            catalog = load_catalog(args.catalog)
+            bindings = load_bindings(args.bindings, catalog)
+            if args.action == 'bind':
+                require(args.target in {x['id'] for x in catalog}, 'unknown target')
+                require(USER.fullmatch(args.user), 'invalid user')
+                aliases = [normal_host(x) for x in args.alias_host]
+                require(len(aliases) <= 8 and len(aliases) == len(set(aliases)))
+                bindings[args.target] = {'host':normal_host(args.host),'user':args.user,'aliases':aliases}
+                write_json(args.bindings, {'schema_version':1,'bindings':bindings})
+                result = {'status':'bound', 'target':args.target}
+            else:
+                result = {'shares':{x['id']:{'reconnect':x['reconnect'],'bound':x['id'] in bindings,
+                          'deployment':x['deployment']} for x in catalog}}
+        print(json.dumps(result, sort_keys=True))
+        return 0
+    except Invalid as error:
+        print(f'smb-shares: {error}', file=sys.stderr)
+    except (OSError, ValueError, RuntimeError, ImportError, RecursionError, subprocess.TimeoutExpired):
+        print('smb-shares: operation unavailable; check private configuration and status', file=sys.stderr)
+    return 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

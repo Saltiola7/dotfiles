@@ -248,6 +248,16 @@
       "artifacts": [
         "docs/specs/homelab_git_hosting/README.md"
       ]
+    },
+    {
+      "id": "INT-028",
+      "kind": "requirement",
+      "text": "Centralize existing Pi and Omarchy Samba policy and logical share declarations, and automatically reconnect both Pi and HP Omarchy shares on the personal Mac when Tailscale and saved native credentials are available, preserving existing access and data.",
+      "disposition": "ready",
+      "artifacts": [
+        "docs/specs/homelab_file_storage/README.md",
+        "docs/specs/homelab_file_storage/SAMBA-RECONNECT.md"
+      ]
     }
   ],
   "contexts": [
@@ -508,6 +518,30 @@
       ],
       "release_group": "pi-private-forgejo",
       "execution_owner": "build"
+    },
+    {
+      "id": "samba-centralization-reconnect",
+      "context": "homelab_file_storage",
+      "state": "ready",
+      "requirements": [
+        "INT-020",
+        "INT-021",
+        "INT-023",
+        "INT-024",
+        "INT-028"
+      ],
+      "depends_on": [
+        "pi-private-samba"
+      ],
+      "artifacts": [
+        "docs/initiatives/personal-homelab/MANIFEST.json",
+        "docs/initiatives/personal-homelab/README.md",
+        "docs/specs/homelab_file_storage/README.md",
+        "docs/specs/homelab_file_storage/PROFILE.md",
+        "docs/specs/homelab_file_storage/SAMBA-RECONNECT.md"
+      ],
+      "release_group": "samba-centralization-reconnect",
+      "execution_owner": "build"
     }
   ],
   "release_groups": [
@@ -564,6 +598,13 @@
       "id": "pi-private-forgejo",
       "members": [
         "pi-private-forgejo"
+      ],
+      "state": "ready"
+    },
+    {
+      "id": "samba-centralization-reconnect",
+      "members": [
+        "samba-centralization-reconnect"
       ],
       "state": "ready"
     }
