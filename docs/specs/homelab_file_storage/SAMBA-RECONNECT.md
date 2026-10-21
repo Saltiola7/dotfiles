@@ -60,6 +60,41 @@ for macOS recovery; this job is not authorized to force recovery of busy or stal
 open handles. Missing or ambiguous identity fails closed rather than mounting a
 duplicate or returning another host's Shared folder.
 
+## Concrete CLI and configuration contract
+
+`~/.local/bin/smb-shares plan`, `status` and `reconnect` respectively preview
+logical targets, report safe result classes, and perform one bounded pass.
+`bind TARGET --host HOST --user USER [--alias-host HOST]` explicitly writes
+owner-only private metadata, never a password. `enable` and `disable` affect
+only `dev.dotfiles.smb-reconnect` in the current GUI user domain. Internal
+native workers run in subprocesses and are not public provisioning interfaces.
+
+The public catalog is `~/.config/samba/shares.json` with `schema_version: 1`
+and `shares`: each row has `id`, `share`, `policy`, `reconnect` and `deployment`.
+IDs are `pi400`, `hp-envy`, `omarchy-arm`; `Shared` remains the share name.
+`reconnect` is true for Pi and HP, false for the unverified ARM guest. Policy
+is `tailscale-only` for Pi and `private-lan-and-tailscale` for Omarchy. Native
+mount access still uses only each bound host's Tailscale endpoint.
+
+`~/.config/samba/private-connections.json` has `schema_version: 1` and a
+`bindings` object keyed by catalog ID. Each value contains `host`, `user` and
+`aliases` (validated host strings only). Aliases recognize an existing approved
+LAN mount but are never used as an automatic fallback destination. Only known
+Tailscale peer addresses/names authorize new mount attempts. Unknown IDs,
+fields, duplicate keys, embedded URL credentials, malformed names and unsafe
+private-file permissions are rejected before any mount request.
+
+Public source remains `.chezmoidata/samba.json`, one Samba configuration
+renderer in `.chezmoitemplates/`, thin wrappers at existing server source paths,
+and a thin rendered client catalog. No endpoint or per-user password belongs in
+those sources. Existing server wrappers must render the same effective policy.
+The helper's native adapter is under `~/.local/lib/smb_shares/`; it calls
+NetFSMountURLSync with default placement, NoUI and no password argument, and
+NetFSCopyURLForRemountingVolume for mounted identity. A per-user lock serializes
+passes. Tailscale queries, peer port probes and native subprocesses have explicit
+timeouts; each target is independently attempted. Fixed safe state is atomically
+replaced under `~/.local/state/smb-shares/` with owner-only permissions.
+
 ## Behavior
 
 - Given a healthy existing Pi or HP Omarchy mount, repeated reconnect passes
