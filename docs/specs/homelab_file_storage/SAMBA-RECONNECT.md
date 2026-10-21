@@ -1,7 +1,7 @@
 # Central Samba policy and macOS reconnect
 
-Status: Discovery ready; implementation and deployment await exact launch
-approval. Owner: personal dotfiles operator. Bounded context:
+Status: Implemented; selectively deployed and verified on the personal Mac.
+Owner: personal dotfiles operator. Bounded context:
 `homelab_file_storage`; topology, backups and AI configuration remain adjacent.
 
 ## Outcome and scope
@@ -40,7 +40,7 @@ bindings under `~/.config/samba/` are unmanaged, owner-only files; they are neve
 committed. Existing homelab access bindings may seed Pi's endpoint locally but
 are not expanded into public source. The helper offers read-only plan/status,
 explicit private binding enrollment, one reconnect pass and explicit launchd
-activation/removal. Final command shapes are settled during the Spec gate.
+activation/removal. The concrete commands are defined below.
 
 The launchd job uses RunAtLoad and a 60-second StartInterval. It has no KeepAlive
 network-state dependency, privileged helper or password in ProgramArguments.
@@ -58,7 +58,10 @@ mounts. No forced unmount, destructive mountpoint replacement, local fallback
 folder or password-bearing URL is permitted. A still-mounted session is left
 for macOS recovery; this job is not authorized to force recovery of busy or stale
 open handles. Missing or ambiguous identity fails closed rather than mounting a
-duplicate or returning another host's Shared folder.
+duplicate or returning another host's Shared folder. Foreign-owned SMB mounts
+are inspected only through cached kernel identity, never through their paths or
+NetFS. A matching foreign mount is an `identity-conflict`; it is not usable as
+the current user's mount and is never replaced by this helper.
 
 ## Concrete CLI and configuration contract
 
@@ -111,6 +114,8 @@ replaced under `~/.local/state/smb-shares/` with owner-only permissions.
 - Given malformed/private-file permissions, unsupported catalog values,
   endpoint mismatch, concurrent invocation or unknown mount identity, no unsafe
   mount, credential disclosure or unrelated state change occurs.
+- Given another user or privileged backup application owns the target mount,
+  the pass reports `identity-conflict`, preserves that mount and retries later.
 - Given Pi and Omarchy are rendered from the central server policy, their
   existing access boundaries and installed provisioning paths remain compatible.
 - Given an operator removes the reconnect job, future retries stop while
@@ -182,6 +187,7 @@ changes.
 | Waiting | Invalid binding or no Tailscale | Safe status; no mount; later retry |
 | Waiting | Peer/port unavailable | Safe status; existing mounts preserved |
 | Waiting | Exact share already mounted | Reuse; no duplicate |
+| Waiting | Matching foreign-owned mount | Identity conflict; preserve it; later retry |
 | Waiting | Ready and missing mount | One bounded NoUI native request |
 | Mounting | Authentication unavailable/error/timeout | Safe status; later retry |
 | Mounting | Identity verified | Mounted; next pass reuses it |
@@ -190,7 +196,8 @@ changes.
 **Text Equivalent:** Every pass first validates bindings and readiness. An exact
 existing mount is reused. Only a ready missing share enters one bounded native
 mount attempt. Authentication failure, timeout or unavailable peer causes a safe
-waiting state; a verified mount becomes reusable. Disabling the job stops future
+waiting state; a verified mount becomes reusable. A foreign-owned target stays
+untouched until its owner releases it. Disabling the job stops future
 attempts without removing data or mounts. Canonical source: behavior and
 contracts above; operator owns updates when guards or retry semantics change.
 
@@ -210,3 +217,83 @@ repeated authentication failures through private Finder enrollment. Maintain
 supported macOS, Python, Samba and Tailscale; review behavior after OS upgrades.
 Retirement disables the user job and preserves data/credentials until the owner
 explicitly authorizes their independent removal.
+
+## Enrollment and routine use
+
+After reviewing the selected revision, apply only the client files when unrelated
+source changes or scripts are pending:
+
+```sh
+chezmoi apply --exclude=scripts \
+  ~/.local/bin/smb-shares \
+  ~/.local/lib/smb_shares/netfs.py \
+  ~/.config/samba/shares.json \
+  ~/Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
+```
+
+Set each connection binding locally. Replace the example endpoints and username
+with verified private values; these are not shell-ready hostnames:
+
+```sh
+smb-shares bind pi400 --host PI_TAILSCALE_HOST --user OWNER
+smb-shares bind hp-envy --host HP_TAILSCALE_HOST --user OWNER
+smb-shares plan
+smb-shares reconnect
+smb-shares enable
+smb-shares status
+```
+
+An optional `--alias-host` recognizes an already verified older LAN or Tailscale
+mount identity. It never authorizes new connections outside the current peer's
+Tailscale addresses. Use Finder's Go → Connect to Server with the canonical
+`smb://HOST/Shared` address to enroll missing credentials privately, choosing
+the registered user and saving the password when offered. Do not put a password
+in the URL or use a command that prints a Keychain password.
+
+Normal chezmoi apply runs the scoped activation hook. The local data setting
+`smb_reconnect_enabled = false` renders a disabled job and makes that hook
+disable it. `smb-shares disable` also stops future attempts immediately; it
+does not disconnect mounted shares. Keep Python 3.12+ and Tailscale available
+in the declared LaunchAgent PATH.
+
+`status` reads the last sanitized result; `checked_at` is a Unix timestamp. A
+recent `mounted` result verifies identity, not continuous I/O health. Use an
+isolated file roundtrip to investigate a suspected stale mount. `needs-login`
+requires private Finder enrollment. `timeout`, `unreachable`, `offline` and
+`tailscale-unavailable` require connection checks, not credential replacement.
+`identity-unavailable` or `identity-conflict` requires mount ownership/identity
+inspection before taking any recovery action.
+
+Carbon Copy Cloner can mount a network destination through its privileged
+helper. During validation it created a root-owned hidden Pi mount while a user
+remount was being tested; the native user mount request returned error 22.
+After the owner stopped the backup task and that mount disappeared, a fresh
+NoUI Pi mount and file roundtrip passed. The reconnect helper now preserves and
+reports a foreign-owned mount instead of competing with it. Let the owning
+backup application finish or have the owner stop it; retry after it releases
+the mount. Never force unmount or change its task/schedule as automatic recovery.
+An independently scheduled backup may recreate the conflict later.
+
+## Verification and deployment limits
+
+The deployed Mac client passed fresh native NoUI mounts for Pi and HP, separate
+SMB uploads and downloads compared with server-side bytes, exact-identity reuse
+without duplicates, a successful launchd execution and 60-second scheduling.
+Only uniquely named test files were created and removed. Pi's writable root,
+SELinux enforcing, anonymous share denial and existing Samba, SSH, S3 and Git
+service state were checked. HP's Samba configuration remained byte-identical.
+The central server renders preserve the old Pi and HP bytes, so no privileged
+configuration replacement or server restart was necessary.
+
+The Mac client was installed from a committed, privately staged source archive,
+with unrelated chezmoi scripts excluded. Existing dirty Mac and HP source
+checkouts were preserved; do not reset or broadly apply them to update this
+feature. A clean Pi checkout may fast-forward after delivery. HP can review and
+integrate the shared source after its unrelated input work is reconciled; its
+running server already matches the central render.
+
+Cold macOS login, wake from sleep and fresh Keychain-unlock persistence were not
+observed. NoUI mounts in the active login session can reuse session-managed
+authentication and do not prove those cases. Phone UI, the cataloged ARM guest
+share and throughput remain unverified. Review these cases after the next
+normal login without interrupting an active remote session solely for testing.

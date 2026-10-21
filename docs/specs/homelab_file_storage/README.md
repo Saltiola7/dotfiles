@@ -2,8 +2,9 @@
 
 Status: Existing Pi Samba is deployed and delivered. Authenticated file
 roundtrip, denied access, SELinux enforcement, fresh startup and macOS Finder
-access have been verified. Centralization and client reconnect are the next
-scoped change; see SAMBA-RECONNECT.md.
+access have been verified. Shared server policy and the logical share catalog
+are centralized in dotfiles. The personal Mac reconnects Pi and HP Omarchy
+through a per-user LaunchAgent; see SAMBA-RECONNECT.md for enrollment and recovery.
 
 ## Intent and ownership
 

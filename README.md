@@ -71,6 +71,34 @@ per-machine setup:
 References: [API access](https://zed.dev/docs/ai/use-api-access),
 [external agents](https://zed.dev/docs/ai/external-agents).
 
+## Private Samba shares on macOS
+
+Pi400 and HP Omarchy share declarations live in `.chezmoidata/samba.json`.
+Both server configurations render through `.chezmoitemplates/samba.conf`, with
+their existing transport policies preserved. The Omarchy ARM VM is cataloged
+as manual and unverified. This does not manage macOS native file-sharing exports.
+
+Personal `mac-mini` and `macbook` profiles install `smb-shares` and the per-user
+`dev.dotfiles.smb-reconnect` LaunchAgent. It retries both enabled shares
+independently every 60 seconds when their Tailscale peers are available, without
+password dialogs. Private endpoint/user bindings stay outside Git; passwords
+remain in macOS-managed authentication. Enroll each canonical Tailscale hostname
+once through Finder and save its credentials privately if needed.
+
+```sh
+smb-shares plan
+smb-shares status
+smb-shares reconnect
+# Stop future retries while preserving mounted shares and saved credentials:
+smb-shares disable
+```
+
+The helper reuses exact mounted identities and never forces an unmount. A
+foreign-owned mount, including one created by Carbon Copy Cloner, produces
+`identity-conflict` until its owning application releases it. Configuration,
+enrollment, update and recovery details are in
+[the Samba reconnect runbook](docs/specs/homelab_file_storage/SAMBA-RECONNECT.md).
+
 ## Omarchy desk profile
 
 Set `[data].machine_type = "omarchy"` in the local chezmoi configuration.
