@@ -18,6 +18,15 @@ This repository is not meant to be cloned or applied directly. It's published as
 - Tmux, starship prompt, atuin, direnv, git, ssh
 - Homebrew dependencies (Brewfile)
 
+## Git identity and signing
+
+Set local chezmoi `data.git_identity_routing_file` to the absolute path of an
+operator-owned routing file under this checkout's ignored `local/git/` directory
+to enable native Git identity profiles and required commit signing. Leaving the
+setting absent or empty preserves the existing name/email configuration. Follow
+the canonical [Git identity and signing guide](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/git-identity-signing.md)
+for profile setup, 1Password signing, and verification.
+
 ## Zed
 
 Zed stable is installed by the Brewfile (`brew install --cask zed`). Chezmoi

@@ -11,6 +11,8 @@ uv.lock
 .opencode/package.json
 .opencode/package-lock.json
 graphify-out/
+# Operator-local identity routing and other private machine configuration.
+/local/
 # Personal Espanso content is owned by a separate private chezmoi source.
 /private_dot_config/espanso/
 /dot_config/espanso/
