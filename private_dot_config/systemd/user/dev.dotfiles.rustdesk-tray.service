@@ -1,0 +1,14 @@
+[Unit]
+Description=RustDesk desktop tray
+PartOf=graphical-session.target
+After=graphical-session-pre.target
+ConditionPathIsExecutable=/usr/bin/rustdesk
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/rustdesk --tray
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
