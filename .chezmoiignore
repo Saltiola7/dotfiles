@@ -187,6 +187,8 @@ Library/LaunchAgents/dev.dotfiles.runtime-state.plist
 !install-remote-workspace-yazi.sh
 !install-yazi-flavor.sh
 {{ end }}
+# Operator-local inputs must never become managed home-directory targets.
+local/
 docs/
 .config/espanso/
 .config/espanso/**

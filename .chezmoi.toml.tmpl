@@ -15,6 +15,9 @@ encryption = "age"
     name = {{ $name | quote }}
     email = {{ $email | quote }}
     machine_type = {{ $machineType | quote }}
+{{ with default "" (get . "git_identity_routing_file") }}
+    git_identity_routing_file = {{ . | quote }}
+{{ end }}
 {{ if eq $machineType "omarchy" }}
     waynergy_client_name = {{ default "omarchy" (get . "waynergy_client_name") | quote }}
 {{ end }}

@@ -1,11 +1,19 @@
+{{- $gitIdentityRoutingFile := default "" (get . "git_identity_routing_file") -}}
+{{- if and $gitIdentityRoutingFile (not (hasPrefix "/" $gitIdentityRoutingFile)) -}}
+{{- fail "git_identity_routing_file must be an absolute path" -}}
+{{- end -}}
 [filter "lfs"]
 	clean = git-lfs clean -- %f
 	smudge = git-lfs smudge -- %f
 	process = git-lfs filter-process
 	required = true
 [user]
+{{ if $gitIdentityRoutingFile -}}
+	useConfigOnly = true
+{{ else -}}
 	name = {{ .name }}
 	email = {{ .email }}
+{{ end -}}
 [core]
 	askpass = git-gui--askpass
 	excludesfile = {{ .chezmoi.homeDir }}/.gitignore_global
@@ -23,3 +31,9 @@
 [credential "https://gist.github.com"]
 	helper = 
 	helper = !/opt/homebrew/bin/gh auth git-credential
+{{ if $gitIdentityRoutingFile -}}
+[commit]
+	gpgSign = true
+[include]
+	path = {{ $gitIdentityRoutingFile | quote }}
+{{ end -}}
