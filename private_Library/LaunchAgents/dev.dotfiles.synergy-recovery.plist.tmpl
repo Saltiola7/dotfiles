@@ -8,7 +8,7 @@
 <key>Label</key><string>dev.dotfiles.synergy-recovery</string>
 <key>LimitLoadToSessionType</key><string>Aqua</string>
 <key>RunAtLoad</key><true/>
-<key>Disabled</key><{{ if $enabled }}false{{ else }}true{{ end }}/>
+<key>Disabled</key>{{ if $enabled }}<false/>{{ else }}<true/>{{ end }}
 <key>Umask</key><integer>63</integer>
 <key>ProgramArguments</key><array>
 <string>{{ .chezmoi.homeDir | html }}/.local/bin/synergy-recovery</string>
