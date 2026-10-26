@@ -75,6 +75,8 @@ checks. Private cycle evidence owns live gate state and delivery outcomes.
 ## Visual Evidence
 
 State: required; the behavior table defines refresh ownership and recovery.
+Review question: which refresh may query metadata, and when can polling resume?
+Canonical source: this feature's Behavior table and Interface and contract.
 Boundary, interaction, data/trust, schema, dependency/deployment and quantitative:
 not_applicable; this bounded local plugin preserves existing owners, runtime
 connections and cadence, with no persistent metadata or transport changes.
