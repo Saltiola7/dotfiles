@@ -1,5 +1,17 @@
 # Host maintenance changelog
 
+## 2026-10-26 — SKETCHYBAR-MEDIA-POLLING
+
+- Replaced three sequential now-playing queries with one JSON query per refresh.
+  A nonblocking native file lock skips overlapping refreshes and automatically
+  releases ownership on process exit. Existing labels, icons and popup controls
+  remain compatible; installed lockf and jq add no new runtime dependency.
+- Validation: focused regression reproduced eight failures before implementation;
+  21 media tests and Bash syntax passed. Native descriptor ownership, immediate
+  contention failure and retained-file recovery were independently confirmed.
+- Deployment, live observation, gate commit identities and Final Push: pending
+  primary review and Cycle Record closure. No gate exception requested.
+
 ## 2026-10-25 — RUSTDESK-SYNERGY-001
 
 - Added Mac-mini-only authenticated incoming RustDesk desktop detection and
