@@ -1,5 +1,27 @@
 # Host maintenance changelog
 
+## 2026-10-25 — RUSTDESK-SYNERGY-001
+
+- Added Mac-mini-only authenticated incoming RustDesk desktop detection and
+  Synergy native Pause/Resume coordination. Durable restoration ownership
+  preserves an initial manual pause, overlapping sessions, reconnects and helper
+  restart; an unavailable detector does not become a false disconnect.
+- Reused installed native app controls and existing Homebrew Python 3.12. Kept
+  Synergy login, TLS pairing, HP Waynergy and narrow TLS-deadlock recovery intact.
+  Adapter compatibility is explicit: RustDesk 1.5.0 and Synergy 3.8.4.
+- Validation: 240 affected tests passed. Native pause/resume idempotency, durable
+  recovery after an actual helper SIGKILL, deployed launchd replacement, and
+  startup-order regression passed. A real incoming desktop reported count one,
+  paused the core and retained its journal through another deployed helper crash.
+  Operator confirmed working clicks; real disconnect restored sharing and cleared
+  the journal. Targeted repeat apply had no drift; private preimages retained.
+- Broader macOS run: 675 passed, one skipped, 12 failures in unchanged Linux
+  desktop-startup tests requiring absent `/usr/bin/bash`. Those are outside this
+  affected scope; Linux CI retains its full configured suite. No gate exception.
+- Implementation commits: `1d7563f`, `5a6aaed`; earlier commits retain the domain,
+  behavior, interface and contract transitions. Release not applicable. Intended
+  Final Push: feature branch and draft PR into main; actual result is in Cycle Record.
+
 ## 2026-10-07 — SSD-HOST-RETIRED-SOURCES
 
 - Removed obsolete Colima launcher, LaunchAgent, bootstrap hook and ignore entries.
