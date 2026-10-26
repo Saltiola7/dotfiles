@@ -45,6 +45,45 @@ Existing pytest/chezmoi authorities cover the helper and managed host files.
 The table is the canonical state evidence: idle, acquiring, suspended, restoring,
 unknown and relinquished are operational states, not independent input owners.
 
+## Interfaces and decisions
+
+`~/.local/bin/synergy-handoff` provides `run`, `once` and `status` commands.
+`~/.config/synergy-handoff/config.json` selects enabled state, existing Python/app
+paths and a 0.5-second polling interval. A current-user Aqua LaunchAgent runs the
+helper with launchd restart supervision. A separate activation helper validates
+managed files and loads this job without changing Synergy's own launch jobs.
+
+Private state lives under `~/Library/Application Support/dotfiles/synergy-handoff/`
+with mode 0700: an atomic restoration journal, current status, a process lock and
+bounded event log. State contains counts and phases, never remote identities,
+passwords, clipboard contents or IPC response dumps.
+
+RustDesk 1.5.0: query the current-user `/tmp/RustDesk-UID/ipc` Unix socket with
+BytesCodec-framed JSON `{"t":"VideoConnCount","c":null}`. Accept only a bounded
+integer response with matching message type. This counts authenticated incoming
+desktop sessions, including view-only. Verify socket ownership, permissions and
+live peer executable. Never infer session state from logs, socket existence or
+`HasNoActiveConns`, which includes other activity.
+
+Synergy 3.8.4: use the same internal loopback service controls as its installed UI:
+GET `/v1/settings`, POST `/v1/controls/pauseCore` and POST
+`/v1/controls/resumeCore` on port 24803. Require the expected current-user native
+service and listener before mutations; validate ready state, version and Boolean
+`local_system.core_enabled`/`coreRunning`. This is a version-gated adapter to an
+internal interface, not a claimed public API. Native Pause disables supervision
+of the core and persists across service restart. Killing core alone is unsuitable.
+
+Runtime interface: `SessionSample(count, host_alive)` feeds a `Coordinator.step`
+method. `Synergy.snapshot/pause/resume/present` and atomic `StateStore` are
+replaceable test boundaries. A successful HTTP response alone never completes a
+transition. Python runtime is the already-installed Homebrew Python 3.12 path,
+not the moving unversioned Python. Tests use the repository's Python 3.12+ pytest
+authority without a new dependency or lockfile.
+
+Implementation order: detector and adapter fixtures; durable state machine and
+crash tests; managed configuration/startup; targeted rendering; native host probes;
+authenticated incoming-session acceptance and recovery probes; coherent review.
+
 ## Visual Evidence
 
 State: required; the transition table added with the behavior contract is canonical.
