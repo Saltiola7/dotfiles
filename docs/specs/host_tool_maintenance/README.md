@@ -1,5 +1,8 @@
 # Host tool maintenance
 
+The [incoming RustDesk/Synergy handoff](features/rustdesk-synergy-handoff.md)
+defines temporary Mac input ownership, prior-state preservation and recovery.
+
 Engineering Profile: [PROFILE.md](PROFILE.md). Authority: SSD toolchain recovery
 Initiative in dotfiles-ai, INT-003, INT-012 and INT-022. Current slice:
 host-sdk-shell-resolution. Risk: elevated; delivery: draft PR and targeted host
