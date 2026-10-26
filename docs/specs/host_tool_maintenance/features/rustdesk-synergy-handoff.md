@@ -84,6 +84,54 @@ Implementation order: detector and adapter fixtures; durable state machine and
 crash tests; managed configuration/startup; targeted rendering; native host probes;
 authenticated incoming-session acceptance and recovery probes; coherent review.
 
+## Contract and ordered recovery
+
+1. Serialize helper instances with an OS lock. Read bounded, private configuration
+   and journal files; malformed state blocks mutation and is reported.
+2. Query authoritative session state with bounded exact reads and a deadline.
+   Positive count acquires input immediately. Two consecutive valid zeros release
+   it. An absent socket is unknown while a desktop-host process remains alive.
+   If no RustDesk desktop-host process exists for five seconds, its sessions are
+   necessarily gone; release without depending on a disconnect log.
+3. Before the first Pause, atomically persist a journal only if sharing was enabled
+   and its core running. A crash before mutation is recoverable because actual
+   settings are reconciled on restart. Pause is idempotent; verify both disabled
+   intent and stopped core before reporting suspension complete.
+4. During positive/unknown ownership keep the journal. On last disconnect write
+   `resume_pending` before Resume. Verify enabled intent and running core before
+   deleting the journal. A crash at either side of a request preserves recovery.
+   Failed verification keeps a visible pending state and retries with bounded I/O.
+5. If both Synergy GUI and service disappear, relinquish the journal and do not
+   launch either app. A service-only crash with GUI present retains it. Initial
+   manual pause/absence never creates a journal. An additional Pause click while
+   already automatically paused has no distinct observable intent; operators must
+   disable the coordinator after session completion to retain a new manual pause.
+
+Compatibility failure never becomes a valid zero count or successful control.
+HTTP uses direct loopback without environment proxies or redirects. Local peers,
+paths and listener identity are checked; network endpoints are not configurable.
+No credentials or RustDesk permission changes are required. Idle polling never
+starts or pauses Synergy. Acquisition is bounded polling, not a synchronous hook
+before RustDesk's first input; live acceptance must assess that short handoff delay.
+
+Validation: meaningful pytest state/transport fixtures cover positive/zero/unknown
+counts, overlapping sessions, reconnects, malformed frames, ownership, version
+drift, request timeouts and crash boundaries. Render all changed templates for
+Mac mini and exclusion profiles; validate shell/plist syntax. Native probes verify
+real read-state, native Pause stops core, native Resume starts it, idempotency and
+coordinator restart. Authenticated incoming session and remote-viewer crash require
+actual separate-client evidence; fixtures alone cannot claim those passed.
+
+Deployment: retain preimages, apply only new handoff targets from this checkout,
+verify launchd health/status and an empty repeat diff. Existing Synergy login and
+TLS-recovery configuration remain independent. Rollback waits until sessions end
+and owned restoration completes, unloads the handoff job and restores only its
+preimages. Never delete a restoration journal to force apparent completion.
+
+Maintenance: requalify both adapters after RustDesk/Synergy upgrades. Expose
+incompatibility in status and log. Owner: dotfiles maintainer. No package release
+or automatic upstream app upgrade. Feature retirement uses the rollback sequence.
+
 ## Visual Evidence
 
 State: required; the transition table added with the behavior contract is canonical.
