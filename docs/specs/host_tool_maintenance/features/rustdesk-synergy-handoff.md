@@ -24,6 +24,27 @@ runtime helper may use the already-installed Homebrew Python, local Unix sockets
 loopback HTTP and private atomic state files. No new dependency or package install.
 Existing pytest/chezmoi authorities cover the helper and managed host files.
 
+## Behavior
+
+| Given | When | Required outcome |
+|---|---|---|
+| Sharing is enabled and running | First authenticated incoming desktop session appears | Journal prior sharing state, request native Pause and verify core stops |
+| Sharing is paused, stopped or service absent | A session starts | Preserve that state; do not acquire restoration ownership |
+| Two incoming desktop sessions exist | One disconnects | Keep sharing suspended until both end |
+| A session reconnects quickly | Zero count is transient | Do not resume between observations; require two consecutive valid zero counts |
+| Coordinator owns a suspension | Last session disconnects | Request native Resume and verify enabled state and running core |
+| Coordinator crashes before/after Pause or Resume | launchd restarts it | Reconcile durable journal and actual state; no lost restore or duplicate toggles |
+| RustDesk crashes | No desktop-host process remains for a grace period | Restore owned suspension without relying on missing disconnect logs |
+| IPC is malformed, stale or times out while RustDesk remains alive | Session state cannot be established | Keep owned suspension, report unknown and retry |
+| Synergy service crashes while suspended | Its supervisor restarts it | Persistent Pause remains; restore ownership survives |
+| User quits Synergy during suspension | GUI and service disappear | Relinquish restore ownership; do not launch Synergy |
+| Pause/Resume times out after possibly applying | Next observation arrives | Reconcile observed state; never treat request success alone as completion |
+| App version or response schema changes | Adapter cannot verify compatibility | Report incompatibility and do not issue mutations |
+| Only outgoing RustDesk or file-transfer activity exists | Detector polls | Incoming desktop count stays zero; preserve sharing |
+
+The table is the canonical state evidence: idle, acquiring, suspended, restoring,
+unknown and relinquished are operational states, not independent input owners.
+
 ## Visual Evidence
 
 State: required; the transition table added with the behavior contract is canonical.
