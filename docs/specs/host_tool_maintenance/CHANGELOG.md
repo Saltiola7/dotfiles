@@ -20,7 +20,8 @@
   closed gracefully; targeted apply is idempotent. Authenticated MCP discovery
   returned 21 tools. A real contender was rejected in 56 ms; the owning Node
   retained its lease, then exited cleanly and allowed reacquisition.
-- Existing cached client contexts still require their owner's final refresh.
+- The existing application loaded the guarded connector. Competing cached
+  contexts were rejected by the lease; no legacy npm parents remain.
   Release is not applicable; no package is published and no gate exception is
   requested. Intended delivery: feature-branch draft PR into main; actual
   deployment and Final Push outcomes belong to the private Cycle Record.
