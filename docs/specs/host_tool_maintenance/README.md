@@ -3,6 +3,10 @@
 The [incoming RustDesk/Synergy handoff](features/rustdesk-synergy-handoff.md)
 defines temporary Mac input ownership, prior-state preservation and recovery.
 
+The [Raindrop connector contract](features/raindrop-mcp.md) defines one live
+connector per authentication cache, offline resolution of the existing pinned
+proxy, and direct Node ownership of its native lease.
+
 The [media polling contract](features/media-polling.md) keeps SketchyBar metadata
 refreshes to one nonoverlapping CLI query while preserving its existing controls.
 

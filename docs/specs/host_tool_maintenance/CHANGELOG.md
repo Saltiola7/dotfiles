@@ -1,5 +1,31 @@
 # Host maintenance changelog
 
+## 2026-10-26 — RAINDROP-MCP-SINGLETON
+
+- Added a macOS Raindrop launcher that admits one live connector per existing
+  authentication cache. It resolves cached mcp-remote 0.15.2 offline without
+  installation, then directly executes Node with the existing endpoint,
+  HTTP-only transport and authentication timeout. No persistent npm or shell
+  guardian is required; busy contenders exit before resolution.
+- Preserved explicit cache selection, caller working directory and MCP stdio.
+  The native descriptor lease remains on the Node PID and releases after EOF,
+  SIGINT or SIGKILL without removing the lock inode or changing credentials.
+- Validation: two intended interface tests failed before the launcher existed;
+  all 20 focused tests then passed. Actual Node descriptor/inode/PID checks,
+  contention, crash recovery, private resolution failures and stdio passed,
+  together with native Bash syntax and diff checks. Gate commits: `ed43d4c`
+  (initial contract) and `15b618f` (tests and launcher).
+- Deployment: installed only the reviewed launcher and configured the native
+  client with the existing authentication cache. Legacy proxy process trees were
+  closed gracefully; targeted apply is idempotent. Authenticated MCP discovery
+  returned 21 tools. A real contender was rejected in 56 ms; the owning Node
+  retained its lease, then exited cleanly and allowed reacquisition.
+- The existing application loaded the guarded connector. Competing cached
+  contexts were rejected by the lease; no legacy npm parents remain.
+  Release is not applicable; no package is published and no gate exception is
+  requested. Intended delivery: feature-branch draft PR into main; actual
+  deployment and Final Push outcomes belong to the private Cycle Record.
+
 ## 2026-10-26 — SKETCHYBAR-MEDIA-POLLING
 
 - Replaced three sequential now-playing queries with one JSON query per refresh.
