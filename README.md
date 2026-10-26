@@ -211,6 +211,37 @@ retain their existing bindings.
 
 ## Synergy recovery on Mac mini
 
+Incoming RustDesk desktop sessions automatically pause Synergy on the Mac mini.
+The separate `synergy-handoff` job queries authenticated incoming desktop count,
+uses Synergy's native Pause/Resume controls and restores only sharing that was
+enabled and running before its intervention. View-only desktops also suspend
+sharing; file transfers and outgoing sessions do not. Two zero observations absorb
+quick reconnects. A confirmed RustDesk host-process exit releases suspension after
+five seconds; IPC failure while the host lives holds it and reports unknown state.
+
+The restoration journal survives helper/service crashes. Existing Synergy startup
+and narrow TLS recovery remain independent; native Pause stops the core so its
+watchdog has nothing to restart. This adapter is qualified for RustDesk 1.5.0 and
+Synergy 3.8.4 and fails visibly on incompatible versions. It uses existing
+Homebrew Python 3.12, with no package installation. See the
+[handoff contract](docs/specs/host_tool_maintenance/features/rustdesk-synergy-handoff.md).
+
+Inspect current state with `synergy-handoff-setup status`; use
+`/opt/homebrew/bin/python3.12 ~/.local/bin/synergy-handoff probe` for a read-only
+live session/sharing snapshot. Status and a bounded event log live under
+`~/Library/Application Support/dotfiles/synergy-handoff/` with private permissions.
+Polling adds a short handoff delay. A manual pause made before the session survives;
+another Pause click while automatically paused has no separately observable intent.
+To retain a new manual pause, finish the remote session, wait for restoration,
+disable the handoff job, then pause Synergy.
+
+Set `[data].synergy_handoff_enabled=false` to disable after owned restoration has
+finished, or override `synergy_handoff_python` for an existing Python 3.12+ runtime.
+Apply only the handoff helper, setup helper, config, LaunchAgent and activation
+hook from the intended source. Retain preimages; rollback unloads only
+`gui/$(id -u)/dev.dotfiles.synergy-handoff` after disconnect and restoration, then
+restores those files. Never remove a pending restoration journal to bypass recovery.
+
 Chezmoi manages two current-user Aqua LaunchAgents for the Darwin `mac-mini`
 profile. One opens Synergy once at desktop login; the other checks its core
 every 60 seconds. Recovery requires two samples of the confirmed TLS cleanup

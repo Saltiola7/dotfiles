@@ -126,6 +126,11 @@ Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist
 .local/bin/synergy-recovery
 .local/bin/synergy-setup
 load-synergy-launchagents.sh
+.config/synergy-handoff/
+Library/LaunchAgents/dev.dotfiles.synergy-handoff.plist
+.local/bin/synergy-handoff
+.local/bin/synergy-handoff-setup
+load-synergy-handoff.sh
 {{ end }}
 {{ if ne .machine_type "fedora-workstation" }}
 .config/sway/

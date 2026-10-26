@@ -1,5 +1,8 @@
 # Host maintenance backlog
 
+- RUSTDESK-SYNERGY-001: deployed and live-qualified on Mac mini, including helper
+  SIGKILL/restart during an incoming desktop; Final Push tracked in Cycle Record.
+
 - SSD-HOST-SDK-SHELL: implemented and host-qualified; Final Push tracked in Cycle Record.
 - SSD-HOST-SDK-BOOTSTRAP: implemented and host-qualified; Homebrew duplicate
   ownership retired without zap, installation backups retained.

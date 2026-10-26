@@ -1,0 +1,6 @@
+{
+  "enabled": {{ if hasKey . "synergy_handoff_enabled" }}{{ .synergy_handoff_enabled }}{{ else }}true{{ end }},
+  "interval": 0.5,
+  "synergy_app": {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | toJson }},
+  "rustdesk_app": "/Applications/RustDesk.app"
+}

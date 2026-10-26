@@ -24,6 +24,8 @@ encryption = "age"
 {{ if eq $machineType "mac-mini" }}
     synergy_recovery_enabled = {{ if hasKey . "synergy_recovery_enabled" }}{{ .synergy_recovery_enabled }}{{ else }}true{{ end }}
     synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
+    synergy_handoff_enabled = {{ if hasKey . "synergy_handoff_enabled" }}{{ .synergy_handoff_enabled }}{{ else }}true{{ end }}
+    synergy_handoff_python = {{ default "/opt/homebrew/bin/python3.12" (get . "synergy_handoff_python") | quote }}
 {{ end }}
 {{ if and (eq .chezmoi.os "darwin") (or (eq $machineType "mac-mini") (eq $machineType "macbook")) }}
     smb_reconnect_enabled = {{ if hasKey . "smb_reconnect_enabled" }}{{ .smb_reconnect_enabled }}{{ else }}true{{ end }}
