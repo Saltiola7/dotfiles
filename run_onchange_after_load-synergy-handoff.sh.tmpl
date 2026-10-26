@@ -1,0 +1,14 @@
+#!/bin/bash
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+set -eu
+# Helper: {{ include "dot_local/bin/executable_synergy-handoff" | sha256sum }}
+# Setup: {{ include "dot_local/bin/executable_synergy-handoff-setup" | sha256sum }}
+# Job: {{ include "private_Library/LaunchAgents/dev.dotfiles.synergy-handoff.plist.tmpl" | sha256sum }}
+# Config: {{ include "private_dot_config/synergy-handoff/private_config.json.tmpl" | sha256sum }}
+{{- $enabled := true }}
+{{- if hasKey . "synergy_handoff_enabled" }}{{ $enabled = .synergy_handoff_enabled }}{{ end }}
+# Render context: {{ printf "%t\n%s\n%s\n%s" $enabled (default "/opt/homebrew/bin/python3.12" (get . "synergy_handoff_python")) (default "/Applications/Synergy.app" (get . "synergy_app_path")) .chezmoi.homeDir | sha256sum }}
+exec {{ printf "%s/.local/bin/synergy-handoff-setup" .chezmoi.homeDir | shellQuote }} activate
+{{ else -}}
+exit 0
+{{ end -}}

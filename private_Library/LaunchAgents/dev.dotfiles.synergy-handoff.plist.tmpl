@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>dev.dotfiles.synergy-handoff</string>
+<key>LimitLoadToSessionType</key><string>Aqua</string>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+<key>ThrottleInterval</key><integer>3</integer>
+<key>Disabled</key><{{ if hasKey . "synergy_handoff_enabled" }}{{ if .synergy_handoff_enabled }}false{{ else }}true{{ end }}{{ else }}false{{ end }}/>
+<key>Umask</key><integer>63</integer>
+<key>ProgramArguments</key><array>
+<string>{{ default "/opt/homebrew/bin/python3.12" (get . "synergy_handoff_python") | html }}</string>
+<string>{{ .chezmoi.homeDir | html }}/.local/bin/synergy-handoff</string><string>run</string>
+</array>
+<key>ProcessType</key><string>Background</string>
+<key>StandardOutPath</key><string>/dev/null</string>
+<key>StandardErrorPath</key><string>/dev/null</string>
+</dict></plist>

@@ -1,0 +1,439 @@
+#!/usr/bin/env python3
+"""Suspend Synergy for authenticated incoming RustDesk desktop sessions."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import plistlib
+import socket
+import stat
+import struct
+import subprocess
+import tempfile
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+MAX_FRAME = 16384
+PHASES = {"pause_pending", "paused", "resume_pending"}
+
+
+class SurfaceError(Exception):
+    """An observation or transition could not be safely verified."""
+
+
+@dataclass(frozen=True)
+class SessionSample:
+    count: int | None
+    host_alive: bool
+
+
+@dataclass(frozen=True)
+class SynergyState:
+    enabled: bool
+    running: bool
+
+
+def encode_frame(payload: bytes) -> bytes:
+    if not 0 <= len(payload) <= MAX_FRAME:
+        raise SurfaceError("invalid-frame-size")
+    size = len(payload)
+    width = next(n for n in range(1, 5) if size < 1 << (8 * n - 2))
+    return ((size << 2) | (width - 1)).to_bytes(width, "little") + payload
+
+
+def recv_frame(stream: socket.socket) -> bytes:
+    deadline = time.monotonic() + 1.0
+
+    def exact(size: int) -> bytes:
+        result = bytearray()
+        while len(result) < size:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise SurfaceError("ipc-deadline")
+            if hasattr(stream, "settimeout"):
+                stream.settimeout(remaining)
+            try:
+                part = stream.recv(size - len(result))
+            except OSError as exc:
+                raise SurfaceError("ipc-read-failed") from exc
+            if not part:
+                raise SurfaceError("ipc-eof")
+            result.extend(part)
+        return bytes(result)
+
+    first = exact(1)
+    width = (first[0] & 3) + 1
+    size = int.from_bytes(first + exact(width - 1), "little") >> 2
+    if not 0 <= size <= MAX_FRAME:
+        raise SurfaceError("invalid-frame-size")
+    return exact(size)
+
+
+def private_json(path: Path, missing=None):
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return missing
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_mode & 0o077 or info.st_size > 65536):
+        raise SurfaceError("unsafe-private-file")
+    try:
+        return json.loads(path.read_bytes())
+    except (ValueError, UnicodeError) as exc:
+        raise SurfaceError("invalid-private-json") from exc
+
+
+class StateStore:
+    def __init__(self, directory: Path):
+        self.directory = Path(directory)
+        self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        info = self.directory.lstat()
+        if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_mode & 0o077):
+            raise SurfaceError("unsafe-state-directory")
+        self.path = self.directory / "lease.json"
+
+    def read(self) -> dict | None:
+        data = private_json(self.path)
+        if (data is not None or self.path.exists()) and (
+                not isinstance(data, dict) or type(data.get("schema")) is not int
+                or data.get("schema") != 1 or not isinstance(data.get("phase"), str)
+                or data.get("phase") not in PHASES):
+            raise SurfaceError("invalid-restoration-journal")
+        return data
+
+    def atomic(self, name: str, data: dict) -> None:
+        fd, temporary = tempfile.mkstemp(prefix=".write-", dir=self.directory)
+        try:
+            with os.fdopen(fd, "w") as output:
+                json.dump(data, output, sort_keys=True)
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            os.replace(temporary, self.directory / name)
+            self.sync_directory()
+        finally:
+            Path(temporary).unlink(missing_ok=True)
+
+    def sync_directory(self) -> None:
+        fd = os.open(self.directory, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+
+    def write(self, data: dict) -> None:
+        self.atomic("lease.json", data)
+
+    def clear(self) -> None:
+        self.path.unlink(missing_ok=True)
+        self.sync_directory()
+
+    def status(self, status: str, count: int | None) -> None:
+        previous = private_json(self.directory / "status.json", {})
+        stamp = datetime.now(timezone.utc).isoformat()
+        if (previous.get("status") == status and previous.get("count") == count
+                and time.time() - datetime.fromisoformat(previous["at"]).timestamp() < 30):
+            return
+        self.atomic("status.json", {"status": status, "count": count, "at": stamp})
+        if previous.get("status") != status:
+            log = self.directory / "events.log"
+            if log.exists() and log.stat().st_size >= 65536:
+                os.replace(log, self.directory / "events.log.1")
+            with log.open("a") as output:
+                output.write(f"{stamp} {status}\n")
+
+
+class Coordinator:
+    def __init__(self, store: StateStore, synergy, clock=time.monotonic,
+                 grace: float = 5, settle: int = 2):
+        self.store, self.synergy, self.clock = store, synergy, clock
+        self.grace, self.settle = grace, settle
+        self.zeros = 0
+        self.missing_since: float | None = None
+        self.error: str | None = None
+
+    def step(self, sample: SessionSample) -> str:
+        try:
+            status = self.reconcile(sample)
+            self.error = None
+        except (SurfaceError, OSError, urllib.error.URLError) as exc:
+            self.error = str(exc) if isinstance(exc, SurfaceError) else "surface-unavailable"
+            status = "unavailable"
+        return status
+
+    def reconcile(self, sample: SessionSample) -> str:
+        lease = self.store.read()
+        if lease and not self.synergy.present():
+            self.store.clear()
+            return "relinquished-user-quit"
+        if sample.count is not None:
+            if type(sample.count) is not int or not 0 <= sample.count <= 1024:
+                raise SurfaceError("invalid-session-count")
+            self.missing_since = None
+            self.zeros = self.zeros + 1 if sample.count == 0 else 0
+            active = sample.count > 0
+            idle = self.zeros >= self.settle
+        else:
+            self.zeros = 0
+            if sample.host_alive:
+                self.missing_since = None
+            elif self.missing_since is None:
+                self.missing_since = self.clock()
+            active = False
+            idle = (not sample.host_alive and self.missing_since is not None
+                    and self.clock() - self.missing_since >= self.grace)
+        if not active and not idle:
+            return "session-unknown" if sample.count is None else "settling"
+        if not active and lease is None:
+            return "idle"
+        state = self.synergy.snapshot()
+        if active:
+            if lease is None:
+                if not state.enabled or not state.running:
+                    return "preexisting-paused-or-stopped"
+                lease = {"schema": 1, "phase": "pause_pending"}
+                self.store.write(lease)
+            if state.enabled or state.running:
+                self.store.write({**lease, "phase": "pause_pending"})
+                self.synergy.pause()
+                state = self.synergy.snapshot()
+            if state.enabled or state.running:
+                return "pause-pending"
+            if lease["phase"] != "paused":
+                self.store.write({**lease, "phase": "paused"})
+            return "suspended"
+        if state.enabled and state.running:
+            self.store.clear()
+            return "restored"
+        self.store.write({**lease, "phase": "resume_pending"})
+        self.synergy.resume()
+        state = self.synergy.snapshot()
+        if state.enabled and state.running:
+            self.store.clear()
+            return "restored"
+        return "resume-pending"
+
+
+@dataclass(frozen=True)
+class Process:
+    uid: int
+    pid: int
+    parent: int
+    executable: str
+
+
+def processes() -> list[Process]:
+    result = subprocess.run(["/bin/ps", "-ww", "-axo", "uid=,pid=,ppid=,comm="],
+                            capture_output=True, text=True, timeout=2, check=True)
+    found = []
+    for line in result.stdout.splitlines():
+        fields = line.strip().split(None, 3)
+        if len(fields) == 4:
+            found.append(Process(int(fields[0]), int(fields[1]), int(fields[2]), fields[3]))
+    return found
+
+
+def app_version(app: Path) -> str:
+    try:
+        with (app / "Contents/Info.plist").open("rb") as source:
+            return plistlib.load(source)["CFBundleShortVersionString"]
+    except (OSError, ValueError, KeyError) as exc:
+        raise SurfaceError("app-version-unavailable") from exc
+
+
+class RustDesk:
+    def __init__(self, app: Path):
+        self.app = app
+        self.executable = str(app / "Contents/MacOS/RustDesk")
+        self.error: str | None = None
+
+    def sample(self) -> SessionSample:
+        alive = True
+        try:
+            found = processes()
+            alive = any(p.uid == os.getuid() and p.executable == self.executable for p in found)
+            if not alive:
+                self.error = None
+                return SessionSample(None, False)
+            if app_version(self.app) != "1.5.0":
+                raise SurfaceError("rustdesk-version-incompatible")
+            path = Path(f"/tmp/RustDesk-{os.getuid()}/ipc")
+            for target, kind in ((path.parent, stat.S_ISDIR), (path, stat.S_ISSOCK)):
+                info = target.lstat()
+                if (not kind(info.st_mode) or info.st_uid != os.getuid()
+                        or info.st_mode & 0o077):
+                    raise SurfaceError("unsafe-rustdesk-socket")
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as stream:
+                stream.settimeout(1)
+                stream.connect(str(path))
+                # Darwin sys/un.h: SOL_LOCAL=0, LOCAL_PEERPID=2.
+                peer = struct.unpack("=i", stream.getsockopt(0, 2, 4))[0]
+                if not any(p.pid == peer and p.uid == os.getuid()
+                           and p.executable == self.executable for p in processes()):
+                    raise SurfaceError("unexpected-rustdesk-peer")
+                stream.sendall(encode_frame(b'{"t":"VideoConnCount","c":null}'))
+                reply = json.loads(recv_frame(stream))
+            count = reply.get("c") if isinstance(reply, dict) else None
+            if (not isinstance(reply, dict) or reply.get("t") != "VideoConnCount"
+                    or type(count) is not int or not 0 <= count <= 1024):
+                raise SurfaceError("invalid-session-response")
+            self.error = None
+            return SessionSample(count, True)
+        except (SurfaceError, OSError, ValueError, subprocess.SubprocessError) as exc:
+            self.error = str(exc) if isinstance(exc, SurfaceError) else "rustdesk-probe-failed"
+            return SessionSample(None, alive)
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise SurfaceError("unexpected-service-redirect")
+
+
+def parse_listener(output: str, pid: int) -> bool:
+    records = output.splitlines()
+    return ([line for line in records if line.startswith("p")] == [f"p{pid}"]
+            and [line for line in records if line.startswith("n")] == ["n127.0.0.1:24803"]
+            and all(line[:1] in ("p", "f", "n") for line in records))
+
+
+class Synergy:
+    def __init__(self, app: Path):
+        self.app = app
+        self.service = str(app / "Contents/MacOS/synergy-service")
+        self.gui = str(app / "Contents/MacOS/Synergy")
+        self.http = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+
+    def present(self) -> bool:
+        return any(p.uid == os.getuid() and p.executable in (self.service, self.gui)
+                   for p in processes())
+
+    def owner(self) -> Process:
+        owners = [p for p in processes() if p.uid == os.getuid()
+                  and p.executable == self.service]
+        if len(owners) != 1:
+            raise SurfaceError("synergy-service-unavailable")
+        return owners[0]
+
+    def request(self, endpoint: str, method: str = "GET") -> dict:
+        req = urllib.request.Request("http://127.0.0.1:24803/v1/" + endpoint, method=method)
+        with self.http.open(req, timeout=2) as response:
+            body = response.read(262145)
+        if len(body) > 262144:
+            raise SurfaceError("oversized-service-response")
+        try:
+            result = json.loads(body)
+        except (ValueError, UnicodeError) as exc:
+            raise SurfaceError("invalid-service-json") from exc
+        if not isinstance(result, dict):
+            raise SurfaceError("invalid-service-response")
+        return result
+
+    def snapshot(self) -> SynergyState:
+        owner = self.owner()
+        data = self.request("settings").get("data")
+        if (not isinstance(data, dict) or data.get("ready") is not True
+                or not isinstance(data.get("serviceInfo"), dict)
+                or data["serviceInfo"].get("serviceVersion") != "3.8.4"
+                or not isinstance(data.get("local_system"), dict)
+                or type(data["local_system"].get("core_enabled")) is not bool
+                or type(data.get("coreRunning")) is not bool):
+            raise SurfaceError("synergy-version-or-schema-incompatible")
+        running = any(p.uid == owner.uid and p.parent == owner.pid
+                      and p.executable.endswith("/synergy-core") for p in processes())
+        if data["coreRunning"] != running or self.owner() != owner:
+            raise SurfaceError("synergy-core-state-changing")
+        return SynergyState(data["local_system"]["core_enabled"], running)
+
+    def control(self, action: str) -> None:
+        owner = self.owner()
+        self.snapshot()
+        result = subprocess.run(["/usr/sbin/lsof", "-nP", "-iTCP:24803", "-sTCP:LISTEN",
+                                 "-Fpn"], capture_output=True, text=True, timeout=3,
+                                check=True)
+        if not parse_listener(result.stdout, owner.pid):
+            raise SurfaceError("unexpected-synergy-listener")
+        if self.owner() != owner:
+            raise SurfaceError("synergy-service-changing")
+        self.request("controls/" + action, "POST")
+
+    def pause(self) -> None:
+        self.control("pauseCore")
+
+    def resume(self) -> None:
+        self.control("resumeCore")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("operation", choices=("run", "once", "status", "probe"), nargs="?", default="status")
+    parser.add_argument("--config", type=Path,
+                        default=Path.home() / ".config/synergy-handoff/config.json")
+    args = parser.parse_args()
+    os.umask(0o077)
+    directory = Path.home() / "Library/Application Support/dotfiles/synergy-handoff"
+    store = StateStore(directory)
+    if args.operation == "status":
+        print(json.dumps(private_json(directory / "status.json", {"status": "not-started"})))
+        return 0
+    config = private_json(args.config)
+    if (not isinstance(config, dict) or type(config.get("enabled")) is not bool
+            or type(config.get("interval")) not in (float, int)
+            or not 0.2 <= config["interval"] <= 5):
+        raise SurfaceError("invalid-configuration")
+    for key in ("rustdesk_app", "synergy_app"):
+        if (not isinstance(config.get(key), str) or not Path(config[key]).is_absolute()
+                or not config[key].endswith(".app")):
+            raise SurfaceError("invalid-app-path")
+    rustdesk = RustDesk(Path(config["rustdesk_app"]))
+    synergy = Synergy(Path(config["synergy_app"]))
+    if args.operation == "probe":
+        sample = rustdesk.sample()
+        state = synergy.snapshot()
+        print(json.dumps({"incoming_desktops": sample.count, "rustdesk_host_alive": sample.host_alive,
+                          "synergy_enabled": state.enabled, "synergy_running": state.running,
+                          "detector_error": rustdesk.error}))
+        return 0
+    with (directory / "run.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SurfaceError("coordinator-already-running")
+        coordinator = Coordinator(store, synergy)
+        while True:
+            # A requested disable still completes an already-owned restoration.
+            current = private_json(args.config)
+            if not isinstance(current, dict) or type(current.get("enabled")) is not bool:
+                raise SurfaceError("invalid-configuration")
+            if not current["enabled"] and store.read() is None:
+                store.status("disabled", None)
+                return 0
+            sample = rustdesk.sample()
+            try:
+                status = coordinator.step(sample)
+                store.status(f"{status}:{coordinator.error}" if coordinator.error else status,
+                             sample.count)
+            except (OSError, SurfaceError, subprocess.SubprocessError):
+                store.status("unavailable", sample.count)
+                status = "unavailable"
+            if rustdesk.error and status == "session-unknown":
+                store.status(rustdesk.error, None)
+            if args.operation == "once":
+                print(json.dumps(private_json(directory / "status.json")))
+                return 0 if status != "unavailable" else 1
+            time.sleep(config["interval"])
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (SurfaceError, OSError, subprocess.SubprocessError) as error:
+        print(error if isinstance(error, SurfaceError) else "handoff-runtime-unavailable")
+        raise SystemExit(1)

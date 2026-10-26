@@ -1,0 +1,30 @@
+#!/bin/bash
+# Activate only the declared current-user handoff job; never change app state.
+set -eu
+[[ "$(/usr/bin/uname -s)" == Darwin ]] || exit 2
+operation="${1:-status}"
+label=dev.dotfiles.synergy-handoff
+domain="gui/$(/usr/bin/id -u)"
+agent="$HOME/Library/LaunchAgents/$label.plist"
+helper="$HOME/.local/bin/synergy-handoff"
+[[ $# -le 1 && ( "$operation" == status || "$operation" == activate ) ]] || exit 2
+/usr/bin/plutil -lint "$agent" >/dev/null
+python=$(/usr/libexec/PlistBuddy -c 'Print :ProgramArguments:0' "$agent")
+[[ -x "$python" && -f "$helper" ]] || { echo 'Handoff runtime is unavailable.' >&2; exit 1; }
+if [[ "$operation" == status ]]; then
+    "$python" "$helper" status
+    exit
+fi
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print :Disabled' "$agent")" == true ]]; then
+    if [[ -e "$HOME/Library/Application Support/dotfiles/synergy-handoff/lease.json" ]]; then
+        echo 'Pending Synergy restoration; wait for disconnect and restored status before unloading.' >&2
+        exit 1
+    fi
+    /bin/launchctl disable "$domain/$label"
+    /bin/launchctl bootout "$domain/$label" 2>/dev/null || true
+    exit
+fi
+# Reload only this managed job. Its OS lock and restoration journal survive it.
+/bin/launchctl enable "$domain/$label"
+/bin/launchctl bootout "$domain/$label" 2>/dev/null || true
+/bin/launchctl bootstrap "$domain" "$agent"
