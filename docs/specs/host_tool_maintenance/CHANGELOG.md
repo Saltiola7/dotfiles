@@ -22,6 +22,26 @@
   requested. Intended delivery: feature-branch draft PR into main; actual
   deployment and Final Push outcomes belong to the private Cycle Record.
 
+## 2026-10-26 — SKETCHYBAR-MEDIA-POLLING
+
+- Replaced three sequential now-playing queries with one JSON query per refresh.
+  A nonblocking native file lock skips overlapping refreshes and automatically
+  releases ownership on process exit. Existing labels, icons and popup controls
+  remain compatible; installed lockf and jq add no new runtime dependency.
+- Validation: focused regression reproduced eight failures before implementation;
+  21 media tests and Bash syntax passed. Native descriptor ownership, immediate
+  contention failure and retained-file recovery were independently confirmed.
+- Deployment: reconciled only the reviewed media plugin into the dirty canonical
+  source, preserved source/target preimages and applied that single target through
+  chezmoi. Repeat targeted diff is empty; no bar restart was required.
+- Live verification: 32.4-second observation, including a ten-second drain of old
+  executions, saw five batched queries and at most one concurrent metadata query.
+  Independent review found no actionable issue. No gate exception requested.
+- Gate commits: `37e5ee6` domain/behavior/contract, `4a6f49a` specification evidence,
+  `ca3fe1e` test-driven fix and `ef6ed4c` documentation/refactor. Deployment closure
+  commit and actual Final Push result are recorded in the private Cycle Record.
+  Intended Final Push: `origin/fix/sketchybar-media-polling`, draft PR into `main`.
+
 ## 2026-10-25 — RUSTDESK-SYNERGY-001
 
 - Added Mac-mini-only authenticated incoming RustDesk desktop detection and

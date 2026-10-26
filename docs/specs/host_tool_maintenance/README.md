@@ -7,6 +7,9 @@ The [Raindrop connector contract](features/raindrop-mcp.md) defines one live
 connector per authentication cache, offline resolution of the existing pinned
 proxy, and direct Node ownership of its native lease.
 
+The [media polling contract](features/media-polling.md) keeps SketchyBar metadata
+refreshes to one nonoverlapping CLI query while preserving its existing controls.
+
 Engineering Profile: [PROFILE.md](PROFILE.md). Authority: SSD toolchain recovery
 Initiative in dotfiles-ai, INT-003, INT-012 and INT-022. Current slice:
 host-sdk-shell-resolution. Risk: elevated; delivery: draft PR and targeted host
