@@ -101,8 +101,10 @@ authenticated incoming-session acceptance and recovery probes; coherent review.
    `resume_pending` before Resume. Verify enabled intent and running core before
    deleting the journal. A crash at either side of a request preserves recovery.
    Failed verification keeps a visible pending state and retries with bounded I/O.
-5. If both Synergy GUI and service disappear, relinquish the journal and do not
-   launch either app. A service-only crash with GUI present retains it. Initial
+5. If both Synergy GUI and service disappear after being observed in this helper
+   run, relinquish the journal and do not launch either app. Initial absence after
+   restart/login keeps the journal until independent startup completes; it does
+   not prove a user quit. A service-only crash with GUI present retains it. Initial
    manual pause/absence never creates a journal. An additional Pause click while
    already automatically paused has no distinct observable intent; operators must
    disable the coordinator after session completion to retain a new manual pause.

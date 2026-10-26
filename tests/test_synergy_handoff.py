@@ -215,6 +215,24 @@ def test_service_only_failure_retains_ownership_for_supervisor_recovery(rig):
     assert rig[1].actions == ["pause", "resume"]
 
 
+@pytest.mark.parametrize("count", [0, 1])
+def test_restart_before_synergy_login_preserves_durable_restoration(rig, count):
+    acquire(rig)
+    rig[1].alive = False
+    rig[1].snapshot_error = handoff.SurfaceError("login service not started")
+    restarted = coordinator(rig)
+    restarted.step(sample(count))
+    restarted.step(sample(count))
+    assert rig[0].read() is not None
+    assert rig[1].actions == ["pause"]
+    rig[1].alive = True
+    rig[1].snapshot_error = None
+    restarted.step(sample(0))
+    restarted.step(sample(0))
+    assert rig[0].read() is None
+    assert rig[1].actions == ["pause", "resume"]
+
+
 @pytest.mark.parametrize("after_effect", [False, True])
 @pytest.mark.parametrize("exception_type", [RuntimeError, handoff.SurfaceError])
 def test_pause_failure_reconciles_journal_and_actual_state_after_restart(rig, after_effect, exception_type):

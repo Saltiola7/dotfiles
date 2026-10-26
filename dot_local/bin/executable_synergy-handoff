@@ -159,6 +159,7 @@ class Coordinator:
         self.zeros = 0
         self.missing_since: float | None = None
         self.error: str | None = None
+        self.seen_synergy = False
 
     def step(self, sample: SessionSample) -> str:
         try:
@@ -171,9 +172,15 @@ class Coordinator:
 
     def reconcile(self, sample: SessionSample) -> str:
         lease = self.store.read()
-        if lease and not self.synergy.present():
-            self.store.clear()
-            return "relinquished-user-quit"
+        if lease:
+            if self.synergy.present():
+                self.seen_synergy = True
+            elif self.seen_synergy:
+                self.store.clear()
+                return "relinquished-user-quit"
+            else:
+                # Login jobs may start after us; absence is not proof of a quit.
+                return "waiting-for-synergy"
         if sample.count is not None:
             if type(sample.count) is not int or not 0 <= sample.count <= 1024:
                 raise SurfaceError("invalid-session-count")
@@ -195,6 +202,7 @@ class Coordinator:
         if not active and lease is None:
             return "idle"
         state = self.synergy.snapshot()
+        self.seen_synergy = True
         if active:
             if lease is None:
                 if not state.enabled or not state.running:
