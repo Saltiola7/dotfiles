@@ -15,9 +15,12 @@
   contention, crash recovery, private resolution failures and stdio passed,
   together with native Bash syntax and diff checks. Gate commits: `ed43d4c`
   (initial contract) and `15b618f` (tests and launcher).
-- Primary deployment, native client configuration and live MCP verification are
-  pending. Existing contexts retain their old commands until their owners close
-  or refresh them; activation must account for those legacy connectors.
+- Deployment: installed only the reviewed launcher and configured the native
+  client with the existing authentication cache. Legacy proxy process trees were
+  closed gracefully; targeted apply is idempotent. Authenticated MCP discovery
+  returned 21 tools. A real contender was rejected in 56 ms; the owning Node
+  retained its lease, then exited cleanly and allowed reacquisition.
+- Existing cached client contexts still require their owner's final refresh.
   Release is not applicable; no package is published and no gate exception is
   requested. Intended delivery: feature-branch draft PR into main; actual
   deployment and Final Push outcomes belong to the private Cycle Record.
