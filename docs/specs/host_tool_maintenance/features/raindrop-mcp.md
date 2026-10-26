@@ -52,8 +52,9 @@ https://api.raindrop.io/rest/v2/ai/mcp --transport http-only --auth-timeout 300
 `MCP_REMOTE_CONFIG_DIR` remains unchanged when explicitly set. When absent or
 empty, export `${CODEX_HOME:-$HOME/.codex}/mcp-auth/raindrop`. The cache directory
 must be absolute; reject a relative directory instead of changing where existing
-credentials resolve. Production activation retains
-`/Volumes/ext/state/codex/home/mcp-auth/raindrop`.
+credentials resolve. Production activation retains the host's existing absolute
+authentication-cache directory; machine-specific paths remain in private
+activation evidence.
 
 Inside that cache, keep `raindrop-mcp.lock` and open it privately without truncating
 or unlinking its inode. Use native macOS `lockf -s -t 0 9` against inherited file
