@@ -1,8 +1,20 @@
 from pathlib import Path
 import json
+import re
 
 
 ROOT = Path(__file__).parents[1]
+
+
+def test_global_graphify_has_no_competing_host_owner() -> None:
+    brewfile = (ROOT / "Brewfile").read_text()
+    assert not re.search(r"(?mi)^\s*uv\s+[\"']graphifyy(?:[^\w-]|$)", brewfile)
+    assert not list(ROOT.glob("run_*graphify*"))
+    assert "graphify" not in (ROOT / "interactive_installers.sh").read_text().lower()
+    assert "graphify" not in (ROOT / ".chezmoiremove").read_text().lower()
+    assert "https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/UPDATES.md#graphify" in (
+        ROOT / "README.md"
+    ).read_text()
 
 
 def test_ai_configuration_is_not_owned_by_personal_source() -> None:
