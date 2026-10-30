@@ -1,5 +1,24 @@
 # Host maintenance changelog
 
+## 2026-10-30 — GRAPHIFY-HOST-SOURCE
+
+- Retired the duplicate Graphify Brewfile declaration, old skill installer and
+  stale installer comment. Added a non-reintroduction regression and pointers to
+  the sole CLI/dependency/skill owner and update procedure in `dotfiles-ai`.
+- Validation: failing-first ownership regression followed by passing ownership,
+  terminal, uv/SDK selection, remote-profile and Fedora tests. Seven native
+  profile inventories preserved all unrelated targets; only the old macOS
+  installer disappeared. Ruby/Bash syntax and diff checks passed. Optional
+  cross-source coverage not selected by the suite remains outside its claim.
+- No live apply, package operation, uninstall, runtime/skill/graph deletion, DKS
+  change or credential migration. Dependabot inputs were unavailable because
+  alerts are disabled; this slice adds or upgrades no dependency. No exception
+  requested or approved.
+- Gate Commits `88cdbed` and `9e99b6f` retain contract and implementation history.
+  The private Cycle Record owns failed/replacement evidence and final closure.
+  Intended Final Push: `discovery/graphify-ownership`, draft PR into
+  `Saltiola7/dotfiles:main`; merge and live activation require their own approvals.
+
 ## 2026-10-26 — RAINDROP-MCP-SINGLETON
 
 - Added a macOS Raindrop launcher that admits one live connector per existing
