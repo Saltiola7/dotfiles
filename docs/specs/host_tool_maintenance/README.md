@@ -76,3 +76,16 @@ with no new data transport, persistent schema or runtime topology.
 gives it precedence even if inherited PATH already contains it. When absent,
 initialization preserves existing selection. No installer or cloud operation runs.
 Owner: dotfiles maintainer. Update this table when shell or selection scope changes.
+
+## Graphify source handoff
+
+Global Graphify CLI/dependencies and its matching OpenCode skill belong to
+`dotfiles-ai`; its [update runbook](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/UPDATES.md#graphify)
+is the single procedure owner. This host source no longer declares the package
+or runs a Graphify installer. Declaration retirement does not uninstall or remove
+an existing CLI, skill, graph/cache, disabled DKS runtime or cycle receipt.
+
+The focused ownership and direct-downstream suites passed. A seven-profile native
+chezmoi inventory showed only the old macOS installer target disappearing, with
+no new or unrelated target changes. `GRAPHIFY-HOST-SOURCE` owns exact gates and
+delivery evidence; this source-only handoff is not live activation approval.

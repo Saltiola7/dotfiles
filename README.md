@@ -27,6 +27,15 @@ setting absent or empty preserves the existing name/email configuration. Follow
 the canonical [Git identity and signing guide](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/git-identity-signing.md)
 for profile setup, 1Password signing, and verification.
 
+## Graphify ownership
+
+`dotfiles-ai` owns the global Graphify CLI, dependency recipe and matching
+OpenCode skill. Use its canonical
+[update runbook](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/UPDATES.md#graphify)
+instead of a host package/skill installer here. Retiring these source declarations
+does not uninstall an existing runtime or remove skills, graphs, caches or DKS.
+Live changes still require their own reviewed apply plan.
+
 ## Zed
 
 Zed stable is installed by the Brewfile (`brew install --cask zed`). Chezmoi
