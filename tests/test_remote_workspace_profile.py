@@ -87,3 +87,17 @@ def test_shared_rendered_targets_are_disjoint_when_source_is_provided():
         {"dotfiles_ai": {"remote_user_environment": {"enabled": True}}},
     )
     assert managed(ROOT, DATA).isdisjoint(shared)
+
+
+def test_ubi_qualification_uses_an_exact_shared_revision_and_existing_smoke():
+    workflow = text(".github/workflows/remote-workspace-ubi.yml")
+    assert "container: registry.access.redhat.com/ubi10/ubi" in workflow
+    assert "repository: Saltiola7/dotfiles-ai" in workflow
+    assert "persist-credentials: false" in workflow
+    assert "tests/remote_workspace_profile_smoke.sh" in workflow
+    assert "DOTFILES_AI_SOURCE" in workflow
+    assert "timeout-minutes:" in workflow
+    # An immutable public source revision is required; final paired acceptance
+    # additionally verifies that the selected RRW-002 revision has merged.
+    import re
+    assert re.search(r"ref: [0-9a-f]{40}\s", workflow)
