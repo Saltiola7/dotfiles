@@ -210,7 +210,7 @@ def test_mac_mini_uses_native_external_cache_paths():
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
         'npm_config_cache="$DOTFILES_CACHE_ROOT/npm"',
         'PULUMI_HOME="/Volumes/ext/state/pulumi"',
-        'PREFECT_HOME="/Volumes/ext/state/prefect/seo-data-science"',
+        'PREFECT_HOME="/Volumes/ext/state/prefect/sample-project"',
         'CODEX_HOME="/Volumes/ext/state/codex/home"',
         'PYCHARM_PROPERTIES="/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"',
     ):
@@ -246,7 +246,7 @@ def test_external_cache_exports_and_fallback(tmp_path):
         "PRE_COMMIT_HOME": "/Volumes/ext/state/cache/pre-commit",
         "npm_config_cache": "/Volumes/ext/state/cache/npm",
         "PULUMI_HOME": "/Volumes/ext/state/pulumi",
-        "PREFECT_HOME": "/Volumes/ext/state/prefect/seo-data-science",
+        "PREFECT_HOME": "/Volumes/ext/state/prefect/sample-project",
         "CODEX_HOME": "/Volumes/ext/state/codex/home",
         "PYCHARM_PROPERTIES": "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties",
     }

@@ -6,11 +6,18 @@
 
 ## Overview
 
-MGM work uses AWS IAM Identity Center (SSO) chained to Microsoft Entra ID for authentication. The `aws sso login` flow opens a browser tab, which redirects through `myapps.microsoft.com`, and completes silently when the Microsoft session cookie is still valid.
+This generic integration uses AWS IAM Identity Center (SSO). Account identifiers
+and portal URLs in this document are synthetic; real account mappings and
+identity-provider policy remain private. The managed source retains its refresh
+wrapper, LaunchAgent, status-bar integration, and manual shell entrypoint.
+
+The browser flow may complete silently when its existing upstream session is
+valid, or require interactive authentication. Microsoft Entra ID below is an
+illustrative upstream identity provider, not a declaration of client policy.
 
 This spec automates re-acquiring the AWS SSO **refresh token** three times per day via a launchd LaunchAgent, so the AWS SDK can keep renewing short-lived access tokens without interaction throughout the work day. The schedule is chosen to overlap the refresh token's ~8-hour lifetime (slots ~7h59m apart) while staying inside an 08:00–23:00 window.
 
-`AWS_PROFILE=BedrockDeveloperAccess-302432775606` and `AWS_REGION=us-west-2` are non-secret shell configuration in Bash and Xonsh. The `secret` command does not read, export, clear, or validate AWS settings or credentials. AWS CLI and this refresh service exclusively own AWS SSO tokens.
+`AWS_PROFILE=ClientAccess-000000000000` and `AWS_REGION=us-west-2` are non-secret shell configuration in Bash and Xonsh. The `secret` command does not read, export, clear, or validate AWS settings or credentials. AWS CLI and this refresh service exclusively own AWS SSO tokens.
 
 ### Token model (important — don't confuse these)
 
@@ -30,22 +37,24 @@ The SSO cache at `~/.aws/sso/cache/*.json` contains **two** distinct expirations
 
 ```
 aws sso login
-  └─> browser → AWS SSO portal (https://mgmri.awsapps.com/start)
+  └─> browser → AWS SSO portal (https://example.awsapps.com/start)
         └─> redirects to myapps.microsoft.com
               ├─ Microsoft session valid → SSO completes silently, tab closes (2–4s)
               └─ Microsoft session expired → MFA prompt (15s+ including user tap)
 ```
 
-The practical consequence: the **first** refresh of a given day (08:00) may require password + MFA; subsequent refreshes (15:59, 22:45) piggyback on the live Microsoft cookie and flash the browser for a split second without interaction. Microsoft session rolls overnight, so the cycle repeats each morning.
+Scheduled refreshes may require password entry or MFA. Whether later attempts
+complete silently depends on private upstream session policy; no client-specific
+session lifetime or daily rollover behavior is assumed.
 
 ## File Map
 
 | Path | Purpose |
 |------|---------|
-| `Library/LaunchAgents/com.mgm.aws-sso-login.plist.tmpl` | launchd agent definition — invokes the wrapper on a calendar schedule |
+| `Library/LaunchAgents/dev.client.aws-sso-login.plist.tmpl` | launchd agent definition — invokes the wrapper on a calendar schedule |
 | `dot_local/bin/executable_aws-sso-refresh` | Bash wrapper — checks token expiry from `~/.aws/sso/cache/*.json`, fires `aws sso login`, notifies on expired |
 | `run_onchange_load-aws-sso-launchagent.sh.tmpl` | Chezmoi hook — unloads + loads the LaunchAgent whenever the plist or wrapper script changes |
-| `docs/specs/aws_creds.md` | This document (not applied to `~/`; tracked in repo only via `docs/` entry in `.chezmoiignore`) |
+| `docs/specs/aws_creds/README.md` | This document (not applied to `~/`; tracked in repo only via `docs/` entry in `.chezmoiignore`) |
 
 ## Schedule
 
@@ -136,7 +145,7 @@ The browser tab sits open awaiting Microsoft MFA. Harmless. The AWS token simply
 
 Both machines (`mac-mini` and `macbook`) get identical configuration. On `chezmoi apply`:
 
-1. `Library/LaunchAgents/com.mgm.aws-sso-login.plist` is rendered and written to `~/Library/LaunchAgents/`.
+1. `Library/LaunchAgents/dev.client.aws-sso-login.plist` is rendered and written to `~/Library/LaunchAgents/`.
 2. `.local/bin/aws-sso-refresh` is installed with 0755.
 3. `run_onchange_load-aws-sso-launchagent.sh.tmpl` evaluates — if the plist or wrapper hash has changed, it unloads and reloads the agent.
 
@@ -153,10 +162,10 @@ chezmoi apply
 launchctl list | grep aws-sso-login
 
 # Test-fire the wrapper directly (bypass launchd)
-~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606
+~/.local/bin/aws-sso-refresh ClientAccess-000000000000
 
 # Test-fire via launchd
-launchctl start com.mgm.aws-sso-login
+launchctl start dev.client.aws-sso-login
 
 # Tail logs
 tail -f ~/Library/Logs/aws-sso-login.log ~/Library/Logs/aws-sso-login.err.log
@@ -165,8 +174,8 @@ tail -f ~/Library/Logs/aws-sso-login.log ~/Library/Logs/aws-sso-login.err.log
 ## Uninstall
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.mgm.aws-sso-login.plist
-rm ~/Library/LaunchAgents/com.mgm.aws-sso-login.plist
+launchctl unload ~/Library/LaunchAgents/dev.client.aws-sso-login.plist
+rm ~/Library/LaunchAgents/dev.client.aws-sso-login.plist
 rm ~/.local/bin/aws-sso-refresh
 # Then remove the source files from ~/.local/share/chezmoi and commit
 ```
@@ -187,22 +196,22 @@ The reload is idempotent: `launchctl unload` ignores errors from an already-unlo
 
 **Logs grow unbounded.** The StandardOutPath / StandardErrorPath files at `~/Library/Logs/aws-sso-login.{log,err.log}` accumulate forever. Rotate manually or with `newsyslog` if they become inconvenient.
 
-**First-run on a new machine** requires AWS CLI + `~/.aws/config` with the `BedrockDeveloperAccess-302432775606` profile set up. The `run_onchange_` script does not fail-hard if the agent load fails — it logs a warning — so chezmoi apply remains green even on machines that haven't yet been AWS-configured.
+**First-run on a new machine** requires AWS CLI + `~/.aws/config` with the `ClientAccess-000000000000` profile set up. The `run_onchange_` script does not fail-hard if the agent load fails — it logs a warning — so chezmoi apply remains green even on machines that haven't yet been AWS-configured.
 
 ## Verification
 
 ```bash
 # 1. Profile is configured
-aws configure list-profiles | grep BedrockDeveloperAccess-302432775606
+aws configure list-profiles | grep ClientAccess-000000000000
 
 # 2. Agent is registered
-launchctl list | grep com.mgm.aws-sso-login
+launchctl list | grep dev.client.aws-sso-login
 
 # 3. Wrapper runs cleanly
-~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606
+~/.local/bin/aws-sso-refresh ClientAccess-000000000000
 
 # 4. Token is valid after refresh
-aws sts get-caller-identity --profile BedrockDeveloperAccess-302432775606
+aws sts get-caller-identity --profile ClientAccess-000000000000
 ```
 
 ## SketchyBar Integration
@@ -289,7 +298,7 @@ The autofill keystroke sequence handles only the password-entry page; the "Pick 
 From any terminal:
 
 ```bash
-awslogin   # alias for ~/.local/bin/aws-sso-refresh BedrockDeveloperAccess-302432775606
+awslogin   # alias for ~/.local/bin/aws-sso-refresh ClientAccess-000000000000
 ```
 
 **Always prefer `awslogin` over raw `aws sso login`.** The wrapper:
@@ -368,7 +377,7 @@ Adjacent contexts: SketchyBar UI (bar rendering), AeroSpace (window layout), 1Pa
 - Given the launchd agent fires at 08:00
 - And `aws sts get-caller-identity` fails (refresh token expired overnight)
 - When `aws-sso-refresh` runs
-- Then it invokes `aws sso login --profile BedrockDeveloperAccess-302432775606`
+- Then it invokes `aws sso login --profile ClientAccess-000000000000`
 - And the browser opens for Microsoft auth + MFA
 
 ### Feature: Reactive Recovery (SketchyBar plugin)

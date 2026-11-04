@@ -1,7 +1,7 @@
 #!/bin/bash
 # Load the AWS SSO LaunchAgent. Re-runs whenever the plist or wrapper changes.
 #
-# plist hash:   {{ include "private_Library/LaunchAgents/com.mgm.aws-sso-login.plist.tmpl" | sha256sum }}
+# plist hash:   {{ include "private_Library/LaunchAgents/dev.client.aws-sso-login.plist.tmpl" | sha256sum }}
 # wrapper hash: {{ include "dot_local/bin/executable_aws-sso-refresh" | sha256sum }}
 
 set -u
@@ -11,8 +11,8 @@ if [[ "$(uname)" != "Darwin" ]]; then
     exit 0
 fi
 
-PLIST="$HOME/Library/LaunchAgents/com.mgm.aws-sso-login.plist"
-LABEL="com.mgm.aws-sso-login"
+PLIST="$HOME/Library/LaunchAgents/dev.client.aws-sso-login.plist"
+LABEL="dev.client.aws-sso-login"
 LOG_DIR="$HOME/Library/Logs"
 
 # Ensure the log directory exists (plist points StandardOutPath here).

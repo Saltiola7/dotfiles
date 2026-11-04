@@ -8,7 +8,7 @@ included in a later slice. No new product UI or public service is introduced.
 Compatibility: preserve managed target paths, user credentials and histories,
 external-state routing, Python minor pins, project dependency constraints and
 guarded AI launchers. Package updates require consumer classification; production
-environments and enterprise-seo-tools are excluded. Guest work is deferred.
+environments and example-project are excluded. Guest work is deferred.
 
 Trust boundaries: shell environment selects executables; chezmoi source must not
 overwrite unrelated user work or copy credentials into tests. Existing native
