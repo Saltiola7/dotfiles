@@ -24,7 +24,7 @@ def test_aws_settings_are_shell_config_not_secrets() -> None:
     assert "AWS_REGION" not in secret
     assert "CLAUDE_CODE_USE_BEDROCK" not in secret
     for profile in profiles:
-        assert "BedrockDeveloperAccess-302432775606" in profile
+        assert "ClientAccess-000000000000" in profile
         assert "us-west-2" in profile
 
 
@@ -45,7 +45,7 @@ cat <<'JSON'
 {{"label":"OPENAI_API_KEY","value":"openai"}},
 {{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
 {{"label":"DATABRICKS_TOKEN","value":"db-token"}},
-{{"label":"GCP_ENTERPRISE_SEO_TOOLS_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}},
+{{"label":"GCP_SERVICE_ACCOUNT_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}},
 {{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
 {{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
 {{"label":"CLICKHOUSE_HOST","value":"clickhouse"}},
@@ -55,8 +55,8 @@ cat <<'JSON'
 {{"label":"SEMRUSH_API","value":"semrush"}},
 {{"label":"SEMRUSH_ENTERPRISE_API","value":"enterprise"}},
 {{"label":"PAGESPEED_API_KEY","value":"pagespeed"}},
-{{"label":"GCS_AKAMAI_ACCESS_KEY","value":"access"}},
-{{"label":"GCS_AKAMAI_SECRET_KEY","value":"secret"}},
+{{"label":"GCS_HMAC_ACCESS_KEY","value":"access"}},
+{{"label":"GCS_HMAC_SECRET_KEY","value":"secret"}},
 {{"label":"CLOCKIFY_API_KEY","value":"clockify"}},
 {{"label":"GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC","value":"github"}},
 {{"label":"ATLASSIAN_API","value":"atlassian"}},

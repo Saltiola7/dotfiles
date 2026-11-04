@@ -287,8 +287,8 @@ seed_opencode_sessions() {
 
 # ── Workspace definitions ──
 
-build_seo-data-science() {
-    local cwd="$HOME/MGM/git/seo-data-science"
+build_sample-project() {
+    local cwd="$HOME/client/git/sample-project"
 
     seed_opencode_sessions
 
@@ -304,11 +304,11 @@ build_seo-data-science() {
 
     # Focus servers tab
     $KITTY_RC focus-tab --match "title:^servers$" 2>/dev/null || true
-    log "build_seo-data-science complete"
+    log "build_sample-project complete"
 }
 
-build_tsc() {
-    local cwd="$HOME/github/tsc"
+build_web-app() {
+    local cwd="$HOME/github/web-app"
 
     seed_opencode_sessions
 
@@ -329,7 +329,7 @@ build_tsc() {
 
     # Focus app tab
     $KITTY_RC focus-tab --match "title:^app$" 2>/dev/null || true
-    log "build_tsc complete"
+    log "build_web-app complete"
 }
 
 build_dotfiles() {
@@ -355,8 +355,8 @@ build_dotfiles() {
 # These must match the tabs created by the build_* functions above.
 base_tabs_for() {
     case "$1" in
-        seo-data-science) echo "servers opencode" ;;
-        tsc)              echo "app flowbite opencode" ;;
+        sample-project) echo "servers opencode" ;;
+        web-app)              echo "app flowbite opencode" ;;
         dotfiles)         echo "shell opencode" ;;
         *)                echo "$1 opencode" ;;  # generic fallback
     esac

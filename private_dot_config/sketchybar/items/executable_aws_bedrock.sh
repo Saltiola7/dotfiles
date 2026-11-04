@@ -33,7 +33,7 @@ sketchybar --add item aws_bedrock.terminal popup.aws_bedrock \
         icon.padding_left=10 \
         icon.font="$FONT:Bold:14.0" \
         label.drawing=off \
-        click_script="kitten quick-access-terminal --instance-group aws-sso bash -c '/usr/local/bin/aws sso login --profile BedrockDeveloperAccess-302432775606; echo; echo \"Done. Press enter to close.\"; read'; sketchybar --set aws_bedrock popup.drawing=off"
+        click_script="kitten quick-access-terminal --instance-group aws-sso bash -c '/usr/local/bin/aws sso login --profile ClientAccess-000000000000; echo; echo \"Done. Press enter to close.\"; read'; sketchybar --set aws_bedrock popup.drawing=off"
 
 # Popup: toggle poller on/off
 sketchybar --add item aws_bedrock.toggle popup.aws_bedrock \

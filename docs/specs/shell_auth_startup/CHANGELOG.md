@@ -96,13 +96,13 @@
 
 - Routed direct Lima, Colima, Docker images, and the Atuin named volume through
   native homes under `/Volumes/ext/state`. Sparse disk conversion passed
-  `qemu-img compare`; personal and rebuilt MGM sandboxes run externally and the
-  stopped MGM v1 rollback is archived externally.
+  `qemu-img compare`; personal and rebuilt client sandboxes run externally and the
+  stopped client v1 rollback is archived externally.
 - Reconstructed the empty Atuin server from the original key and surviving
-  client stores. Host, personal, and MGM clients authenticate as `tommi` and
-  converge on 17,157 encrypted records. Registration is closed, loopback and
-  tailnet health pass, and a 9.6 MiB cold named-volume export passed an isolated
-  restore health check.
+  client stores. Host and sandbox clients retain distinct local state and
+  synchronize encrypted records through a private account. Registration is
+  closed; loopback, tailnet health, and an isolated cold-backup restore passed.
+  Private record counts and account identifiers are not published here.
 - Replaced the failing Homebrew service with a sentinel-, mount-, and
   state-root-guarded LaunchAgent. A dependency-hashed onchange target reloads
   wrapper/plist changes; a live stop/bootstrap restart restored Atuin health.

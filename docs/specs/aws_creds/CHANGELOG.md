@@ -51,7 +51,7 @@ All notable changes to the AWS SSO credential automation.
 ## [2026-05-28]
 
 ### Added
-- **`awslogin` shell alias** (commit `dfaf9b5`): alias for `aws-sso-refresh BedrockDeveloperAccess-302432775606`. Defined in `dot_common_profile.tmpl`.
+- **`awslogin` shell alias** (commit `dfaf9b5`): alias for `aws-sso-refresh ClientAccess-000000000000`. Defined in `dot_common_profile.tmpl`.
 - **GCP env cleanup** (commit `dfaf9b5`): `__cleanup_gcp_cache` now also unsets `GOOGLE_APPLICATION_CREDENTIALS`, `GWS_CONTENT_READER_CREDENTIALS`, `CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE`.
 
 ## [2026-05-01]
