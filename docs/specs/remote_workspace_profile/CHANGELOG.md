@@ -1,5 +1,20 @@
 # Remote Workspace Profile Changelog
 
+## 2026-11-04 - RRW-002B RHEL owner overlay qualification
+
+- Added native UBI 10 qualification and profile checks for the explicit
+  Yazi-only overlay: target-disjoint installation over the shared foundation,
+  preserved macOS/`lmsh` renders, checksum proof, empty second apply and
+  rollback preservation.
+- Final paired qualification pins the shared foundation to the merged RRW-002
+  runtime revision `b8043183c403e49be774d6dbac4cb77c446e9820`; the earlier
+  unmerged pin is historical.
+- The first UBI run failed because the image lacked `diffutils` for the smoke's
+  `cmp` comparison. A supervised mechanical repair added the package to the CI
+  container only; overlay behavior and test assertions are unchanged.
+- No owner apply, colleague acceptance, live RHEL readiness or credential change
+  is claimed; live owner apply remains separately approved.
+
 ## 2026-11-02 - RRW-002B RHEL Successor Discovery
 
 - Defined RHEL 10 x86_64 and UBI 10 userland qualification for the existing

@@ -34,7 +34,7 @@ jobs:
           repository: Saltiola7/dotfiles-ai
           # Reviewed RRW-002 candidate; replace with its full merge SHA before
           # final paired qualification. This candidate is not rollout authority.
-          ref: ed0f0cd628e4badd45595df1371290b885768aa5
+          ref: b8043183c403e49be774d6dbac4cb77c446e9820
           path: shared
           persist-credentials: false
       - name: Qualify disjoint installation, idempotency and rollback
