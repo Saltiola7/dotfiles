@@ -24,8 +24,8 @@ The core design principle: Kitty is the terminal platform (rendering, window man
 
 | Path | Purpose | Status |
 |------|---------|--------|
-| `~/.config/kitty/sessions/seo-data-science.conf` | SEO workspace base session definition | Stable |
-| `~/.config/kitty/sessions/tsc.conf` | TSC workspace base session definition | Stable |
+| `~/.config/kitty/sessions/sample-project.conf` | Generic analytics workspace base session definition | Stable |
+| `~/.config/kitty/sessions/web-app.conf` | web application workspace base session definition | Stable |
 | `~/.config/kitty/sessions/dotfiles.conf` | Dotfiles workspace base session definition | Stable |
 | `~/.config/kitty/sessions/{workspace}.snapshot.conf` | Auto-generated snapshot of evolved workspace state | Runtime |
 
@@ -185,13 +185,13 @@ The socket directory (`~/.local/share/kitty/`) must exist before Kitty starts. T
 Each workspace's first pane is tagged with a Kitty user variable:
 
 ```bash
-kitty @ launch --type=os-window --var workspace="seo-data-science" ...
+kitty @ launch --type=os-window --var workspace="sample-project" ...
 ```
 
 This persists in Kitty's state and is queryable via `kitty @ ls`:
 
 ```json
-{"user_vars": {"workspace": "seo-data-science"}}
+{"user_vars": {"workspace": "sample-project"}}
 ```
 
 Detection uses this marker to find existing workspaces and avoid duplicates. It also allows `opencode-kitty` to determine which workspace it belongs to without any environment variable passing.
@@ -297,14 +297,14 @@ All DB queries filter with:
 Projects with custom needs have hardcoded build functions in `kitty-workspace`. These define the base structure:
 
 ```bash
-build_seo-data-science() {
+build_sample-project() {
     # Tab 1: servers (2 vertical split panes)
     #   Left:  pre-typed "mise run local-prefect"
     #   Right: pre-typed "marimo --watch notebooks/"
     # Tab 2: opencode (opencode-kitty with session resumption)
 }
 
-build_tsc() {
+build_web-app() {
     # Tab 1: app (pre-typed "make start")
     # Tab 2: flowbite (2 vertical split panes, pre-typed "npm start")
     # Tab 3: opencode (opencode-kitty with session resumption)

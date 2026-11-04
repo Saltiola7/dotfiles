@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-AWS_PROFILE="BedrockDeveloperAccess-302432775606"
+AWS_PROFILE="ClientAccess-000000000000"
 AWS_BIN="/usr/local/bin/aws"
 LOGIN_EPOCH_FILE="/tmp/sketchybar_aws_login_epoch"
 RECOVERY_LOCKFILE="/tmp/sketchybar_aws_recovery_lock"

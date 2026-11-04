@@ -2,6 +2,15 @@
 
 Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 
+## Repository privacy
+
+Keep source, documentation, examples, filenames, commit messages, and pull request
+titles and descriptions neutral. Client identities, project paths, accounts,
+internal infrastructure, and operational evidence belong in ignored private
+configuration or private storage outside this repository. Use synthetic examples
+and private configuration inputs when describing integrations. Existing Git
+history is retained.
+
 macOS-focused configuration for development workstations. Secrets are managed via 1Password CLI and age encryption — nothing sensitive is stored in plain text in this repo.
 
 ## Not for direct use

@@ -22,14 +22,15 @@ All notable changes to this bounded context.
 - Contracts for scoped noise isolation, concern authorities, fix safety,
   validation evidence, subagents, and non-duplicated instructions.
 - Global `qa` skill and thin `/qa` command.
-- Chezmoi-managed project instructions and `seo-data-science` toolchain handoff.
+- Project instruction and handoff ownership is maintained privately outside
+  this repository.
 
 ### Decisions
 - One `qa` skill replaces the standalone Dependabot skill and command.
 - DBSCTR2 uses QA as a touched-scope gate and ignores unrelated tool noise.
 - Explicit QA runs may inventory and reduce full-repository debt.
-- Project tool configuration is deferred to a `seo-data-science` handoff spec.
-- Chezmoi becomes canonical for the project-specific `AGENTS.md`.
+- Downstream tool configuration and project-specific instructions remain with
+  their private project owner.
 
 ### Changed
 - DBSCTR2 now delegates affected-scope phase gates to QA.
@@ -44,9 +45,9 @@ All notable changes to this bounded context.
 ### Verified
 - Rendered OpenCode JSON parsed successfully.
 - Targeted chezmoi apply deployed QA, updated DBSCTR2/Discovery2 and routing,
-  removed standalone Dependabot surfaces, and synchronized project instructions.
+  and removed standalone Dependabot surfaces.
 - Chezmoi dry-run was idempotent and `chezmoi status` was clean.
 - Restarted OpenCode successfully launched three concurrent ownership-isolated
   write subagents with the corrected model configuration.
-- `seo-data-science` handoff Markdown passed diff checks; unrelated DVC drift and
-  one unrelated high Dependabot alert remained out of scope.
+- Private downstream handoff evidence remains with its project owner;
+  unrelated dependency and storage findings remained out of scope.
