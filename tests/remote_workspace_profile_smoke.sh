@@ -2,13 +2,21 @@
 set -euo pipefail
 
 owner_source=${1:?owner source required}
-shared_source=${2:?shared source required}
+incoming_shared=${2:?shared source required}
 export HOME=/home/owner
 export PATH="/tmp/test-bin:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin"
 export DOTFILES_AI_SYSTEMCTL=/tmp/test-bin/systemctl
 
 dnf install -qy curl findutils git gzip tar xz python3 gcc gcc-c++ make lsof
 install -d -m 0700 "$HOME"
+install -d -m 0700 "$HOME/.local/share" "$HOME/.config/dotfiles-ai"
+shared_revision=$(git -C "$incoming_shared" rev-parse HEAD)
+shared_source="$HOME/.local/share/chezmoi-dotfiles-ai"
+test ! -e "$shared_source"
+git clone --no-hardlinks "$incoming_shared" "$shared_source"
+git -C "$shared_source" remote set-url origin https://github.com/Saltiola7/dotfiles-ai.git
+git -C "$shared_source" checkout --detach "$shared_revision"
+shared_config="$HOME/.config/dotfiles-ai/chezmoi.toml"
 install -d -m 0755 /tmp/test-bin /usr/local/bin
 cat >"$DOTFILES_AI_SYSTEMCTL" <<'EOF'
 #!/bin/bash
@@ -27,7 +35,7 @@ chmod 0755 "$DOTFILES_AI_SYSTEMCTL"
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-cat >"$tmp/shared.toml" <<EOF
+cat >"$shared_config" <<EOF
 sourceDir = "$shared_source"
 persistentState = "$HOME/.local/state/dotfiles-ai/chezmoi.boltdb"
 
@@ -42,12 +50,12 @@ host_enabled = false
 schema_version = 1
 root = "$HOME/.local/state/worktrees"
 EOF
-chmod 0600 "$tmp/shared.toml"
+chmod 0600 "$shared_config"
 owner_data='{"machine_type":"remote-workspace","name":"Test User","email":"personal@example.invalid","work_email":"work@example.invalid","personal_email":"personal@example.invalid","atuin_sync_address":"https://api.atuin.sh"}'
 
-export DOTFILES_AI_SOURCE="$shared_source" DOTFILES_AI_CONFIG="$tmp/shared.toml"
+export DOTFILES_AI_SOURCE="$shared_source" DOTFILES_AI_CONFIG="$shared_config"
 python3 "$shared_source/dot_local/bin/executable_remote-user-bootstrap" bootstrap "$(git -C "$shared_source" rev-parse HEAD)"
-chezmoi -S "$shared_source" -D "$HOME" -c "$tmp/shared.toml" managed --include files,scripts | sort >"$tmp/shared-rendered"
+chezmoi -S "$shared_source" -D "$HOME" -c "$shared_config" managed --include files,scripts | sort >"$tmp/shared-rendered"
 chezmoi -S "$owner_source" -D "$HOME" --config /dev/null --config-format toml \
   --override-data "$owner_data" managed --include files,scripts | sort >"$tmp/owner-rendered"
 comm -12 "$tmp/shared-rendered" "$tmp/owner-rendered" >"$tmp/rendered-intersection"
@@ -57,7 +65,7 @@ for target in yazi ya fd fzf 7zz zoxide direnv rg nvim; do
     test ! -e "$HOME/.local/bin/$target"
 done
 find "$HOME" \( -type f -o -type l \) -print | sort >"$tmp/shared-installed"
-chezmoi -S "$shared_source" -D "$HOME" -c "$tmp/shared.toml" managed --include files |
+chezmoi -S "$shared_source" -D "$HOME" -c "$shared_config" managed --include files |
   while IFS= read -r target; do
     test ! -f "$HOME/$target" || sha256sum "$HOME/$target"
   done >"$tmp/shared-managed-hashes"

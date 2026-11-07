@@ -28,8 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container: registry.access.redhat.com/ubi10/ubi
-    env:
-      DOTFILES_AI_SOURCE: ${{ github.workspace }}/shared
     steps:
       - run: dnf -qy install ca-certificates curl git gzip python3 tar unzip diffutils findutils lsof xz gcc gcc-c++ make
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,4 +46,5 @@ jobs:
         shell: bash
         run: |
           unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+          export DOTFILES_AI_SOURCE="$GITHUB_WORKSPACE/shared"
           bash owner/tests/remote_workspace_profile_smoke.sh "$GITHUB_WORKSPACE/owner" "$DOTFILES_AI_SOURCE"

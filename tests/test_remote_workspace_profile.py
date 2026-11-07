@@ -138,3 +138,13 @@ def test_expanded_contract_keeps_private_inputs_and_source_ownership():
     workflow = text('.github/workflows/test.yml')
     assert workflow.count('"private_dot_config/nvim/**"') == 2
     assert 'gcc-c++' in text('.github/workflows/remote-workspace-ubi.yml')
+
+
+def test_paired_fixture_keeps_bootstrap_source_and_config_under_home():
+    smoke = text('tests/remote_workspace_profile_smoke.sh')
+    assert 'git clone --no-hardlinks' in smoke
+    assert 'shared_source="$HOME/.local/share/chezmoi-dotfiles-ai"' in smoke
+    assert 'shared_config="$HOME/.config/dotfiles-ai/chezmoi.toml"' in smoke
+    assert 'remote set-url origin https://github.com/Saltiola7/dotfiles-ai.git' in smoke
+    workflow = text('.github/workflows/remote-workspace-ubi.yml')
+    assert 'export DOTFILES_AI_SOURCE="$GITHUB_WORKSPACE/shared"' in workflow
