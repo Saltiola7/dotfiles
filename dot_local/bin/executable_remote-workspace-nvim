@@ -1,0 +1,245 @@
+#!/usr/bin/env python3
+"""Restore the owner's locked editor and await every required parser build."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+LUA_STAGES = {'owner-init', 'plugin-restore', 'plugin-verify', 'parser-build', 'parser-verify'}
+LUA_REASONS = {'locked plugin absent', 'locked plugin restore/build failed',
+    'locked plugin identity mismatch', 'parser installation failed',
+    'required compiled parser absent', 'required parser cannot load', 'headless editor reported an error'}
+PREPARATION_REASONS = frozenset({
+    'unsupported editor setup operation', 'unsafe editor lock', 'invalid lazy revision',
+    'editor compiler prerequisite missing', 'unsafe editor directory', 'unsafe lazy directory',
+    'installed lazy identity differs from lock', 'unsafe plugin link',
+    'plugin contains local work; refusing restore', 'managed editor lock changed during restore',
+    'unsafe editor state directory', 'unsafe editor readiness manifest',
+})
+
+
+def preparation_reason(error: Exception) -> str:
+    reason = str(error)
+    return reason if type(error) is ValueError and reason in PREPARATION_REASONS else 'unclassified preparation failure'
+
+
+def dirty_summary(name: str, entries: dict, status: str) -> str:
+    names = sorted(entries)
+    index = names.index(name) + 1 if name in entries else 0
+    index = min(index, 9999)
+    lines = status.splitlines()
+    untracked = sum(line.startswith('?? ') for line in lines)
+    tracked = len(lines) - untracked
+    return (f'remote editor dirty lock-index {index}; '
+            f'tracked {min(tracked, 9999)}; untracked {min(untracked, 9999)}')
+
+
+class EditorSetupFailure(ValueError):
+    def __init__(self, code, output):
+        code = code if type(code) is int and 0 < code < 256 else 1
+        stages = [line.removeprefix('remote editor stage ') for line in output.splitlines()
+                  if line.removeprefix('remote editor stage ') in LUA_STAGES]
+        reasons = [line.removeprefix('remote editor invariant ') for line in output.splitlines()
+                   if line.removeprefix('remote editor invariant ') in LUA_REASONS]
+        stage = stages[-1] if stages else 'native-command'
+        reason = reasons[-1] if reasons else 'output suppressed'
+        super().__init__(f'editor exit {code}; stage {stage}; {reason}')
+
+
+def run(*args: str, env: dict, timeout: int = 60) -> str:
+    result = subprocess.run(args, env=env, cwd=env['HOME'], text=True, capture_output=True, timeout=timeout)
+    if result.returncode:
+        raise EditorSetupFailure(result.returncode, result.stderr + '\n' + result.stdout)
+    return result.stdout.strip()
+
+
+def read_receipts(target: Path, lock_digest: str) -> dict:
+    for parent in (target.parent, *target.parent.parents):
+        if parent.is_symlink():
+            raise ValueError('unsafe editor state directory')
+    if not os.path.lexists(target):
+        return {}
+    info = target.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+            or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600):
+        raise ValueError('unsafe editor readiness manifest')
+    saved = json.loads(target.read_text())
+    if (not isinstance(saved, dict) or saved.get('lock_sha256') != lock_digest
+            or not isinstance(saved.get('generated_tags'), dict)):
+        raise ValueError('unsafe editor readiness manifest')
+    for receipt in saved['generated_tags'].values():
+        if (not isinstance(receipt, dict) or set(receipt) != {'commit', 'sha256'}
+                or not isinstance(receipt['commit'], str) or not re.fullmatch('[0-9a-f]{40}', receipt['commit'])
+                or not isinstance(receipt['sha256'], str) or not re.fullmatch('[0-9a-f]{64}', receipt['sha256'])):
+            raise ValueError('unsafe editor readiness manifest')
+    return saved['generated_tags']
+
+
+def plugin_receipt(plugin: Path, revision: str, saved: dict | None, *,
+                   newly_installed: bool, env: dict) -> dict | None:
+    if plugin.is_symlink() or run('git', '-C', str(plugin), 'rev-parse', 'HEAD', env=env) != revision:
+        raise ValueError('plugin contains local work; refusing restore')
+    status = run('git', '-C', str(plugin), 'status', '--porcelain', env=env)
+    if not status and saved is None:
+        return None
+    if status != '?? doc/tags' or (saved is None and not newly_installed):
+        raise ValueError('plugin contains local work; refusing restore')
+    tags = plugin / 'doc/tags'
+    if (plugin / 'doc').is_symlink():
+        raise ValueError('unsafe plugin link')
+    info = tags.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
+        raise ValueError('unsafe plugin link')
+    observed = {'commit': revision, 'sha256': hashlib.sha256(tags.read_bytes()).hexdigest()}
+    if saved is not None and saved != observed:
+        raise ValueError('plugin contains local work; refusing restore')
+    return observed
+
+
+def validate_existing_receipts(root: Path, entries: dict, receipts: dict, *, env: dict) -> None:
+    for name, saved in receipts.items():
+        plugin = root / name
+        if (name not in entries or not plugin.is_dir() or not (plugin / 'doc/tags').is_file()):
+            raise ValueError('plugin contains local work; refusing restore')
+        plugin_receipt(plugin, entries[name]['commit'], saved, newly_installed=False, env=env)
+
+
+def main() -> None:
+    if len(sys.argv) != 1:
+        raise ValueError('unsupported editor setup operation')
+    home = Path.home()
+    print('remote editor preparation inputs', flush=True)
+    config = home / '.config/nvim'
+    lock = config / 'lazy-lock.json'
+    if lock.is_symlink() or not lock.is_file() or lock.stat().st_uid != os.getuid():
+        raise ValueError('unsafe editor lock')
+    before = lock.read_bytes()
+    lock_digest = hashlib.sha256(before).hexdigest()
+    state = home / '.local/state/remote-workspace'
+    target = state / 'editor-ready.json'
+    receipts = read_receipts(target, lock_digest)
+    entries = json.loads(before)
+    revision = entries['lazy.nvim']['commit']
+    branch = entries['lazy.nvim']['branch']
+    if not re.fullmatch('[0-9a-f]{40}', revision):
+        raise ValueError('invalid lazy revision')
+    env = {key: value for key, value in os.environ.items() if not key.startswith(('GIT_', 'LAZY'))}
+    env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'),
+               XDG_DATA_HOME=str(home / '.local/share'), XDG_STATE_HOME=str(home / '.local/state'),
+               XDG_CACHE_HOME=str(home / '.cache'), GIT_TERMINAL_PROMPT='0', NVIM_APPNAME='nvim',
+               PATH=str(home / '.local/libexec/remote-workspace') + ':' + str(home / '.local/bin') + ':' + os.defpath)
+    for tool in ('gcc', 'g++', 'make', 'tree-sitter'):
+        if shutil.which(tool, path=env['PATH']) is None:
+            raise ValueError('editor compiler prerequisite missing')
+    print('remote editor preparation lazy-bootstrap', flush=True)
+    lazy = home / '.local/share/nvim/lazy/lazy.nvim'
+    for parent in (config, *config.parents, lazy.parent, *lazy.parent.parents):
+        if parent.is_symlink():
+            raise ValueError('unsafe editor directory')
+    lazy.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if lazy.is_symlink():
+        raise ValueError('unsafe lazy directory')
+    new_plugins = {name for name in entries if not os.path.lexists(lazy.parent / name)}
+    if set(receipts) - set(entries):
+        raise ValueError('unsafe editor readiness manifest')
+    validate_existing_receipts(lazy.parent, entries, receipts, env=env)
+    if not lazy.exists():
+        with tempfile.TemporaryDirectory(prefix='.lazy-bootstrap-', dir=lazy.parent) as scratch:
+            candidate = Path(scratch) / 'lazy.nvim'
+            run('git', 'init', '-q', str(candidate), env=env)
+            run('git', '-C', str(candidate), 'remote', 'add', 'origin', 'https://github.com/folke/lazy.nvim.git', env=env)
+            run('git', '-C', str(candidate), 'fetch', '--depth', '1', 'origin', revision, env=env, timeout=180)
+            run('git', '-C', str(candidate), 'checkout', '--detach', revision, env=env)
+            run('git', '-C', str(candidate), 'check-ref-format', 'refs/remotes/origin/' + branch, env=env)
+            run('git', '-C', str(candidate), 'update-ref', 'refs/remotes/origin/' + branch, revision, env=env)
+            run('git', '-C', str(candidate), 'symbolic-ref', 'refs/remotes/origin/HEAD',
+                'refs/remotes/origin/' + branch, env=env)
+            candidate.rename(lazy)
+    if run('git', '-C', str(lazy), 'rev-parse', 'HEAD', env=env) != revision:
+        raise ValueError('installed lazy identity differs from lock')
+    for entry in lazy.parent.iterdir():
+        if entry.is_symlink():
+            raise ValueError('unsafe plugin link')
+        if (entry / '.git').exists():
+            status = run('git', '-C', str(entry), 'status', '--porcelain', env=env)
+            if status:
+                try:
+                    plugin_receipt(entry, entries[entry.name]['commit'], receipts.get(entry.name),
+                                   newly_installed=False, env=env)
+                except (KeyError, ValueError):
+                    print(dirty_summary(entry.name, entries, status), file=sys.stderr, flush=True)
+                    raise ValueError('plugin contains local work; refusing restore') from None
+            elif entry.name in receipts:
+                raise ValueError('plugin contains local work; refusing restore')
+    env['LAZY'] = str(lazy)
+    print('remote editor preparation headless-restore', flush=True)
+    nvim = str(home / '.local/bin/nvim')
+    run(nvim, '--headless', '-i', 'NONE', '-u', 'NONE', '-l',
+        str(home / '.config/remote-workspace/restore-nvim.lua'), env=env, timeout=900)
+    if before != lock.read_bytes():
+        raise ValueError('managed editor lock changed during restore')
+    generated_tags = {}
+    for name, pin in entries.items():
+        receipt = plugin_receipt(lazy.parent / name, pin['commit'], receipts.get(name),
+                                 newly_installed=name in new_plugins, env=env)
+        if receipt is not None:
+            generated_tags[name] = receipt
+    print('remote editor preparation second-startup', flush=True)
+    # Nvim may print its marker to stderr; success additionally requires a second
+    # first-open startup using the real owner init, without parser installation.
+    run(nvim, '--headless', '-i', 'NONE', '--cmd',
+        'lua _G.remote_setup_errors=0; local old=vim.notify; vim.notify=function(m,l,o) if l==vim.log.levels.ERROR then _G.remote_setup_errors=_G.remote_setup_errors+1 end; return old(m,l,o) end',
+        '-u', str(config / 'init.lua'),
+        '+lua if vim.v.errmsg ~= "" or _G.remote_setup_errors > 0 then vim.cmd("cquit 1") end', '+qa!', env=env, timeout=60)
+    if before != lock.read_bytes():
+        raise ValueError('managed editor lock changed during restore')
+    for name, pin in entries.items():
+        plugin_receipt(lazy.parent / name, pin['commit'], generated_tags.get(name),
+                       newly_installed=False, env=env)
+    for parent in (state, *state.parents):
+        if parent.is_symlink():
+            raise ValueError('unsafe editor state directory')
+        if parent.exists():
+            info = parent.stat()
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, os.getuid()}
+                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValueError('unsafe editor state directory')
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    paths = []
+    for root in (home / '.local/share/nvim', home / '.local/state/nvim', home / '.cache/nvim'):
+        if root.exists():
+            paths.extend(str(path.relative_to(home)) for path in root.rglob('*')
+                         if path.is_file() or path.is_symlink())
+    target = state / 'editor-ready.json'
+    if target.is_symlink() or (target.exists() and (
+            not target.is_file() or target.stat().st_uid != os.getuid() or target.stat().st_nlink != 1)):
+        raise ValueError('unsafe editor readiness manifest')
+    document = json.dumps({'lock_sha256': lock_digest, 'generated_tags': generated_tags,
+        'files': sorted(paths), 'required_parsers': ['bash', 'python', 'lua', 'vim', 'vimdoc',
+        'json', 'yaml', 'toml', 'markdown', 'sql']}, sort_keys=True) + '\n'
+    fd, temporary = tempfile.mkstemp(prefix='.editor-ready-', dir=state)
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            stream.write(document)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+    finally:
+        if os.path.lexists(temporary):
+            os.unlink(temporary)
+    print('remote owner AstroNvim ten parsers verified')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except EditorSetupFailure as error:
+        raise SystemExit('remote owner editor setup failed: ' + str(error)) from None
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        raise SystemExit('remote owner editor setup failed: ' + preparation_reason(error)) from None

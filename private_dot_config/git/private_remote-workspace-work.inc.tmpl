@@ -1,0 +1,15 @@
+{{- $name := trim (default "" (get . "name")) -}}
+{{- $email := trim (default "" (get . "work_email")) -}}
+{{- if or (not $name) (not $email) -}}
+{{- fail "remote work Git identity requires explicit nonblank name and work_email" -}}
+{{- end -}}
+[user]
+    name = {{ $name | quote }}
+    email = {{ $email | quote }}
+# Never declare remotes here: Git forbids them in hasconfig URL includes.
+{{ range $owner := list "Saltiola7" "saltiola7" -}}
+{{ range $prefix := list "https://github.com/" "git@github.com:" "ssh://git@github.com/" "ssh://git@github.com:*/" "ssh://github.com/" -}}
+[includeIf "hasconfig:remote.*.url:{{ $prefix }}{{ $owner }}/**"]
+    path = remote-workspace-conflict.inc
+{{ end -}}
+{{ end -}}

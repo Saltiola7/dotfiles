@@ -1,0 +1,8 @@
+#!/bin/bash
+# pins: {{ include "private_dot_config/remote-workspace/private_tools.json" | sha256sum }}
+# installer: {{ include "dot_local/bin/executable_remote-workspace-tools" | sha256sum }}
+set -euo pipefail
+{{ if ne .machine_type "remote-workspace" -}}
+exit 0
+{{ end -}}
+exec "$HOME/.local/bin/remote-workspace-tools"

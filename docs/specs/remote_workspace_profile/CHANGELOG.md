@@ -1,5 +1,20 @@
 # Remote Workspace Profile Changelog
 
+## 2026-11-07 — Owner overlay expansion (RRW-007B / F02)
+
+- Add explicit work/personal Git routing through private includes without taking
+  over global Git or gh helpers. Add four checksum-pinned tools and the separately
+  approved private tree-sitter build CLI, owner-locked AstroNvim/parser readiness,
+  portable aliases/hooks and a separate STARSHIP_CONFIG. Preserve foundation
+  ownership and other profiles. Exact native/paired evidence remains in the cycle;
+  live pin, rollout and apply remain Fork A's responsibility.
+- Final paired qualification pins merged foundation
+  `83137ab69d3ac66f3ddd2f88ae208e818a4dfb82` (RRW-007E), replacing the provisional
+  candidate. Require native cold locked restore, ten parsers plus dependencies,
+  generated-tag receipt/error contracts, credential-preserving reapply/rollback
+  and managed/installed-file disjointness on that exact pair. Final results and
+  actual Final Push remain in the cycle; RRW-007F is a separate delivery.
+
 ## 2026-11-04 - RRW-002B RHEL owner overlay qualification
 
 - Added native UBI 10 qualification and profile checks for the explicit

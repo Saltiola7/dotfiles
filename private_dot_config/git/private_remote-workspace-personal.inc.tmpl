@@ -1,0 +1,8 @@
+{{- $name := trim (default "" (get . "name")) -}}
+{{- $email := trim (default "" (get . "personal_email")) -}}
+{{- if or (not $name) (not $email) -}}
+{{- fail "remote personal Git identity requires explicit nonblank name and personal_email" -}}
+{{- end -}}
+[user]
+    name = {{ $name | quote }}
+    email = {{ $email | quote }}
