@@ -15,6 +15,18 @@ LUA_STAGES = {'owner-init', 'plugin-restore', 'plugin-verify', 'parser-build', '
 LUA_REASONS = {'locked plugin absent', 'locked plugin restore/build failed',
     'locked plugin identity mismatch', 'parser installation failed',
     'required compiled parser absent', 'required parser cannot load', 'headless editor reported an error'}
+PREPARATION_REASONS = frozenset({
+    'unsupported editor setup operation', 'unsafe editor lock', 'invalid lazy revision',
+    'editor compiler prerequisite missing', 'unsafe editor directory', 'unsafe lazy directory',
+    'installed lazy identity differs from lock', 'unsafe plugin link',
+    'plugin contains local work; refusing restore', 'managed editor lock changed during restore',
+    'unsafe editor state directory', 'unsafe editor readiness manifest',
+})
+
+
+def preparation_reason(error: Exception) -> str:
+    reason = str(error)
+    return reason if type(error) is ValueError and reason in PREPARATION_REASONS else 'unclassified preparation failure'
 
 
 class EditorSetupFailure(ValueError):
@@ -131,5 +143,5 @@ if __name__ == '__main__':
         main()
     except EditorSetupFailure as error:
         raise SystemExit('remote owner editor setup failed: ' + str(error)) from None
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        raise SystemExit('remote owner editor setup failed; lock and local work require inspection') from None
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        raise SystemExit('remote owner editor setup failed: ' + preparation_reason(error)) from None

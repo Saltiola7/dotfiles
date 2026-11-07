@@ -55,3 +55,9 @@ def test_editor_failure_diagnostics_only_admit_literal_labels():
         'remote editor stage private-secret\nremote editor invariant locked plugin absent\n')
     assert str(error) == 'editor exit 1; stage plugin-verify; locked plugin absent'
     assert 'private' not in str(module.EditorSetupFailure(1, 'private-path/token'))
+    for reason in ('installed lazy identity differs from lock', 'unsafe plugin link',
+                   'plugin contains local work; refusing restore', 'editor compiler prerequisite missing'):
+        assert module.preparation_reason(ValueError(reason)) == reason
+    for error in (ValueError('private-path/token'), OSError('private-path/token'),
+                  KeyError('private-path/token'), RuntimeError('unsafe plugin link')):
+        assert module.preparation_reason(error) == 'unclassified preparation failure'
