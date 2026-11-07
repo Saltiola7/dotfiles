@@ -11,11 +11,28 @@ import subprocess
 import sys
 import tempfile
 
+LUA_STAGES = {'owner-init', 'plugin-restore', 'plugin-verify', 'parser-build', 'parser-verify'}
+LUA_REASONS = {'locked plugin absent', 'locked plugin restore/build failed',
+    'locked plugin identity mismatch', 'parser installation failed',
+    'required compiled parser absent', 'required parser cannot load', 'headless editor reported an error'}
+
+
+class EditorSetupFailure(ValueError):
+    def __init__(self, code, output):
+        code = code if type(code) is int and 0 < code < 256 else 1
+        stages = [line.removeprefix('remote editor stage ') for line in output.splitlines()
+                  if line.removeprefix('remote editor stage ') in LUA_STAGES]
+        reasons = [line.removeprefix('remote editor invariant ') for line in output.splitlines()
+                   if line.removeprefix('remote editor invariant ') in LUA_REASONS]
+        stage = stages[-1] if stages else 'native-command'
+        reason = reasons[-1] if reasons else 'output suppressed'
+        super().__init__(f'editor exit {code}; stage {stage}; {reason}')
+
 
 def run(*args: str, env: dict, timeout: int = 60) -> str:
     result = subprocess.run(args, env=env, cwd=env['HOME'], text=True, capture_output=True, timeout=timeout)
     if result.returncode:
-        raise ValueError('headless editor setup command failed')
+        raise EditorSetupFailure(result.returncode, result.stderr + '\n' + result.stdout)
     return result.stdout.strip()
 
 
@@ -23,6 +40,7 @@ def main() -> None:
     if len(sys.argv) != 1:
         raise ValueError('unsupported editor setup operation')
     home = Path.home()
+    print('remote editor preparation inputs', flush=True)
     config = home / '.config/nvim'
     lock = config / 'lazy-lock.json'
     if lock.is_symlink() or not lock.is_file() or lock.stat().st_uid != os.getuid():
@@ -41,6 +59,7 @@ def main() -> None:
     for tool in ('gcc', 'g++', 'make', 'tree-sitter'):
         if shutil.which(tool, path=env['PATH']) is None:
             raise ValueError('editor compiler prerequisite missing')
+    print('remote editor preparation lazy-bootstrap', flush=True)
     lazy = home / '.local/share/nvim/lazy/lazy.nvim'
     for parent in (config, *config.parents, lazy.parent, *lazy.parent.parents):
         if parent.is_symlink():
@@ -68,11 +87,13 @@ def main() -> None:
         if (entry / '.git').exists() and run('git', '-C', str(entry), 'status', '--porcelain', env=env):
             raise ValueError('plugin contains local work; refusing restore')
     env['LAZY'] = str(lazy)
+    print('remote editor preparation headless-restore', flush=True)
     nvim = str(home / '.local/bin/nvim')
     run(nvim, '--headless', '-i', 'NONE', '-u', 'NONE', '-l',
         str(home / '.config/remote-workspace/restore-nvim.lua'), env=env, timeout=900)
     if before != lock.read_bytes():
         raise ValueError('managed editor lock changed during restore')
+    print('remote editor preparation second-startup', flush=True)
     # Nvim may print its marker to stderr; success additionally requires a second
     # first-open startup using the real owner init, without parser installation.
     run(nvim, '--headless', '-i', 'NONE', '--cmd',
@@ -108,5 +129,7 @@ def main() -> None:
 if __name__ == '__main__':
     try:
         main()
+    except EditorSetupFailure as error:
+        raise SystemExit('remote owner editor setup failed: ' + str(error)) from None
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         raise SystemExit('remote owner editor setup failed; lock and local work require inspection') from None

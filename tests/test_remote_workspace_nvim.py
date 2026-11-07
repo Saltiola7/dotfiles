@@ -1,4 +1,6 @@
 import json
+import importlib.machinery
+import importlib.util
 from pathlib import Path
 
 ROOT = Path(__file__).parents[1]
@@ -38,3 +40,15 @@ def test_remote_plugin_override_keeps_mason_on_demand():
     assert 'opts.run_on_start = false' in script
     assert 'opts.ensure_installed = {}' in script
     assert 'opts.automatic_installation = false' in script
+
+
+def test_editor_failure_diagnostics_only_admit_literal_labels():
+    loader = importlib.machinery.SourceFileLoader('remote_editor', str(ROOT / 'dot_local/bin/executable_remote-workspace-nvim'))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    loader.exec_module(module)
+    error = module.EditorSetupFailure(1, 'private-path/token\nremote editor stage plugin-verify\n'
+        'remote editor stage private-secret\nremote editor invariant locked plugin absent\n')
+    assert str(error) == 'editor exit 1; stage plugin-verify; locked plugin absent'
+    assert 'private' not in str(module.EditorSetupFailure(1, 'private-path/token'))
