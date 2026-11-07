@@ -17,12 +17,18 @@ def qualify(binary: str, restore: Path) -> None:
             harness = home / 'contract.lua'
             harness.write_text('''
 local sha = string.rep("a", 40)
-vim.fn.readfile = function() return { '{"fixture":{"branch":"main","commit":"' .. sha .. '"}}' } end
+vim.env.LAZY = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+vim.fn.readfile = function() return { '{"fixture":{"branch":"main","commit":"' .. sha .. '"},"late-plugin":{"branch":"main","commit":"' .. sha .. '"}}' } end
+local lock_manager = { lock = {}, _loaded = false, update = function() error("incremental update would drop late lock entry") end }
+package.preload["lazy.manage.lock"] = function() return lock_manager end
 package.preload["lazy"] = function() return {
-  restore = function(opts) assert(opts.wait and vim.opt.loadplugins:get()) end,
+  restore = function(opts)
+    assert(opts.wait and vim.opt.loadplugins:get())
+    assert(lock_manager._loaded and lock_manager.lock["late-plugin"].commit == sha)
+  end,
   load = function() end,
 } end
-package.preload["lazy.core.config"] = function() return { plugins = { fixture = { dir = "/fixture" } } } end
+package.preload["lazy.core.config"] = function() return { plugins = { fixture = { dir = "/fixture" }, ["late-plugin"] = {dir = "/late-fixture"} } } end
 package.preload["lazy.core.plugin"] = function() return { has_errors = function() return BUILD_ERROR end } end
 vim.system = function() return { wait = function() return { code = 0, stdout = sha .. "\\n" } end } end
 package.preload["nvim-treesitter"] = function() return {
@@ -35,7 +41,11 @@ vim.treesitter.language.add = function(name, opts)
 end
 local dofile_real = dofile
 dofile = function(path)
-  if path:match("/init.lua$") then return end
+  if path:match("/init.lua$") then
+    lock_manager.update() -- Simulated incremental install round must be read-only.
+    assert(lock_manager.lock["late-plugin"].commit == sha)
+    return
+  end
   return dofile_real(path)
 end
 dofile_real(RESTORE)

@@ -9,6 +9,13 @@ local ok = xpcall(function()
   local config = vim.fn.stdpath("config")
   local lock = vim.json.decode(table.concat(vim.fn.readfile(config .. "/lazy-lock.json"), "\n"))
   vim.opt.loadplugins = true
+  -- The pinned manager rewrites/prunes its lock after each incremental import
+  -- round. Preserve the original map for later imports; never rewrite the file.
+  vim.opt.rtp:prepend(assert(vim.env.LAZY, "locked Lazy directory missing"))
+  local lock_manager = require("lazy.manage.lock")
+  lock_manager.lock = vim.deepcopy(lock)
+  lock_manager._loaded = true
+  lock_manager.update = function() end
   io.stderr:write("remote editor stage owner-init\n")
   dofile(config .. "/init.lua")
   io.stderr:write("remote editor stage plugin-restore\n")

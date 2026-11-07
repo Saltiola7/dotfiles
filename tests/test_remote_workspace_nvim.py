@@ -21,6 +21,9 @@ def test_headless_restore_uses_locked_plugins_and_verifies_ten_native_parsers():
     assert 'norm_languages' in script
     assert 'remote_workspace_verify_' in script and 'symbol_name = lang' in script
     assert 'has_errors(plugin)' in script
+    assert script.index('lock_manager._loaded = true') < script.index('dofile(config')
+    assert 'lock_manager.lock = vim.deepcopy(lock)' in script
+    assert 'lock_manager.update = function() end' in script
 
 
 def test_editor_setup_keeps_lock_and_uses_overlay_private_cli():
