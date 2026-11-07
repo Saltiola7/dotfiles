@@ -61,3 +61,9 @@ def test_editor_failure_diagnostics_only_admit_literal_labels():
     for error in (ValueError('private-path/token'), OSError('private-path/token'),
                   KeyError('private-path/token'), RuntimeError('unsafe plugin link')):
         assert module.preparation_reason(error) == 'unclassified preparation failure'
+    entries = {'fixture-b': {}, 'fixture-a': {}}
+    assert module.dirty_summary('fixture-b', entries, ' M private/token\n?? private/untracked') == (
+        'remote editor dirty lock-index 2; tracked 1; untracked 1')
+    assert module.dirty_summary('private-plugin', entries, '?? secret') == (
+        'remote editor dirty lock-index 0; tracked 0; untracked 1')
+    assert 'private' not in module.dirty_summary('private-plugin', entries, ' M private/token')

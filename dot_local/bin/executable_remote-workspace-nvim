@@ -29,6 +29,17 @@ def preparation_reason(error: Exception) -> str:
     return reason if type(error) is ValueError and reason in PREPARATION_REASONS else 'unclassified preparation failure'
 
 
+def dirty_summary(name: str, entries: dict, status: str) -> str:
+    names = sorted(entries)
+    index = names.index(name) + 1 if name in entries else 0
+    index = min(index, 9999)
+    lines = status.splitlines()
+    untracked = sum(line.startswith('?? ') for line in lines)
+    tracked = len(lines) - untracked
+    return (f'remote editor dirty lock-index {index}; '
+            f'tracked {min(tracked, 9999)}; untracked {min(untracked, 9999)}')
+
+
 class EditorSetupFailure(ValueError):
     def __init__(self, code, output):
         code = code if type(code) is int and 0 < code < 256 else 1
@@ -96,8 +107,11 @@ def main() -> None:
     for entry in lazy.parent.iterdir():
         if entry.is_symlink():
             raise ValueError('unsafe plugin link')
-        if (entry / '.git').exists() and run('git', '-C', str(entry), 'status', '--porcelain', env=env):
-            raise ValueError('plugin contains local work; refusing restore')
+        if (entry / '.git').exists():
+            status = run('git', '-C', str(entry), 'status', '--porcelain', env=env)
+            if status:
+                print(dirty_summary(entry.name, entries, status), file=sys.stderr, flush=True)
+                raise ValueError('plugin contains local work; refusing restore')
     env['LAZY'] = str(lazy)
     print('remote editor preparation headless-restore', flush=True)
     nvim = str(home / '.local/bin/nvim')
