@@ -1,0 +1,112 @@
+#!/usr/bin/env python3
+"""Restore the owner's locked editor and await every required parser build."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+
+
+def run(*args: str, env: dict, timeout: int = 60) -> str:
+    result = subprocess.run(args, env=env, cwd=env['HOME'], text=True, capture_output=True, timeout=timeout)
+    if result.returncode:
+        raise ValueError('headless editor setup command failed')
+    return result.stdout.strip()
+
+
+def main() -> None:
+    if len(sys.argv) != 1:
+        raise ValueError('unsupported editor setup operation')
+    home = Path.home()
+    config = home / '.config/nvim'
+    lock = config / 'lazy-lock.json'
+    if lock.is_symlink() or not lock.is_file() or lock.stat().st_uid != os.getuid():
+        raise ValueError('unsafe editor lock')
+    before = lock.read_bytes()
+    entries = json.loads(before)
+    revision = entries['lazy.nvim']['commit']
+    branch = entries['lazy.nvim']['branch']
+    if not re.fullmatch('[0-9a-f]{40}', revision):
+        raise ValueError('invalid lazy revision')
+    env = {key: value for key, value in os.environ.items() if not key.startswith(('GIT_', 'LAZY'))}
+    env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'),
+               XDG_DATA_HOME=str(home / '.local/share'), XDG_STATE_HOME=str(home / '.local/state'),
+               XDG_CACHE_HOME=str(home / '.cache'), GIT_TERMINAL_PROMPT='0', NVIM_APPNAME='nvim',
+               PATH=str(home / '.local/libexec/remote-workspace') + ':' + str(home / '.local/bin') + ':' + os.defpath)
+    for tool in ('gcc', 'g++', 'make', 'tree-sitter'):
+        if shutil.which(tool, path=env['PATH']) is None:
+            raise ValueError('editor compiler prerequisite missing')
+    lazy = home / '.local/share/nvim/lazy/lazy.nvim'
+    for parent in (config, *config.parents, lazy.parent, *lazy.parent.parents):
+        if parent.is_symlink():
+            raise ValueError('unsafe editor directory')
+    lazy.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if lazy.is_symlink():
+        raise ValueError('unsafe lazy directory')
+    if not lazy.exists():
+        with tempfile.TemporaryDirectory(prefix='.lazy-bootstrap-', dir=lazy.parent) as scratch:
+            candidate = Path(scratch) / 'lazy.nvim'
+            run('git', 'init', '-q', str(candidate), env=env)
+            run('git', '-C', str(candidate), 'remote', 'add', 'origin', 'https://github.com/folke/lazy.nvim.git', env=env)
+            run('git', '-C', str(candidate), 'fetch', '--depth', '1', 'origin', revision, env=env, timeout=180)
+            run('git', '-C', str(candidate), 'checkout', '--detach', revision, env=env)
+            run('git', '-C', str(candidate), 'check-ref-format', 'refs/remotes/origin/' + branch, env=env)
+            run('git', '-C', str(candidate), 'update-ref', 'refs/remotes/origin/' + branch, revision, env=env)
+            run('git', '-C', str(candidate), 'symbolic-ref', 'refs/remotes/origin/HEAD',
+                'refs/remotes/origin/' + branch, env=env)
+            candidate.rename(lazy)
+    if run('git', '-C', str(lazy), 'rev-parse', 'HEAD', env=env) != revision:
+        raise ValueError('installed lazy identity differs from lock')
+    for entry in lazy.parent.iterdir():
+        if entry.is_symlink():
+            raise ValueError('unsafe plugin link')
+        if (entry / '.git').exists() and run('git', '-C', str(entry), 'status', '--porcelain', env=env):
+            raise ValueError('plugin contains local work; refusing restore')
+    env['LAZY'] = str(lazy)
+    nvim = str(home / '.local/bin/nvim')
+    run(nvim, '--headless', '-i', 'NONE', '-u', 'NONE', '-l',
+        str(home / '.config/remote-workspace/restore-nvim.lua'), env=env, timeout=900)
+    if before != lock.read_bytes():
+        raise ValueError('managed editor lock changed during restore')
+    # Nvim may print its marker to stderr; success additionally requires a second
+    # first-open startup using the real owner init, without parser installation.
+    run(nvim, '--headless', '-i', 'NONE', '--cmd',
+        'lua _G.remote_setup_errors=0; local old=vim.notify; vim.notify=function(m,l,o) if l==vim.log.levels.ERROR then _G.remote_setup_errors=_G.remote_setup_errors+1 end; return old(m,l,o) end',
+        '-u', str(config / 'init.lua'),
+        '+lua if vim.v.errmsg ~= "" or _G.remote_setup_errors > 0 then vim.cmd("cquit 1") end', '+qa!', env=env, timeout=60)
+    state = home / '.local/state/remote-workspace'
+    for parent in (state, *state.parents):
+        if parent.is_symlink():
+            raise ValueError('unsafe editor state directory')
+        if parent.exists():
+            info = parent.stat()
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, os.getuid()}
+                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValueError('unsafe editor state directory')
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    paths = []
+    for root in (home / '.local/share/nvim', home / '.local/state/nvim', home / '.cache/nvim'):
+        if root.exists():
+            paths.extend(str(path.relative_to(home)) for path in root.rglob('*')
+                         if path.is_file() or path.is_symlink())
+    target = state / 'editor-ready.json'
+    if target.is_symlink() or (target.exists() and (
+            not target.is_file() or target.stat().st_uid != os.getuid() or target.stat().st_nlink != 1)):
+        raise ValueError('unsafe editor readiness manifest')
+    target.write_text(json.dumps({'lock_sha256': hashlib.sha256(before).hexdigest(),
+        'files': sorted(paths), 'required_parsers': ['bash', 'python', 'lua', 'vim', 'vimdoc',
+        'json', 'yaml', 'toml', 'markdown', 'sql']}, sort_keys=True) + '\n')
+    target.chmod(0o600)
+    print('remote owner AstroNvim ten parsers verified')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        raise SystemExit('remote owner editor setup failed; lock and local work require inspection') from None

@@ -1,5 +1,11 @@
 # Remote Workspace Profile
 
+> The [RRW-007B owner expansion](OWNER_EXPANSION.md) supersedes the historical
+> Yazi-only scope below: included Git identity/F02 preservation, four pinned
+> tools, a private parser-build CLI, locked first-open AstroNvim, portable Bash
+> snippets and a separate prompt config. The overlay remains optional and
+> disjoint; source approval does not authorize live rollout or apply.
+
 ## Outcome
 
 The owner may explicitly apply a narrow Yazi-only overlay after the shared

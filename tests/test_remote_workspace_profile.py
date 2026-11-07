@@ -12,6 +12,8 @@ DATA = {
     "machine_type": "remote-workspace",
     "name": "Test User",
     "email": "test@example.com",
+    "work_email": "work@example.invalid",
+    "personal_email": "personal@example.invalid",
     "atuin_sync_address": "https://api.atuin.sh",
 }
 REMOTE_TARGETS = {
@@ -19,7 +21,27 @@ REMOTE_TARGETS = {
     ".config/yazi/theme.toml",
     "install-remote-workspace-yazi.sh",
     "install-yazi-flavor.sh",
+    ".bashrc.d/40-remote-workspace.sh",
+    ".local/bin/remote-workspace-git",
+    ".local/bin/remote-workspace-tools",
+    ".local/bin/remote-workspace-nvim",
+    ".config/git/remote-workspace.inc",
+    ".config/git/remote-workspace-work.inc",
+    ".config/git/remote-workspace-personal.inc",
+    ".config/git/remote-workspace-conflict.inc",
+    ".config/remote-workspace/tools.json",
+    ".config/remote-workspace/restore-nvim.lua",
+    ".config/remote-workspace/starship.toml",
+    "configure-remote-workspace-git.sh",
+    "install-01-remote-workspace-tools.sh",
+    "zz-remote-workspace-nvim.sh",
 }
+REMOTE_TARGETS |= {'.config/nvim/' + path for path in (
+    '.luarc.json', '.neoconf.json', '.stylua.toml', 'README.md', 'init.lua', 'lazy-lock.json',
+    'neovim.yml', 'selene.toml', 'lua/community.lua', 'lua/lazy_setup.lua', 'lua/polish.lua',
+    'lua/plugins/astrocore.lua', 'lua/plugins/astrolsp.lua', 'lua/plugins/astroui.lua',
+    'lua/plugins/mason.lua', 'lua/plugins/none-ls.lua', 'lua/plugins/remote-workspace.lua',
+    'lua/plugins/treesitter.lua', 'lua/plugins/user.lua')}
 
 
 def text(path):
@@ -101,3 +123,18 @@ def test_ubi_qualification_uses_an_exact_shared_revision_and_existing_smoke():
     # additionally verifies that the selected RRW-002 revision has merged.
     import re
     assert re.search(r"ref: [0-9a-f]{40}\s", workflow)
+
+
+def test_expanded_contract_keeps_private_inputs_and_source_ownership():
+    contract = text('docs/specs/remote_workspace_profile/OWNER_EXPANSION.md')
+    for required in ('work_email', 'personal_email', 'STARSHIP_CONFIG', '0.26.1',
+                     '## Visual Evidence', '**Text Equivalent:**', 'markdown_inline'):
+        assert required in contract
+    for document in ('README.md', 'CHANGELOG.md'):
+        assert 'RRW-007B' in text('docs/specs/remote_workspace_profile/' + document)
+    assert '.gitconfig' not in REMOTE_TARGETS
+    assert '.bashrc' not in REMOTE_TARGETS
+    assert '.config/starship.toml' not in REMOTE_TARGETS
+    workflow = text('.github/workflows/test.yml')
+    assert workflow.count('"private_dot_config/nvim/**"') == 2
+    assert 'gcc-c++' in text('.github/workflows/remote-workspace-ubi.yml')

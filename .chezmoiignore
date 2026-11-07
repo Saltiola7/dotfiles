@@ -191,6 +191,41 @@ Library/LaunchAgents/dev.dotfiles.runtime-state.plist
 !.config/yazi/theme.toml
 !install-remote-workspace-yazi.sh
 !install-yazi-flavor.sh
+!.config/git/
+.config/git/*
+!.config/git/remote-workspace.inc
+!.config/git/remote-workspace-work.inc
+!.config/git/remote-workspace-personal.inc
+!.config/git/remote-workspace-conflict.inc
+!.config/remote-workspace/
+!.config/remote-workspace/**
+!.config/nvim/
+!.config/nvim/**
+!.bashrc.d/
+.bashrc.d/*
+!.bashrc.d/40-remote-workspace.sh
+!.local/
+.local/*
+!.local/bin/
+.local/bin/*
+!.local/bin/remote-workspace-git
+!.local/bin/remote-workspace-tools
+!.local/bin/remote-workspace-nvim
+!configure-remote-workspace-git.sh
+!install-01-remote-workspace-tools.sh
+!zz-remote-workspace-nvim.sh
+{{ end }}
+{{ if ne .machine_type "remote-workspace" }}
+.config/git/remote-workspace*.inc
+.config/remote-workspace/
+.config/nvim/lua/plugins/remote-workspace.lua
+.bashrc.d/40-remote-workspace.sh
+.local/bin/remote-workspace-git
+.local/bin/remote-workspace-tools
+.local/bin/remote-workspace-nvim
+configure-remote-workspace-git.sh
+install-01-remote-workspace-tools.sh
+zz-remote-workspace-nvim.sh
 {{ end }}
 # Operator-local inputs must never become managed home-directory targets.
 local/

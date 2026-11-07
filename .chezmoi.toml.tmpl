@@ -15,6 +15,10 @@ encryption = "age"
     name = {{ $name | quote }}
     email = {{ $email | quote }}
     machine_type = {{ $machineType | quote }}
+{{ if eq $machineType "remote-workspace" }}
+    work_email = {{ promptStringOnce . "work_email" "Work Git email (mgmri-dge/Superformula)" "" | quote }}
+    personal_email = {{ promptStringOnce . "personal_email" "Personal Git email (Saltiola7)" "" | quote }}
+{{ end }}
 {{ with default "" (get . "git_identity_routing_file") }}
     git_identity_routing_file = {{ . | quote }}
 {{ end }}

@@ -6,6 +6,13 @@ on:
       - ".github/workflows/remote-workspace-ubi.yml"
       - ".chezmoi*"
       - "private_dot_config/yazi/**"
+      - "private_dot_config/git/**"
+      - "private_dot_config/nvim/**"
+      - "private_dot_config/remote-workspace/**"
+      - "dot_bashrc.d/40-remote-workspace.sh"
+      - "dot_local/bin/executable_remote-workspace-*"
+      - "run*remote-workspace*.tmpl"
+      - "tests/test_remote_workspace_*.py"
       - "run_onchange_install-remote-workspace-yazi.sh.tmpl"
       - "run_onchange_after_install-yazi-flavor.sh.tmpl"
       - "tests/test_remote_workspace_profile.py"
@@ -19,12 +26,12 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     container: registry.access.redhat.com/ubi10/ubi
     env:
       DOTFILES_AI_SOURCE: ${{ github.workspace }}/shared
     steps:
-      - run: dnf -qy install ca-certificates curl git gzip python3 tar unzip diffutils findutils lsof xz
+      - run: dnf -qy install ca-certificates curl git gzip python3 tar unzip diffutils findutils lsof xz gcc gcc-c++ make
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: owner
@@ -32,9 +39,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Saltiola7/dotfiles-ai
-          # Reviewed RRW-002 candidate; replace with its full merge SHA before
-          # final paired qualification. This candidate is not rollout authority.
-          ref: b8043183c403e49be774d6dbac4cb77c446e9820
+          # RRW-007E qualification candidate. Replace with its verified merge
+          # SHA and requalify before final paired acceptance or owner apply.
+          ref: 5c9b3250bf935d0e64eec771809e9912c31eebaa
           path: shared
           persist-credentials: false
       - name: Qualify disjoint installation, idempotency and rollback
