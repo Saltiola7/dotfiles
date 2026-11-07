@@ -66,6 +66,14 @@ duplicate mise/Atuin/Starship initialization or terminal-scanner side effects.
 Deliver the owner's committed `private_dot_config/nvim` and unchanged
 `lazy-lock.json`. Bootstrap Lazy at its locked commit, retaining locked branch
 metadata. Refuse dirty existing plugin repositories; do not reset owner changes.
+The sole dirty-state exception is an exact, private receipt for generated
+`doc/tags` in a plugin absent before controlled setup. Bind its SHA-256 to the
+plugin commit and owner-lock digest, verify after restore and second startup,
+and publish only after readiness. Reapply admits only that unchanged output;
+tracked edits, other untracked files, changed/missing tags, unsafe/missing
+receipts and preexisting dirty plugins still refuse. Never blanket-ignore or
+delete dirty files. A failed first setup does not adopt its leftover files.
+
 Headless setup explicitly enables plugin loading, restores locked plugins and
 verifies every selected plugin SHA. Lock drift or startup errors fail apply.
 
