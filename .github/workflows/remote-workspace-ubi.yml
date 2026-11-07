@@ -37,9 +37,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: Saltiola7/dotfiles-ai
-          # RRW-007E qualification candidate. Replace with its verified merge
-          # SHA and requalify before final paired acceptance or owner apply.
-          ref: 5c9b3250bf935d0e64eec771809e9912c31eebaa
+          # Verified merged RRW-007E foundation; qualify this exact source pair.
+          ref: 83137ab69d3ac66f3ddd2f88ae208e818a4dfb82
           path: shared
           persist-credentials: false
       - name: Qualify disjoint installation, idempotency and rollback

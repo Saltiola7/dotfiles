@@ -123,6 +123,8 @@ def test_ubi_qualification_uses_an_exact_shared_revision_and_existing_smoke():
     # additionally verifies that the selected RRW-002 revision has merged.
     import re
     assert re.search(r"ref: [0-9a-f]{40}\s", workflow)
+    assert 'ref: 83137ab69d3ac66f3ddd2f88ae208e818a4dfb82' in workflow
+    assert 'qualification candidate' not in workflow
 
 
 def test_expanded_contract_keeps_private_inputs_and_source_ownership():
