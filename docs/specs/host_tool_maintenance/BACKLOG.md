@@ -1,5 +1,8 @@
 # Host maintenance backlog
 
+- OMARCHY-SHELL-001: preserve normal context menus while guarding the upstream
+  null-focus crash; suppress internal debug flooding and retain dead logs safely.
+
 - RUSTDESK-SYNERGY-001: deployed and live-qualified on Mac mini, including helper
   SIGKILL/restart during an incoming desktop; Final Push tracked in Cycle Record.
 

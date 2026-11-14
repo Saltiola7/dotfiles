@@ -1,5 +1,9 @@
 # Host tool maintenance
 
+The [Omarchy shell reliability contract](features/omarchy-shell-reliability.md)
+explicitly extends this context to the Linux x86_64 Omarchy profile for a native
+context-menu guard, sparse diagnostic capture and safe dead-log retention.
+
 The [incoming RustDesk/Synergy handoff](features/rustdesk-synergy-handoff.md)
 defines temporary Mac input ownership, prior-state preservation and recovery.
 
