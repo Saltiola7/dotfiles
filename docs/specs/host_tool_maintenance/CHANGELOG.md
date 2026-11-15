@@ -1,5 +1,25 @@
 # Host maintenance changelog
 
+## 2026-11-15 — Omarchy MacBook Pro install prep and card validation
+
+- Chose the official Omarchy for Apple Silicon installer for the 13" M1
+  MacBook Pro over the legacy Asahi Alarm script route, and installed
+  installer 2.3.16 on the host via `brew install omacom/mac/omarchy`.
+  Recorded the phased runbook, the post-install Apple Silicon quirk
+  checklist, and the open backup-shape decision in
+  `features/omarchy-mbp-install.md`. Pre-flight observed: macOS 27.2.1,
+  FileVault on, 176 GiB free.
+- Validated the owner's 471 GB exFAT microSD (retired Fujifilm camera
+  card) against the 8 TB backup disk before any reuse: only 73 of 701
+  files matched by name and size; 551 files including every MOV are
+  absent by original filename. Registered the card as `fuji-sd-500gb` in
+  the homelab registry with a do-not-empty guard note, and recorded the
+  8 TB's observed 136 GiB free near-full state on `mac-backup-disk`.
+- Recovered stranded local work into main: the volume-popup pytest
+  (`tests/test_sketchybar_volume.py`) that belonged to the shipped
+  desktop-controls slice, and the DBSCTR gate-plan artifact
+  `DESKTOP-CONTROLS.plan.json`.
+
 ## 2026-11-15 — Menu-bar auto-hide key migration
 
 - Root-caused a completely unresponsive native menu bar on macOS 27.0.1: the
