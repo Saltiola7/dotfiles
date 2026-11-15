@@ -452,7 +452,7 @@ install-omarchy-apps
 # Public example input, never a home-directory target.
 config.omarchy-try.example.toml
 
-{{ if ne .chezmoi.hostname "ts-mbp" }}
+{{ if not (hasPrefix "ts-mbp" .chezmoi.hostname) }}
 Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 .local/bin/mbp-borg-backup
 {{ end }}
