@@ -1,0 +1,8 @@
+[Unit]
+Description=Retain verified dead Omarchy shell logs
+ConditionPathIsDirectory=%t/quickshell/by-id
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/omarchy-shell-maintenance prune
+UMask=0077

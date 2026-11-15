@@ -1,0 +1,15 @@
+#!/bin/bash
+set -euo pipefail
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") -}}
+if systemctl --user is-active default.target >/dev/null 2>&1; then
+  systemctl --user daemon-reload
+  systemctl --user start omarchy-shell-log-maintenance.timer
+fi
+# Native IPC preserves the current preferences. A fresh session loads the
+# baseline plugin declaration when no shell is currently available.
+if /usr/bin/omarchy-shell shell rescanPlugins >/dev/null 2>&1; then
+  /usr/bin/omarchy plugin enable dotfiles.context-menu-guard
+fi
+{{ else -}}
+exit 0
+{{ end -}}

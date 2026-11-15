@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") -}}
+source_root={{ .chezmoi.sourceDir | quote }}
+python3 "$source_root/dot_local/bin/executable_omarchy-shell-maintenance" build \
+  --source "$source_root/private_dot_config/omarchy-host/context-menu-guard" \
+  --target "$HOME/.local/lib/omarchy-qml/Dotfiles/ContextMenuGuard"
+{{ else -}}
+exit 0
+{{ end -}}

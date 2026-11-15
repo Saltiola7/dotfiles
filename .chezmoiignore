@@ -63,7 +63,12 @@ apply-omarchy-theme.sh
 .config/omarchy/*
 !.config/omarchy/shell.json
 !.config/omarchy-host/
-!.config/omarchy-host/**
+!.config/omarchy-host/next-steps.md
+!.config/omarchy-host/logind.conf
+!.config/omarchy-host/backup/
+!.config/omarchy-host/backup/**
+!.config/omarchy-host/waynergy-package/
+!.config/omarchy-host/waynergy-package/**
 !.config/zen-managed/
 !.config/zen-managed/**
 !.config/systemd/
@@ -388,4 +393,35 @@ configure-desktop-startup.sh
 .local/lib/smb_shares/
 Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
 load-smb-reconnect.sh
+{{ end }}
+
+# The native shell guard is qualified for the Omarchy Linux x86_64 profile.
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") }}
+!.local/bin/quickshell
+!.local/bin/omarchy-shell-maintenance
+!.config/omarchy/plugins/
+.config/omarchy/plugins/*
+!.config/omarchy/plugins/dotfiles.context-menu-guard/
+!.config/omarchy/plugins/dotfiles.context-menu-guard/**
+!.config/omarchy-host/context-menu-guard/
+!.config/omarchy-host/context-menu-guard/**
+!.config/systemd/user/omarchy-shell-log-maintenance.service
+!.config/systemd/user/omarchy-shell-log-maintenance.timer
+!.config/systemd/user/timers.target.wants/
+.config/systemd/user/timers.target.wants/*
+!.config/systemd/user/timers.target.wants/omarchy-shell-log-maintenance.timer
+!build-omarchy-shell.sh
+!configure-omarchy-shell.sh
+{{ else }}
+.local/bin/quickshell
+.local/bin/omarchy-shell-maintenance
+.config/omarchy/plugins/dotfiles.context-menu-guard/
+.config/omarchy/plugins/dotfiles.context-menu-guard/**
+.config/omarchy-host/context-menu-guard/
+.config/omarchy-host/context-menu-guard/**
+.config/systemd/user/omarchy-shell-log-maintenance.service
+.config/systemd/user/omarchy-shell-log-maintenance.timer
+.config/systemd/user/timers.target.wants/omarchy-shell-log-maintenance.timer
+build-omarchy-shell.sh
+configure-omarchy-shell.sh
 {{ end }}
