@@ -1,4 +1,4 @@
-{{ if eq .machine_type "omarchy" -}}
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
 # Keep Omarchy's shell integrations, then select the chezmoi-managed agents.
 [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
 export PATH="$HOME/.local/bin:$PATH"

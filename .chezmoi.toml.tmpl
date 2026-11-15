@@ -1,6 +1,6 @@
 {{- $name := promptStringOnce . "name" "Your full name" "" -}}
 {{- $email := promptStringOnce . "email" "Your email address" "" -}}
-{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/fedora-server)" "macbook" -}}
+{{- $machineType := promptStringOnce . "machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/omarchy-try/fedora-server)" "macbook" -}}
 {{- $atuinSyncAddress := promptStringOnce . "atuin_sync_address" "Atuin sync address" "https://api.atuin.sh" -}}
 
 sourceDir = {{ if eq $machineType "mac-mini" }}"/Volumes/ext/git/Personal/dotfiles"{{ else }}{{ .chezmoi.sourceDir | quote }}{{ end }}
@@ -29,6 +29,9 @@ encryption = "age"
 {{ end }}
 {{ if and (eq .chezmoi.os "darwin") (or (eq $machineType "mac-mini") (eq $machineType "macbook")) }}
     smb_reconnect_enabled = {{ if hasKey . "smb_reconnect_enabled" }}{{ .smb_reconnect_enabled }}{{ else }}true{{ end }}
+{{ end }}
+{{ if eq $machineType "omarchy-try" }}
+    omarchy_keyboard_layout = {{ default "fi" (get . "omarchy_keyboard_layout") | quote }}
 {{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
 {{ if eq $machineType "fedora-server" }}

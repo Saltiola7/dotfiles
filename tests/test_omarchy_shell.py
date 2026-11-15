@@ -3,14 +3,17 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).parents[1]
 
 
-def test_managed_agents_survive_later_runtime_path_updates(tmp_path):
+@pytest.mark.parametrize("machine_type", ["omarchy", "omarchy-try"])
+def test_managed_agents_survive_later_runtime_path_updates(tmp_path, machine_type):
     rendered = subprocess.run(
         ["chezmoi", "-S", str(ROOT), "--config", "/dev/null", "--config-format", "toml",
-         "--override-data", json.dumps({"machine_type": "omarchy"}), "execute-template"],
+         "--override-data", json.dumps({"machine_type": machine_type}), "execute-template"],
         input=(ROOT / "dot_bashrc.tmpl").read_text(), capture_output=True, text=True, check=True,
     ).stdout
     rc = tmp_path / "bashrc"

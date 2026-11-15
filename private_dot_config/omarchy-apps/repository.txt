@@ -1,0 +1,5 @@
+# Essentials only; no hardware packages or package holds.
+python
+curl
+git
+podman
