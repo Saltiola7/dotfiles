@@ -16,7 +16,7 @@ DATA = {
     "chezmoi": {"os": "linux", "arch": "arm64", "homeDir": "/home/test"},
 }
 TARGETS = {
-    ".bashrc", ".config/hypr/bindings.lua", ".config/hypr/input.lua",
+    ".bashrc", ".config/hypr/bindings.lua", ".config/hypr/input.lua", ".config/hypr/xdph.conf",
     ".config/kitty/kitty-query.py", ".config/kitty/kitty.conf",
     ".config/kitty/load-snapshot.py", ".config/kitty/mocha.conf",
     ".config/kitty/save-workspace.py", ".config/xdg-terminals.list",
@@ -130,3 +130,11 @@ def test_release_checksum_failure_preserves_existing_command(tmp_path, monkeypat
         module.install_release({'name': 'pycharm', 'command': 'pycharm', 'version': 'test', 'sha256': '0' * 64})
     assert existing.read_text() == 'existing application'
     assert not list((tmp_path / 'bundles').iterdir())
+
+
+def test_native_share_picker_is_scoped_to_try_guest():
+    picker = ROOT / "private_dot_config/hypr/xdph.conf"
+    assert "custom_picker_binary = /usr/bin/hyprland-share-picker" in picker.read_text()
+    for machine, os_name in [("omarchy", "linux"), ("mac-mini", "darwin")]:
+        data = {**DATA, "machine_type": machine, "chezmoi": {**DATA["chezmoi"], "os": os_name}}
+        assert ".config/hypr/xdph.conf" not in chezmoi("managed", "--include", "files", data=data).splitlines()
