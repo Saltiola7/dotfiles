@@ -1,0 +1,10 @@
+{{ if eq .machine_type "omarchy-try" -}}
+#!/bin/bash
+set -euo pipefail
+# Essentials installer: {{ include "dot_local/bin/executable_omarchy-apps" | sha256sum }}
+# Native recipes: {{ include "private_dot_config/omarchy-apps/recipes.json.tmpl" | sha256sum }}
+# Repository packages: {{ include "private_dot_config/omarchy-apps/repository.txt" | sha256sum }}
+# RustDesk recipe: {{ include "dot_local/lib/omarchy-apps/recipes/rustdesk-bin/PKGBUILD" | sha256sum }}
+# RustDesk hook: {{ include "dot_local/lib/omarchy-apps/recipes/rustdesk-bin/rustdesk-bin.install" | sha256sum }}
+exec "$HOME/.local/bin/omarchy-apps" --install
+{{ end }}

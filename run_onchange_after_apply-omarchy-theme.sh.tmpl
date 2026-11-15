@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-{{ if eq .machine_type "omarchy" -}}
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
 omarchy theme set catppuccin
 {{ end -}}

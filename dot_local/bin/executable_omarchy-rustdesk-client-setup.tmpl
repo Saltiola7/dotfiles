@@ -2,7 +2,14 @@
 # Native RustDesk client; server routing lives in chezmoi, credentials do not.
 set -euo pipefail
 [[ -t 0 ]] || { echo "Run in a terminal for installation and sudo prompts." >&2; exit 1; }
+{{ if eq .machine_type "omarchy-try" -}}
+command -v rustdesk >/dev/null || {
+  echo "Install the managed essentials first: omarchy-apps --install" >&2
+  exit 1
+}
+{{ else -}}
 omarchy pkg aur add rustdesk-bin
+{{ end -}}
 sudo systemctl enable --now rustdesk.service
 config="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk-client/server.json"
 key_file="${XDG_CONFIG_HOME:-$HOME/.config}/rustdesk-server/server-key.pub"

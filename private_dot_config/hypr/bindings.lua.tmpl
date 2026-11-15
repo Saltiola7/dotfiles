@@ -12,7 +12,8 @@ for key, direction in pairs({ N = "l", E = "d", I = "u", O = "r" }) do
   replace("ALT + " .. key, "AeroSpace: focus " .. direction, hl.dsp.focus({ direction = direction }))
   replace("ALT + SHIFT + " .. key, "AeroSpace: move window " .. direction, hl.dsp.window.swap({ direction = direction }))
 end
-for workspace = 1, 7 do
+-- Workspace 8 is a normal workspace reserved for hidden apps.
+for workspace = 1, {{ if eq .machine_type "omarchy-try" }}8{{ else }}7{{ end }} do
   replace("CTRL + SHIFT + ALT + " .. workspace, "AeroSpace: workspace " .. workspace,
     hl.dsp.focus({ workspace = tostring(workspace) }))
   replace("SUPER + CTRL + SHIFT + ALT + " .. workspace, "AeroSpace: move window to workspace " .. workspace,
@@ -22,6 +23,7 @@ replace("ALT + MINUS", "AeroSpace: shrink window", hl.dsp.window.resize({ x = -5
 replace("ALT + EQUAL", "AeroSpace: grow window", hl.dsp.window.resize({ x = 50, y = 0, relative = true }))
 -- Previously the Omarchy root menu.
 replace("SUPER + SPACE", "Application launcher", "omarchy-menu toggle apps")
+{{ if eq .machine_type "omarchy" -}}
 -- The Finnish Mac/ZSA @ macro sends left Option+2 over Synergy.
 -- Insert the character directly instead of forwarding an application shortcut.
 local pending_at = false
@@ -37,6 +39,7 @@ replace("Alt_L", "Insert prepared @ after Option release", function()
     hl.exec_cmd("wtype -m alt -- @")
   end
 end, { release = true, ignore_mods = true, non_consuming = true, transparent = true })
+{{ end -}}
 -- Cmd+W is already close-window; Cmd+Q is an alias.
 replace("SUPER + Q", "Close window", hl.dsp.window.close())
 -- Cmd+T belongs to Kitty tabs; keep the desktop action on Ctrl+Cmd+T.
