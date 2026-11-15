@@ -26,7 +26,7 @@ def text(path):
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
     config = text(".chezmoi.toml.tmpl")
-    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/fedora-server)" "macbook"' in config
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/omarchy-try/fedora-server)" "macbook"' in config
     assert "macbook/mac-mini/lmsh" in config
     assert "atuin_sync_address" in config
     assert '{{ if eq $machineType "mac-mini" }}' in config
