@@ -17,15 +17,18 @@ installed by design; firmware updates continue to come through macOS.
 
 The legacy Intel-Mac USB/Secure Boot flow from the Omarchy manual does not
 apply. No USB drive is required; the installer shrinks the APFS container
-after the operator attests to a current backup (Carbon Copy Cloner is the
-owner's backup tool; Time Machine is not used on this host).
+after the operator attests to a current backup. The owner's backup engine
+is borg — restic and clone tools (CCC, Time Machine) were evaluated and
+rejected in favor of the borg/borgmatic stack this repository already
+ships — so the pre-install safety net is a one-time borg baseline of the
+macOS home written over SSH to a homelab disk, not a clone.
 
 ## Install runbook
 
 | Phase | Actor | Required outcome |
 |---|---|---|
 | 0. Pre-flight | session | Free space confirmed (176 GiB observed), macOS 27.2.1 confirmed, FileVault state recorded, installer installed via Homebrew. |
-| 1. Backup | owner | Fresh Carbon Copy Cloner clone of the macOS side. The installer's backup checkbox is an attestation, not a check. |
+| 1. Backup | session + owner | One-time borg baseline of `/Users/tis` from the MBP (borgbackup via Homebrew) into a new repokey repository on a homelab disk over SSH; `mac-backup-disk` is near full, so `ext-2`/`ext-3` are the fitting targets. The installer's backup checkbox is an attestation, not a check. |
 | 2. Installer GUI | owner at host | Review disk plan, set Omarchy size (100–120 GB), tick backup attestation, authorize with the macOS admin password; stay on power. |
 | 3. Recovery finish | owner at host | Shut down, hold power until "Loading startup options", choose Omarchy, sign in with the macOS account, wait for "Installation complete!", restart. |
 | 4. First boot | owner at host | Hold power, choose Omarchy, set the disk-encryption password, join Wi-Fi. The passphrase is typed at the machine on every boot; accepted because the host lives on the desk. |
