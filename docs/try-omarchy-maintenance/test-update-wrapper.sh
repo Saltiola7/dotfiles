@@ -39,7 +39,7 @@ boot_verified=1
 omarchy-update-boot || boot_verified=0
 (( boot_verified )) || exit 1
 MOCK
-chmod +x "$w/bin/"* 
+chmod +x "$w/bin/"*
 python3 - "$w" <<'PY'
 from pathlib import Path
 import os,sys
