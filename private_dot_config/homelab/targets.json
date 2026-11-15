@@ -240,7 +240,7 @@
       "parent_id": null,
       "lifecycle": "active",
       "evidence_status": "observed",
-      "notes": "471 GB exFAT card observed on pi400 native slot (mmcblk0p1) and via Mac mini USB reader. DCIM 110AF000/111AF000 holds 701 files (255 RAF, 359 JPG, 87 MOV, about 45 GiB, last written 2025-05). Name+size validation against mac-backup-disk on 2026-11-15 matched only 73 files (under ADATA/Transcend/Lumi and ADATA/Transcend/magialemuria/Capture); 551 files including every MOV were absent by original filename. Card must not be emptied until an off-card copy is verified.",
+      "notes": "471 GB exFAT card observed on pi400 native slot (mmcblk0p1) and via Mac mini USB reader. DCIM 110AF000/111AF000 holds 701 files (255 RAF, 359 JPG, 87 MOV, about 45 GiB, last written 2025-05). Name+size validation against mac-backup-disk on 2026-11-15 matched only 73 files (under ADATA/Transcend/Lumi and ADATA/Transcend/magialemuria/Capture); 551 files including every MOV were absent by original filename. Verified off-card copy completed 2026-11-15: 701/701 files name+size exact plus FFDB at /Volumes/8TB Seagate Barracuda/fuji-sd-500gb-2026-11-15; card cleared for reuse.",
       "owner": "personal-dotfiles"
     }
   ],

@@ -49,7 +49,7 @@ macOS home written over SSH to a homelab disk, not a clone.
 - Installer 2.3.16 had one reported Recovery binary hash-mismatch failure
   (upstream #18016). If hit, fall back to the 2.3.15 dmg.
 
-## Backup shape decision (open)
+## Backup shape decision
 
 The new host joins the existing borg/borgmatic stack
 (`private_dot_config/omarchy-host/backup`); restic was considered and
@@ -57,6 +57,16 @@ rejected in favor of the one tested engine. The repository shape is open
 because the preferred network destination `mac-backup-disk` is near full:
 a dedicated ext4 disk (HP pattern) versus an SSH forced-command repository
 on the mini (homelab pattern) versus both.
+
+The macOS side is settled: Carbon Copy Cloner is retired and replaced by
+the `mbp-borg-backup` LaunchAgent (daily 03:00) writing to
+`ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-macos/borg`, the same
+repository seeded by the pre-install baseline. Omarchy-side enrollment
+follows after first boot.
+
+Post-install app qualification (queued): LosslessCut via an omarchy-apps
+recipe (arm64 AppImage or AUR); IBKR programmatic access tracked as
+MBP-IBKR-LINUX-001 in the backlog.
 
 ## microSD card validation (blocking the storage decision)
 

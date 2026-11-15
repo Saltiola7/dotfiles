@@ -1,0 +1,21 @@
+#!/bin/sh
+# CCC replacement: recurring macOS-side borg backup of this home to the mini.
+# Repo: ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-macos/borg (repokey-blake2).
+# Deployed only on ts-mbp via .chezmoiignore hostname gate.
+[ "$(hostname -s)" = "ts-mbp" ] || exit 0
+BORG=/opt/homebrew/bin/borg
+[ -x "$BORG" ] || exit 0
+export BORG_RSH='ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4'
+export BORG_PASSCOMMAND='ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 tis@mac-mini cat /Volumes/ext-2/Users/Shared/mbp-macos/passphrase'
+export BORG_REMOTE_PATH=/opt/homebrew/bin/borg
+REPO='ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-macos/borg'
+
+"$BORG" create --compression zstd,3 --exclude-caches \
+  --exclude 'sh:/Users/tis/.Trash' \
+  --exclude 'sh:/Users/tis/Library/Caches' \
+  --exclude 'sh:/Users/tis/Library/Application Support/FileProvider' \
+  --exclude 'sh:/Users/tis/Library/Application Support/Google/DriveFS' \
+  "$REPO::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" /Users/tis || exit 1
+
+"$BORG" prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 "$REPO"
+"$BORG" compact "$REPO"
