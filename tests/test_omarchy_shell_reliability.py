@@ -354,3 +354,30 @@ def test_omarchy_launch_selects_sparse_capture_and_preserves_imports():
         "/home/synthetic user/.local/lib/omarchy-qml:/existing/modules"
     )
     assert environment["QML_IMPORT_PATH"] == "/existing/modules"
+
+
+def test_activation_hook_supplies_native_environment_over_ssh(tmp_path):
+    rendered = subprocess.run([
+        "chezmoi", "--source", str(ROOT), "--config", "/dev/null", "--config-format", "toml",
+        "--override-data", json.dumps({"machine_type": "omarchy", "chezmoi": {"os": "linux", "arch": "amd64"}}),
+        "execute-template"], input=(ROOT / "run_after_configure-omarchy-shell.sh.tmpl").read_text(),
+        text=True, capture_output=True, check=True).stdout
+    hook = tmp_path / "configure.sh"
+    hook.write_text(rendered)
+    program = '''
+set -euo pipefail
+systemctl() { return 1; }
+native_control() {
+  test "$(printenv OMARCHY_PATH)" = /usr/share/omarchy || return 42
+  printf '%s\\n' "$*" >> "$OBSERVED"
+}
+function /usr/bin/omarchy-shell() { native_control "$@"; }
+function /usr/bin/omarchy() { native_control "$@"; }
+source "$1"
+'''
+    environment = {**os.environ, "OBSERVED": str(tmp_path / "observed")}
+    environment.pop("OMARCHY_PATH", None)
+    subprocess.run(["bash", "-c", program, "test", str(hook)], env=environment,
+                   check=True, text=True, capture_output=True)
+    assert (tmp_path / "observed").read_text().splitlines() == [
+        "shell rescanPlugins", "plugin enable dotfiles.context-menu-guard"]
