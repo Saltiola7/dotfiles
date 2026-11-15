@@ -23,6 +23,7 @@ TARGETS = {
     ".config/omarchy-apps/recipes.json", ".config/omarchy-apps/repository.txt",
     ".config/rustdesk-client/server.json", ".local/bin/omarchy-apps",
     ".local/bin/omarchy-rustdesk-client-setup",
+    ".local/bin/try-omarchy-update", ".local/bin/try-omarchy-efi-audit",
     ".local/lib/omarchy-apps/recipes/rustdesk-bin/PKGBUILD",
     ".local/lib/omarchy-apps/recipes/rustdesk-bin/rustdesk-bin.install",
     ".local/state/omarchy/indicators/stay-awake", "apply-omarchy-theme.sh",

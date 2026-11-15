@@ -1,0 +1,12 @@
+[Unit]
+Description=Mount selected Mac project and worktree folders
+After=local-fs.target systemd-modules-load.service omarchy-native-mac-share.service
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/try-omarchy-mount-projects
+
+[Install]
+WantedBy=multi-user.target
