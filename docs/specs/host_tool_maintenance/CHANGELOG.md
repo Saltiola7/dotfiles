@@ -15,6 +15,10 @@
   absent by original filename. Registered the card as `fuji-sd-500gb` in
   the homelab registry with a do-not-empty guard note, and recorded the
   8 TB's observed 136 GiB free near-full state on `mac-backup-disk`.
+- Amended the runbook pre-flight after the owner retired Carbon Copy
+  Cloner: the pre-install safety net is a one-time borg baseline of the
+  macOS home to a homelab disk, consistent with the repo's borg/borgmatic
+  backup engine decision.
 - Recovered stranded local work into main: the volume-popup pytest
   (`tests/test_sketchybar_volume.py`) that belonged to the shipped
   desktop-controls slice, and the DBSCTR gate-plan artifact
