@@ -1,3 +1,12 @@
+{{ if eq .machine_type "omarchy-try" -}}
+-- Keep Try Omarchy's device model, gestures and Mac integration untouched.
+-- Every keyboard uses Finnish; ZSA firmware owns Colemak-DH.
+hl.config({ input = {
+  kb_layout = {{ default "fi" (get . "omarchy_keyboard_layout") | quote }},
+  kb_variant = "",
+  resolve_binds_by_sym = true,
+} })
+{{ else -}}
 -- Hardware-mapped ZSA and remote keyboards must not be remapped twice.
 -- Apply software Colemak DH only to the laptop's built-in keyboard.
 -- Use the unshifted bottom row (Z X C D V), matching the ZSA arrangement.
@@ -10,3 +19,4 @@ hl.device({
 })
 -- Literal text injection must not invoke the desktop's shortcut bindings.
 hl.device({ name = "hl-virtual-keyboard-wtype", keybinds = false })
+{{ end -}}

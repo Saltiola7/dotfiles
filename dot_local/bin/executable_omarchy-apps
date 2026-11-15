@@ -1,0 +1,239 @@
+#!/usr/bin/env python3
+"""Install reviewed Try Omarchy essentials without changing platform configuration."""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import zipfile
+
+HOME = Path.home()
+CONFIG = HOME / '.config/omarchy-apps'
+STATE = HOME / '.local/state/omarchy-apps'
+LIB = HOME / '.local/lib/omarchy-apps'
+BIN = HOME / '.local/bin'
+NAME = re.compile(r'^[a-zA-Z0-9][a-zA-Z0-9+_.-]*$')
+
+
+def run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
+    return subprocess.run(command, check=True, **kwargs)
+
+
+def package_installed(name: str) -> bool:
+    return subprocess.run(['pacman', '-Q', name], stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode == 0
+
+
+def command_present(name: str) -> bool:
+    return os.access(BIN / name, os.X_OK) or shutil.which(name) is not None
+
+
+def missing_packages(packages: list[str]) -> list[str]:
+    return [p for p in packages if not package_installed(p)]
+
+
+def missing_apps(recipes: list[dict]) -> list[dict]:
+    return [r for r in recipes if not command_present(r['command'])]
+
+
+def verify_digest(path: Path, expected: str) -> None:
+    if not re.fullmatch(r'[0-9a-f]{64}', expected):
+        raise ValueError('Invalid pinned checksum')
+    with path.open('rb') as handle:
+        actual = hashlib.file_digest(handle, 'sha256').hexdigest()
+    if actual != expected:
+        raise ValueError(f'Release checksum mismatch: {path.name}')
+
+
+def extract_archive(archive: Path, destination: Path) -> None:
+    if zipfile.is_zipfile(archive):
+        with zipfile.ZipFile(archive) as bundle:
+            for entry in bundle.infolist():
+                target = (destination / entry.filename).resolve()
+                if not target.is_relative_to(destination.resolve()):
+                    raise ValueError('Unsafe archive path')
+                if (entry.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError('Zip symlinks are unsupported')
+            bundle.extractall(destination)
+    else:
+        with tarfile.open(archive) as bundle:
+            # Reject absolute paths explicitly; the data filter otherwise strips them.
+            if any(Path(entry.name).is_absolute() for entry in bundle.getmembers()):
+                raise ValueError('Unsafe absolute archive path')
+            bundle.extractall(destination, filter='data')
+
+
+def link_command(target: Path, destination: Path) -> None:
+    if destination.exists() or destination.is_symlink():
+        if destination.is_symlink() and destination.resolve() == target.resolve():
+            return
+        raise FileExistsError(f'Preserving existing command: {destination}')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.symlink_to(target)
+
+
+def install_repository(packages: list[str]) -> None:
+    if not packages:
+        return
+    run(['sudo', 'pacman', '-Syu', '--needed', *packages])
+
+
+def download(recipe: dict, directory: Path) -> Path:
+    archive = directory / 'release.download'
+    run(['curl', '--proto', '=https', '--proto-redir', '=https', '--tlsv1.2',
+         '-fL', '--retry', '2', '--retry-all-errors', '--connect-timeout', '10',
+         '--max-time', '600', '-o', str(archive), recipe['url']])
+    verify_digest(archive, recipe['sha256'])
+    return archive
+
+
+def launcher(name: str, command: Path) -> None:
+    destination = HOME / '.local/share/applications' / f'dotfiles-{name}.desktop'
+    text = (f'[Desktop Entry]\nType=Application\nName={name.title()}\n'
+            f'Exec="{command}" %F\nTerminal=false\nCategories=Development;\n')
+    if destination.exists() and destination.read_text() != text:
+        raise FileExistsError(f'Preserving existing launcher: {destination}')
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(text)
+
+
+def install_release(recipe: dict) -> None:
+    final = LIB / f"{recipe['name']}-{recipe['version']}-{platform.machine()}"
+    if final.exists():
+        # Only directories carrying our exact recipe receipt can be resumed.
+        receipt = final / '.omarchy-recipe.json'
+        if not receipt.is_file() or json.loads(receipt.read_text()) != recipe:
+            raise FileExistsError(f'Preserving unknown bundle: {final}')
+    else:
+        LIB.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.stage-', dir=LIB) as scratch:
+            stage = Path(scratch)
+            archive = download(recipe, stage)
+            payload = stage / 'payload'
+            payload.mkdir()
+            if recipe['method'] == 'binary':
+                shutil.copy2(archive, payload / recipe['command'])
+            else:
+                extract_archive(archive, payload)
+            matches = list(payload.glob(recipe['binary']))
+            if len(matches) != 1 or not matches[0].is_file():
+                raise ValueError(f"Release binary not unique: {recipe['name']}")
+            matches[0].chmod(matches[0].stat().st_mode | 0o111)
+            (payload / '.omarchy-recipe.json').write_text(json.dumps(recipe, sort_keys=True))
+            payload.rename(final)
+    executable = list(final.glob(recipe['binary']))
+    if len(executable) != 1:
+        raise ValueError('Installed bundle binary missing')
+    link_command(executable[0], BIN / recipe['command'])
+    if recipe.get('gui'):
+        launcher(recipe['name'], BIN / recipe['command'])
+    for alias, pattern in recipe.get('aliases', {}).items():
+        matches = list(final.glob(pattern))
+        if len(matches) != 1:
+            raise ValueError(f'Missing bundled command {alias}')
+        link_command(matches[0], BIN / alias)
+
+
+def install_aur(recipe: dict) -> None:
+    source = LIB / 'recipes' / recipe['recipe']
+    scratch = Path(tempfile.mkdtemp(prefix=recipe['name'] + '-', dir=STATE))
+    shutil.copytree(source, scratch, dirs_exist_ok=True)
+    # Dependencies are declared in the reviewed recipe manifest; no root makepkg.
+    run(['makepkg', '--noconfirm', '--cleanbuild'], cwd=scratch)
+    packages = list(scratch.glob('*.pkg.tar.*'))
+    packages = [p for p in packages if not p.name.endswith('.sig')]
+    if not packages:
+        raise ValueError('Community build produced no package')
+    run(['sudo', 'pacman', '-U', '--needed', *map(str, packages)])
+
+
+def load_profile() -> tuple[list[str], list[dict]]:
+    profile = json.loads((CONFIG / 'recipes.json').read_text())
+    if platform.system() != 'Linux' or profile['architecture'] != platform.machine():
+        raise ValueError('Profile does not match native Linux architecture')
+    if profile['machine_type'] not in {'omarchy-try'}:
+        raise ValueError('Unsupported workstation profile')
+    packages = [s.strip() for s in (CONFIG / 'repository.txt').read_text().splitlines()
+                if s.strip() and not s.startswith('#')]
+    for name in packages:
+        if not NAME.fullmatch(name):
+            raise ValueError('Invalid package name')
+    for recipe in profile['apps']:
+        for key in ('name', 'command'):
+            if not NAME.fullmatch(recipe[key]):
+                raise ValueError('Invalid application name')
+        if recipe['command'] in {'herdr', 'opencode', 'codex', 'wt', 'uv'}:
+            raise ValueError('AI-owned command is excluded')
+        if recipe['method'] not in {'archive', 'binary', 'aur'}:
+            raise ValueError('Unsupported installation method')
+        if 'url' in recipe and not recipe['url'].startswith('https://'):
+            raise ValueError('HTTPS upstream required')
+    return packages, profile['apps']
+
+
+def install_apps(recipes: list[dict], packages: list[str]) -> None:
+    # Install user bundles before privilege-dependent work; failure remains retryable.
+    for recipe in recipes:
+        if recipe['method'] in {'archive', 'binary'}:
+            install_release(recipe)
+    remaining = [r for r in recipes if not command_present(r['command'])]
+    dependencies = list(dict.fromkeys(packages + [p for r in remaining for p in r.get('dependencies', [])]))
+    install_repository(missing_packages(dependencies))
+    for recipe in remaining:
+        print(f"Installing {recipe['name']}", flush=True)
+        if recipe['method'] == 'aur':
+            install_aur(recipe)
+    if missing_apps(recipes) or missing_packages(packages):
+        raise ValueError('Application installation incomplete; rerun omarchy-apps --install')
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument('--plan', action='store_true')
+    action.add_argument('--check', action='store_true')
+    action.add_argument('--install', action='store_true')
+    parser.add_argument('--only', action='append', default=[])
+    args = parser.parse_args()
+    packages, recipes = load_profile()
+    if args.only:
+        unknown = set(args.only) - {r['name'] for r in recipes}
+        if unknown:
+            raise ValueError('Unknown selected app: ' + ', '.join(sorted(unknown)))
+        recipes = [r for r in recipes if r['name'] in args.only]
+        packages = []
+    packages = missing_packages(packages)
+    recipes = missing_apps(recipes)
+    print(json.dumps({'missing_packages': packages, 'missing_apps': [r['name'] for r in recipes]}, indent=2))
+    if args.plan:
+        return 0
+    if args.check:
+        return int(bool(packages or recipes))
+    if os.getuid() == 0:
+        raise ValueError('Run as desktop owner; root builds and root-owned user state forbidden')
+    if not packages and not recipes:
+        return 0
+    STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with (STATE / 'install.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        # Recheck after locking to make retries safe.
+        install_apps(missing_apps(recipes), missing_packages(packages))
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except (ValueError, FileExistsError, OSError, subprocess.CalledProcessError) as error:
+        print(f'omarchy-apps: {error}\nRetry locally: omarchy-apps --install', file=sys.stderr)
+        sys.exit(1)

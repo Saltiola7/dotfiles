@@ -1,3 +1,4 @@
+.config/hypr/xdph.conf
 {{ if ne .machine_type "omarchy" }}
 .config/hypr/input.lua
 .config/hypr/bindings.lua
@@ -389,3 +390,64 @@ configure-desktop-startup.sh
 Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
 load-smb-reconnect.sh
 {{ end }}
+
+{{ if ne .machine_type "omarchy-try" }}
+.local/bin/try-omarchy-update
+.local/bin/try-omarchy-efi-audit
+.config/omarchy-apps/
+.local/bin/omarchy-apps
+.local/lib/omarchy-apps/
+install-omarchy-apps
+{{ end }}
+{{ if eq .machine_type "omarchy-try" }}
+# A separate VM role: never inherit HP hardware/services or host/private state.
+*
+!.bashrc
+!.config/
+.config/*
+!.config/hypr/
+.config/hypr/*
+!.config/hypr/input.lua
+!.config/hypr/bindings.lua
+!.config/hypr/xdph.conf
+!.config/xdg-terminals.list
+!.config/kitty/
+.config/kitty/*
+!.config/kitty/kitty.conf
+!.config/kitty/mocha.conf
+!.config/kitty/save-workspace.py
+!.config/kitty/load-snapshot.py
+!.config/kitty/kitty-query.py
+!create-kitty-socket-dir.sh
+!apply-omarchy-theme.sh
+!.config/rustdesk-client/
+.config/rustdesk-client/*
+!.config/rustdesk-client/server.json
+!.config/omarchy-apps/
+.config/omarchy-apps/*
+!.config/omarchy-apps/repository.txt
+!.config/omarchy-apps/recipes.json
+!.local/
+.local/*
+!.local/bin/
+.local/bin/*
+!.local/bin/omarchy-apps
+!.local/bin/omarchy-rustdesk-client-setup
+!.local/bin/try-omarchy-update
+!.local/bin/try-omarchy-efi-audit
+!.local/lib/
+.local/lib/*
+!.local/lib/omarchy-apps/
+!.local/lib/omarchy-apps/**
+!.local/state/
+.local/state/*
+!.local/state/omarchy/
+.local/state/omarchy/*
+!.local/state/omarchy/indicators/
+.local/state/omarchy/indicators/*
+!.local/state/omarchy/indicators/stay-awake
+!install-omarchy-apps
+{{ end }}
+
+# Public example input, never a home-directory target.
+config.omarchy-try.example.toml

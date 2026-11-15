@@ -1,0 +1,39 @@
+--- a/run-qemu-gpu-projects.sh
++++ b/run-qemu-gpu-projects.sh
+@@ -719,6 +719,36 @@
+     -device 'virtio-9p-pci,fsdev=omarchy-share,mount_tag=mac,romfile='
+   )
+ fi
++# Refuse launch if a protected disk already has an additional hard-link name.
++for protected_root in \
++  /Volumes/ext/state/try-omarchy/VM \
++  /Volumes/ext/state/try-omarchy/baselines \
++  /Volumes/ext/state/try-omarchy/diagnostics \
++  /Volumes/ext/state/lima; do
++  [[ -d $protected_root && ! -L $protected_root ]] || fail "protected VM storage is missing or unsafe: $protected_root"
++  if ! linked_disk=$(find "$protected_root" -type f \
++    \( -name disk -o -name '*.img' -o -name '*.qcow2' -o -name '*.raw' -o -name '*.vmdk' -o -name '*.fd' \) \
++    -links +1 -print -quit); then
++    fail "cannot inspect protected VM storage: $protected_root"
++  fi
++  [[ -z $linked_disk ]] || fail "a protected VM file has a hard-link alias; refusing to export project folders"
++done
++# Explicit project/worktree exports; no parent state directory is exported.
++for export_spec in \
++  'host-git:/Volumes/ext/git' \
++  'host-worktrees:/Volumes/ext/state/worktrees' \
++  'host-dbsctr:/Volumes/ext/state/dbsctr/worktrees' \
++  'host-discovery:/Volumes/ext/state/discovery-worktrees'; do
++  export_tag=${export_spec%%:*}
++  export_path=${export_spec#*:}
++  [[ -d $export_path && ! -L $export_path ]] || fail "project share is missing or is a symlink: $export_path"
++  [[ $(cd "$export_path" && pwd -P) == "$export_path" ]] || fail "project share resolves outside its expected path: $export_path"
++  [[ $(stat -f %u "$export_path") == "$(id -u)" ]] || fail "project share must be owned by this user: $export_path"
++  qemu_args+=(
++    -fsdev "local,id=$export_tag,path=$export_path,security_model=none,multidevs=remap,guest_owner_uid=1000,guest_owner_gid=1000"
++    -device "virtio-9p-pci,fsdev=$export_tag,mount_tag=$export_tag,romfile="
++  )
++done
+ if [[ -n $usb_host_properties ]]; then
+   qemu_args+=(
+     -device "usb-host,bus=omarchy-usb.0,id=omarchy-usb-host,$usb_host_properties"
