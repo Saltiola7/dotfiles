@@ -28,6 +28,6 @@ def test_plist_renders_valid_schedule():
 
 def test_ignore_gates_both_targets_to_ts_mbp():
     text = IGNORE.read_text()
-    assert 'ne .chezmoi.hostname "ts-mbp"' in text
+    assert 'hasPrefix "ts-mbp" .chezmoi.hostname' in text
     assert "Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist" in text
     assert ".local/bin/mbp-borg-backup" in text
