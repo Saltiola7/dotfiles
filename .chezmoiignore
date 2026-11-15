@@ -1,3 +1,4 @@
+.config/hypr/xdph.conf
 {{ if ne .machine_type "omarchy" }}
 .config/hypr/input.lua
 .config/hypr/bindings.lua
@@ -371,6 +372,7 @@ install-omarchy-apps
 .config/hypr/*
 !.config/hypr/input.lua
 !.config/hypr/bindings.lua
+!.config/hypr/xdph.conf
 !.config/xdg-terminals.list
 !.config/kitty/
 .config/kitty/*

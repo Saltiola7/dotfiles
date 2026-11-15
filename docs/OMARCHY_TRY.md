@@ -76,7 +76,7 @@ are retained. The reviewed application catalog is deliberately limited to:
 
 - PyCharm 2026.2.3, using JetBrains' architecture-matched archive and retained
   SHA-256 pins from the previous qualified setup;
-- RustDesk 1.5.0, using the retained reviewed community PKGBUILD and upstream
+- RustDesk 1.5.3, using the retained reviewed community PKGBUILD and upstream
   artifact hashes. `makepkg` runs unprivileged; only dependency/package installation
   uses sudo. Its package hook does not automatically enable remote access.
 
@@ -125,3 +125,11 @@ the managed stay-awake marker from source before using `omarchy-toggle-idle
 allow-idle`; a subsequent apply otherwise restores the marker. Source rollback
 alone does not uninstall packages or reverse a full system upgrade: use the guest
 recovery snapshot for system rollback, and independent backups for shared files.
+
+## Runtime qualification notes
+
+The Try role also owns `hypr/xdph.conf`, selecting the installed native Hyprland share picker. The factory preview picker crashed during RustDesk screen selection; replacing it allowed the operator to see the remote desktop. Passwords are set only in the guest RustDesk UI and are never managed by chezmoi.
+
+The current guest additionally needs a service-only libxdo compatibility mount to avoid the libxdo 4 null-atom crash. Its private library and root helper are retained in the external VM setup record under `/Volumes/ext/state/try-omarchy`; this compatibility repair is not yet automated by the profile. Installing the package alone must not be described as a fully qualified remote desktop. The ARM64 1.5.3 package was built from the reviewed recipe and its upstream digest verified; the x86 package digest is pinned from the official release but this setup did not test that architecture.
+
+Host behavior is conditional: launching directly on the second monitor and leaving the VM there permits macOS/guest switching per operator. Moving a running fullscreen VM between monitors caused host display/input failure even with full capture disabled. Synergy was paused during these tests. Keep existing Parallels and HP installations preserved while evaluating.
