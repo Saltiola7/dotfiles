@@ -1,5 +1,24 @@
 # Host maintenance changelog
 
+## 2026-11-15 — Menu-bar auto-hide key migration
+
+- Root-caused a completely unresponsive native menu bar on macOS 27.0.1: the
+  stack hook's legacy `NSGlobalDomain _HIHideMenuBar=true` split-brained with
+  `com.apple.controlcenter AutoHideMenuBarOption=0`, holding the bar hidden
+  with no hover-reveal, while a stuck Control Center panel at a window level
+  above the menu bar blocked right-side clicks. SketchyBar itself renders
+  below the menu bar (`topmost=off`, layer −20) and was never the blocker.
+- The stack hook now persists `AutoHideMenuBarOption=2` (Always) and deletes
+  the stale legacy key; `AppleMenuBarVisibleInFullscreen=false` is unchanged.
+  Runtime recovery on the host: killed the stuck Control Center panel
+  (auto-respawned clean), applied the key and restarted the Dock; ghost
+  window gone and reveal restored on operator hover verification.
+- Validation: rendered-template Bash syntax check and targeted chezmoi apply
+  re-ran the hook; live values confirmed `AutoHideMenuBarOption=2` and the
+  legacy key absent. Volume tests unaffected (no volume file touched).
+  Spec `features/desktop-controls.md` settings-hook bullet and findings
+  updated to match.
+
 ## 2026-10-30 — GRAPHIFY-HOST-SOURCE
 
 - Retired the duplicate Graphify Brewfile declaration, old skill installer and
@@ -65,6 +84,7 @@
   commit and actual Final Push result are recorded in the private Cycle Record.
   Intended Final Push: `origin/fix/sketchybar-media-polling`, draft PR into `main`.
 
+
 ## 2026-10-25 — RUSTDESK-SYNERGY-001
 
 - Added Mac-mini-only authenticated incoming RustDesk desktop detection and
@@ -86,6 +106,31 @@
 - Implementation commits: `1d7563f`, `5a6aaed`; earlier commits retain the domain,
   behavior, interface and contract transitions. Release not applicable. Intended
   Final Push: feature branch and draft PR into main; actual result is in Cycle Record.
+
+## 2026-10-09 — Desktop controls and local client retirement
+
+- Added an icon-only speaker control with click-open slider, percentage and mute;
+  bounded scroll/slider input, system-state read-back and visible audio errors.
+- Kept SketchyBar below Apple's menu bar and retained the existing hover helper.
+  SketchyBar starts the helper only when missing; AeroSpace no longer starts it
+  independently. Live reload retained exactly one helper and the volume popup.
+- Initial helper retirement failed host acceptance. Native hiding also differed
+  between apps despite equal preferences. Approved SystemUIServer/Dock recovery
+  and an intervening session/server recovery preceded operator confirmation that
+  volume and native auto-hide behaved as expected. Exact recovery cause remains
+  unisolated; exhaustive fullscreen/multi-display coverage was not separately
+  recorded. MenuBarAgent restart was SIP-blocked and was not bypassed.
+- Retired local client service, SketchyBar integration, shell defaults, profile/session
+  and two attributable caches. Preserved Backblaze credentials/profile byte/value
+  equality, the shared CLI and one unattributable client-registration cache.
+  Generic retired auth source is retained under `docs/_archive/aws-auth/`.
+- Validation: 65 focused pytest checks passed, including the startup regression;
+  affected Bash/template syntax and AeroSpace TOML passed. Live popup open/close
+  and same-volume write/read-back preserved system volume and mute.
+- Operator selected lighter local completion after failed deployment evidence.
+  Original implementation commit: `d9dc5dc`; original cycle remains incomplete
+  with Spec reopened and failed evidence preserved. No Gate Exception, Final Push
+  or draft PR is claimed. Local corrections are committed separately.
 
 ## 2026-10-07 — SSD-HOST-RETIRED-SOURCES
 
