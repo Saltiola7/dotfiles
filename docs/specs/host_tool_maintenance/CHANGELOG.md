@@ -1,5 +1,29 @@
 # Host maintenance changelog
 
+## 2026-11-14 — OMARCHY-SHELL-001
+
+- Added an Omarchy Linux AMD64 user QML guard for the Qt focusless context-menu
+  crash. Normal events and guard destruction are qualified against the actual
+  Qt extension; packaged Qt and Quickshell remain distribution owned.
+- Select native sparse capture for the packaged shell. Archive only exclusively
+  locked dead instance logs, verify copies before reclaim, and retain at most
+  eight archives, seven days and 64 MiB. Original crash reports and live logs
+  remain preserved. Live warning streams have no absolute byte cap.
+- Validation: 33 reliability tests passed on macOS and HP Linux; native baseline
+  SIGSEGV became guarded survival, with forwarding and lifetime controls passing.
+  Independent review verified archive directory replacement, publication failure,
+  partial reclaim, FIFO refusal and ZIP64 handling. Broader macOS-compatible run:
+  830 passed, one skipped; Linux-only desktop startup tests remain CI-owned.
+- HP deployment verified the actual module mapping and activation marker in the
+  new shell's own log, sparse argv/import path, healthy timer and clean repeat
+  apply. Native serialization added only an empty tray default; all existing
+  preferences survived. Reclaimed 6.4 MB of dead runtime logs. Selectively
+  reconciled the configured HP source while preserving unrelated dirty files.
+- Implementation checkpoints: `4ddc0da` and `307540e`. No gate exceptions;
+  independent package release not applicable.
+  Intended Final Push: feature branch and draft PR into main; actual delivery is
+  recorded in Cycle Record. Worktrunk remains with its separate installer owner.
+
 ## 2026-10-30 — GRAPHIFY-HOST-SOURCE
 
 - Retired the duplicate Graphify Brewfile declaration, old skill installer and

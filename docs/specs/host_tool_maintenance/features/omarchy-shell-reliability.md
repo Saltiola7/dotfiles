@@ -70,6 +70,9 @@ module with existing `c++`, `pkg-config` and Qt `moc`, stage it privately and
 publish atomically only after a successful build. Missing tools leave a healthy
 installed module untouched and fail before activation. Cache identity includes
 source content and the selected Qt build version.
+Complete immutable generations are activated through one atomic relative link;
+previous generations remain available for rollback. Unknown module targets are
+refused rather than adopted.
 
 The baseline managed `shell.json` includes the plugin. Live activation uses
 Omarchy's native plugin rescan/enable interface to preserve other preferences.
@@ -130,6 +133,30 @@ feature's timer/launcher/module, and restarts through the native shell owner.
 Maintain the guard against the pinned upstream defect and requalify on Qt or
 Quickshell changes. Retire it only after a packaged upstream fix passes the same
 regression. Removing the feature does not delete retained crash evidence.
+
+Operating checks use native instance inventory and the service's result:
+
+```sh
+/usr/bin/quickshell list --all --json
+OMARCHY_PATH=/usr/share/omarchy /usr/bin/omarchy-shell shell listPlugins
+systemctl --user status omarchy-shell-log-maintenance.timer
+journalctl --user -u omarchy-shell-log-maintenance.service
+```
+
+For the active instance, verify `OMARCHY_CONTEXT_MENU_GUARD_ACTIVE` in its own
+runtime `log.log` and confirm the native module in that process's mappings.
+Quickshell owns its Qt message handler; standalone canary journald output is not
+proof of live shell activation. The after hook supplies the packaged
+`OMARCHY_PATH` explicitly for noninteractive SSH applies. Native serialization
+may add an absent empty tray default; existing preference values must survive.
+
+After a Qt or Quickshell update, apply this feature's source to rebuild if inputs
+changed, rerun the isolated native harness, and verify live activation after a
+controlled refresh. A new warning flood requires focused diagnosis and retained
+evidence. When a packaged fix passes the same harness, remove this feature from
+source, disable its native plugin and timer, refresh through the native owner,
+then retire only its verified module generations and launcher. Preserve archives
+and original crash reports for operator review.
 
 ## Visual Evidence
 
