@@ -1,5 +1,23 @@
 # Host maintenance changelog
 
+## 2026-11-15 — macOS thin-client transition
+
+- Retired roughly 45 GB of applications for the thin-client role with an
+  explicit keep list (Slack, Telegram, WhatsApp, Zen, RustDesk, Mullvad
+  VPN, all wallet apps, ChatGPT as fallback, Citrix, 1Password, kitty,
+  Obsidian, Trader Workstation, utilities layer). Capture One archived to
+  ext-2 for restore-on-demand; Steam saves and the Zotero library copied
+  to ext-2 app-data; retired brew casks commented in the Brewfile with a
+  dated marker instead of deleted declarations.
+- Carbon Copy Cloner retired: `mbp-borg-backup` (LaunchAgent, daily 03:00,
+  ts-mbp-gated) now owns the recurring macOS-side backup into the ext-2
+  repository seeded by the pre-install baseline. Keepalive-hardened SSH
+  settings prevent the silent hang observed in earlier runs.
+- microSD card cleared for reuse: verified off-card copy (701/701 exact
+  plus FFDB) recorded in the fuji-sd-500gb registry entry.
+- Logged MBP-ARCHIVE-RECONCILE-001 and MBP-IBKR-LINUX-001 follow-ups in
+  the backlog.
+
 ## 2026-11-15 — Omarchy MacBook Pro install prep and card validation
 
 - Chose the official Omarchy for Apple Silicon installer for the 13" M1
