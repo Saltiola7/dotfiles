@@ -149,7 +149,7 @@ def test_help_and_unknown_command_are_non_mutating():
     assert result.returncode != 0
     assert "unknown command" in result.stderr
     script = COMMAND.read_text()
-    assert 'cask "parallels"' in (ROOT / "Brewfile").read_text()
+    assert 'cask "parallels"' in (ROOT / "Brewfile.tmpl").read_text()
     for operation in ("addVolume", "eraseDisk", "deleteVolume", "deleteContainer", "create_vm", "curl"):
         assert operation not in script
 
