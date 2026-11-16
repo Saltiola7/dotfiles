@@ -97,3 +97,22 @@ def test_waynergy_install_converges_via_apply():
     assert "[[ -t 0 ]]" in script
     assert "omarchy-waynergy-install" in script
     assert "enable --now omarchy-waynergy.service" in script
+
+
+def test_omarchy_allowlist_actually_reincludes_mbp_targets():
+    # The omarchy profile ignores * and re-includes explicitly; anything
+    # missing here silently never deploys on the host.
+    ignore = (ROOT / ".chezmoiignore").read_text()
+    for entry in (
+        "!install-waynergy.sh",
+        "!install-omarchy-remote-access.sh",
+        "!after_mbp-asahi-hardware.sh",
+        "!disable-fcitx5-mbp.sh",
+        "!.config/uwsm/env",
+        "!.local/bin/mbp-omarchy-borg-backup",
+        "!.config/systemd/user/mbp-omarchy-borg-backup.service",
+        "!.config/systemd/user/mbp-omarchy-borg-backup.timer",
+        "!.config/systemd/user/org.fcitx.FcitX5.service",
+        "!.config/autostart/org.fcitx.Fcitx5.desktop",
+    ):
+        assert entry in ignore, f"allowlist missing {entry}"
