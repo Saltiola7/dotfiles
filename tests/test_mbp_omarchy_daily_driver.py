@@ -106,8 +106,8 @@ def test_omarchy_allowlist_actually_reincludes_mbp_targets():
     for entry in (
         "!install-waynergy.sh",
         "!install-omarchy-remote-access.sh",
-        "!after_mbp-asahi-hardware.sh",
-        "!disable-fcitx5-mbp.sh",
+        "!mbp-asahi-hardware.sh",
+        "!always_disable-fcitx5-mbp.sh",
         "!.config/uwsm/env",
         "!.local/bin/mbp-omarchy-borg-backup",
         "!.config/systemd/user/mbp-omarchy-borg-backup.service",
