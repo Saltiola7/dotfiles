@@ -1,0 +1,7 @@
+{
+  "zoxide": {"version":"0.10.0","format":"tar.gz","member":"zoxide","url":"https://github.com/ajeetdsouza/zoxide/releases/download/v0.10.0/zoxide-0.10.0-x86_64-unknown-linux-musl.tar.gz","sha256":"2d93385b99f3e82cf2701609a1bffcad863fbeb75aa3fe7eb6be4d29be68b1ae"},
+  "direnv": {"version":"2.38.2","format":"binary","member":"direnv","url":"https://github.com/direnv/direnv/releases/download/v2.38.2/direnv.linux-amd64","sha256":"148820a187930d36ca6a204504e5cdb30d8396cd1a97e64c3b3f10d793c11247"},
+  "rg": {"version":"15.2.0","format":"tar.gz","member":"ripgrep-15.2.0-x86_64-unknown-linux-musl/rg","url":"https://github.com/BurntSushi/ripgrep/releases/download/15.2.0/ripgrep-15.2.0-x86_64-unknown-linux-musl.tar.gz","sha256":"33e15bcf1624b25cdd2a55813a47a2f95dbe126268203e76aa6a585d1e7b149c"},
+  "nvim": {"version":"0.12.6","format":"tar.gz","member":"nvim-linux-x86_64/bin/nvim","url":"https://github.com/neovim/neovim/releases/download/v0.12.6/nvim-linux-x86_64.tar.gz","sha256":"474430d53e6264f6d6dd18db42d6dc9df3a1b56ca9e88a325bbf860e1a811d87"},
+  "tree-sitter": {"version":"0.26.1","format":"gzip","member":"tree-sitter","url":"https://github.com/tree-sitter/tree-sitter/releases/download/v0.26.1/tree-sitter-linux-x64.gz","sha256":"d74182fffbf441f247371ad6af77d99b10ac9f788d7e068e4b44992d9d6d7c26"}
+}

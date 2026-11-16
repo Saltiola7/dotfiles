@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+{{ if ne .machine_type "remote-workspace" -}}
+exit 0
+{{ end -}}
+exec "$HOME/.local/bin/remote-workspace-nvim"

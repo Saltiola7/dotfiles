@@ -1,0 +1,24 @@
+{{- range $key := list "name" "work_email" "personal_email" -}}
+{{- if not (trim (default "" (get $ $key))) -}}
+{{- fail (printf "remote Git identity requires explicit nonblank %s" $key) -}}
+{{- end -}}
+{{- end -}}
+# Local identity values only; native gh owns credential helpers elsewhere.
+# Clear legacy identity: unknown ownership must not inherit OSLogin or email.
+[user]
+    useConfigOnly = true
+    name = ""
+    email = ""
+{{ range $owner := list "Saltiola7" "saltiola7" -}}
+{{ range $prefix := list "https://github.com/" "git@github.com:" "ssh://git@github.com/" "ssh://git@github.com:*/" "ssh://github.com/" -}}
+[includeIf "hasconfig:remote.*.url:{{ $prefix }}{{ $owner }}/**"]
+    path = remote-workspace-personal.inc
+{{ end -}}
+{{ end -}}
+# Work follows personal; a mixed repository is cleared by the nested include.
+{{ range $owner := list "mgmri-dge" "Superformula" "superformula" -}}
+{{ range $prefix := list "https://github.com/" "git@github.com:" "ssh://git@github.com/" "ssh://git@github.com:*/" "ssh://github.com/" -}}
+[includeIf "hasconfig:remote.*.url:{{ $prefix }}{{ $owner }}/**"]
+    path = remote-workspace-work.inc
+{{ end -}}
+{{ end -}}

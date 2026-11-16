@@ -3,6 +3,13 @@
 The [incoming RustDesk/Synergy handoff](features/rustdesk-synergy-handoff.md)
 defines temporary Mac input ownership, prior-state preservation and recovery.
 
+The [Raindrop connector contract](features/raindrop-mcp.md) defines one live
+connector per authentication cache, offline resolution of the existing pinned
+proxy, and direct Node ownership of its native lease.
+
+The [media polling contract](features/media-polling.md) keeps SketchyBar metadata
+refreshes to one nonoverlapping CLI query while preserving its existing controls.
+
 Engineering Profile: [PROFILE.md](PROFILE.md). Authority: SSD toolchain recovery
 Initiative in dotfiles-ai, INT-003, INT-012 and INT-022. Current slice:
 host-sdk-shell-resolution. Risk: elevated; delivery: draft PR and targeted host
@@ -69,3 +76,16 @@ with no new data transport, persistent schema or runtime topology.
 gives it precedence even if inherited PATH already contains it. When absent,
 initialization preserves existing selection. No installer or cloud operation runs.
 Owner: dotfiles maintainer. Update this table when shell or selection scope changes.
+
+## Graphify source handoff
+
+Global Graphify CLI/dependencies and its matching OpenCode skill belong to
+`dotfiles-ai`; its [update runbook](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/UPDATES.md#graphify)
+is the single procedure owner. This host source no longer declares the package
+or runs a Graphify installer. Declaration retirement does not uninstall or remove
+an existing CLI, skill, graph/cache, disabled DKS runtime or cycle receipt.
+
+The focused ownership and direct-downstream suites passed. A seven-profile native
+chezmoi inventory showed only the old macOS installer target disappearing, with
+no new or unrelated target changes. `GRAPHIFY-HOST-SOURCE` owns exact gates and
+delivery evidence; this source-only handoff is not live activation approval.

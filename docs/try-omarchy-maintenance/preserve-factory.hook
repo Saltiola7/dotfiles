@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Upgrade
+Type = Package
+Target = try-omarchy
+
+[Action]
+Description = Try Omarchy upgrade blocked: review factory recovery preservation
+When = PreTransaction
+Exec = /usr/bin/false
+AbortOnFail

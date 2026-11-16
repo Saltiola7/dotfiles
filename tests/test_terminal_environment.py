@@ -7,10 +7,10 @@ ROOT = Path(__file__).parents[1]
 
 
 def test_retired_host_tools_cannot_be_reintroduced():
-    brewfile = (ROOT / "Brewfile").read_text()
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
     for name in ("colima", "docker", "docker-buildx", "docker-compose", "docker-credential-helper"):
         assert f'brew "{name}"' not in brewfile
-    for name in ("loop", "shortcat"):
+    for name in ("loop", "shortcat", "parallels"):
         assert f'cask "{name}"' not in brewfile
     for name in (
         "run_onchange_after_bootstrap-colima-atuin.sh.tmpl",
@@ -26,7 +26,7 @@ def text(path):
 
 def test_lmsh_profile_is_portable_and_excludes_credentials():
     config = text(".chezmoi.toml.tmpl")
-    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/fedora-server)" "macbook"' in config
+    assert '"machine_type" "Machine type (macbook/mac-mini/lmsh/remote-workspace/fedora-workstation/omarchy/omarchy-try/fedora-server)" "macbook"' in config
     assert "macbook/mac-mini/lmsh" in config
     assert "atuin_sync_address" in config
     assert '{{ if eq $machineType "mac-mini" }}' in config
@@ -78,7 +78,7 @@ def test_opencode_wrapper_survives_later_path_updates(tmp_path):
 
 
 def test_yazi_is_managed_across_terminal_targets(tmp_path):
-    brewfile = text("Brewfile")
+    brewfile = text("Brewfile.tmpl")
     for formula in ("yazi", "sevenzip", "fd", "ripgrep", "resvg"):
         assert f'brew "{formula}"' in brewfile
 
@@ -210,7 +210,7 @@ def test_mac_mini_uses_native_external_cache_paths():
         'PRE_COMMIT_HOME="$DOTFILES_CACHE_ROOT/pre-commit"',
         'npm_config_cache="$DOTFILES_CACHE_ROOT/npm"',
         'PULUMI_HOME="/Volumes/ext/state/pulumi"',
-        'PREFECT_HOME="/Volumes/ext/state/prefect/seo-data-science"',
+        'PREFECT_HOME="/Volumes/ext/state/prefect/sample-project"',
         'CODEX_HOME="/Volumes/ext/state/codex/home"',
         'PYCHARM_PROPERTIES="/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties"',
     ):
@@ -246,7 +246,7 @@ def test_external_cache_exports_and_fallback(tmp_path):
         "PRE_COMMIT_HOME": "/Volumes/ext/state/cache/pre-commit",
         "npm_config_cache": "/Volumes/ext/state/cache/npm",
         "PULUMI_HOME": "/Volumes/ext/state/pulumi",
-        "PREFECT_HOME": "/Volumes/ext/state/prefect/seo-data-science",
+        "PREFECT_HOME": "/Volumes/ext/state/prefect/sample-project",
         "CODEX_HOME": "/Volumes/ext/state/codex/home",
         "PYCHARM_PROPERTIES": "/Volumes/ext/state/jetbrains/PyCharm2026.2/idea.properties",
     }
@@ -404,6 +404,28 @@ def test_atuin_server_is_pinned_private_and_closed_by_default():
     assert "${HOME}" not in compose
     assert "latest" not in compose
 
-    brewfile = text("Brewfile")
+    brewfile = text("Brewfile.tmpl")
     assert 'brew "atuin"' in brewfile
     assert 'brew "atuin", restart_service:' not in brewfile
+
+
+def test_thin_client_branch_declares_remote_access_stack():
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
+    assert 'eq .machine_type "macbook"' in brewfile
+    for cask in ("herdr-app", "rustdesk", "tailscale-app", "1password", "mullvad-vpn", "paste"):
+        assert f'cask "{cask}"' in brewfile
+    assert 'cask "obsidian"' in brewfile  # still declared for full hosts
+
+def test_macbook_thin_branch_excludes_sketchybar_stack():
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
+    thin = brewfile.split('{{ if eq .machine_type "macbook" -}}')[1].split('{{- else }}')[0]
+    assert 'brew "sketchybar"' not in thin
+    assert 'brew "sketchybar-toggle"' not in thin
+    assert 'brew "borders"' in thin  # window borders stay on the thin client
+
+
+def test_aerospace_sketchybar_hooks_are_gated_to_macbook():
+    tmpl = (ROOT / "dot_aerospace.toml.tmpl").read_text()
+    assert 'exec-and-forget sketchybar' in tmpl  # kept for mac-mini
+    assert "exec-on-workspace-change = []" in tmpl  # macbook: no SketchyBar trigger
+    assert 'outer.top =        5' in tmpl  # macbook: native bar visible

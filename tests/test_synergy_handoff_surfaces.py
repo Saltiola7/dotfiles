@@ -100,6 +100,14 @@ def rustdesk(monkeypatch):
     return adapter, stream, entries, metadata, opens
 
 
+@pytest.mark.parametrize("version", ["1.5.0", "1.5.1"])
+def test_rustdesk_supported_versions_use_same_verified_protocol(rustdesk, monkeypatch, version):
+    adapter, _, _, _, _ = rustdesk
+    monkeypatch.setattr(handoff, "app_version", lambda app: version)
+    assert adapter.sample() == handoff.SessionSample(0, True)
+    assert adapter.error is None
+
+
 @pytest.mark.parametrize("count", [0, 1, 2, 1024])
 def test_rustdesk_uses_authenticated_desktop_count_request_and_validates_peer(rustdesk, count):
     adapter, stream, _, _, _ = rustdesk

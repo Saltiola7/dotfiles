@@ -2,7 +2,8 @@
 
 > **Ownership note (2026-07-13):** Active QA skill and OpenCode command source
 > moved to `Saltiola7/dotfiles-ai`. Source paths below are historical unless
-> explicitly described as deployed target paths.
+> explicitly described as deployed target paths. Project adaptations and
+> toolchain handoffs are privately owned outside this repository.
 
 **Status:** Experimental
 **Created:** 2026-07-10
@@ -42,13 +43,12 @@ passing but broadly suppressed tool such as mypy as complete evidence.
   dependency, dead-code, complexity, documentation, mutation, and packaging
   tools.
 - Prefer one authority per concern and avoid duplicate gates.
-- Manage the project-specific `seo-data-science/AGENTS.md` through chezmoi
-  without repeating global instructions.
-- Produce a project handoff spec for later `seo-data-science` toolchain work.
+- Respect privately owned project instructions without repeating global
+  standards or embedding project implementation details in this repository.
 
 ## Non-Goals
 
-- Do not configure the `seo-data-science` Python toolchain in this cycle.
+- Do not configure downstream project toolchains in this cycle.
 - Do not fix project-specific mypy debt in this cycle.
 - Do not retain `/dependabot` or a standalone `dependabot` skill.
 - Do not deploy archived V2 lifecycle skills or reintroduce versioned commands.
@@ -233,8 +233,6 @@ Adjacent contexts:
 | `dot_agents/skills/dbsctr/SKILL.md` | Delegates scope and Capability Requirements | DBSCTR Scoped Gate |
 | `dot_agents/skills/discovery/SKILL.md` | Captures Engineering Profile and Toolchain Profile inputs | Repository Toolchain Discovery |
 | `private_dot_config/opencode/AGENTS.md` | Global skill routing and team standards | Toolchain discovery and scoped QA |
-| `MGM/git/seo-data-science/AGENTS.md` | Chezmoi source for project adaptations | Project-specific routing only |
-| `seo-data-science/docs/specs/toolchain/**` | Project implementation handoff | Tool evaluation and later rollout |
 
 ## Contracts & Invariants
 
@@ -267,20 +265,19 @@ Restart OpenCode, then smoke-test `explore` subagent launch and `/qa` loading.
 ## Facts, Assumptions, And Risks
 
 Facts:
-- `seo-data-science` already uses Ruff, mypy, pytest, coverage, Hypothesis,
-  pre-commit, uv, and Dependabot configuration.
-- Its current mypy command passes while multiple modules use `ignore_errors`.
-- JFrog Xray is specified as a future sole vulnerability authority.
+- Project toolchains and suppression policies are discovered from each
+  repository when QA runs; this repository does not publish their private
+  configuration or validation evidence.
 - Current OpenCode `explore` delegation fails because its configured model ID is
   rejected.
 
 Assumptions:
 - OpenCode will reload global config and skills after restart.
-- Chezmoi may manage a file inside an independently tracked Git repository.
+- Project instruction ownership is resolved within the selected repository.
 
 Risks:
 - Full audits can produce noisy findings; baseline and diff scoping are required.
-- Chezmoi and project git can drift for the managed project `AGENTS.md`; drift is
-  reconciled manually.
+- Privately owned project instructions can drift from global guidance; reconcile
+  ownership and duplication within the selected project.
 - Scanner overlap can create conflicting severity or exception policy unless the
   Concern Authority rule is enforced.

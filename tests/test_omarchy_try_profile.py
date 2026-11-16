@@ -23,6 +23,7 @@ TARGETS = {
     ".config/omarchy-apps/recipes.json", ".config/omarchy-apps/repository.txt",
     ".config/rustdesk-client/server.json", ".local/bin/omarchy-apps",
     ".local/bin/omarchy-rustdesk-client-setup",
+    ".local/bin/try-omarchy-update", ".local/bin/try-omarchy-efi-audit",
     ".local/lib/omarchy-apps/recipes/rustdesk-bin/PKGBUILD",
     ".local/lib/omarchy-apps/recipes/rustdesk-bin/rustdesk-bin.install",
     ".local/state/omarchy/indicators/stay-awake", "apply-omarchy-theme.sh",
@@ -66,7 +67,9 @@ def test_guest_workspace_bindings_do_not_capture_hp_at_macro():
     hp = render("private_dot_config/hypr/bindings.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
     assert 'pending_at' in hp
     assert 'for workspace = 1, 7 do' in hp
-    assert 'colemak_dh_ortho' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
+    assert 'kb_variant = "colemak_dh_ortho,' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
+    assert 'natural_scroll = true' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
+    assert 'natural_scroll = true' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
 
 
 def test_recipes_select_native_architecture_and_essentials_only():

@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Add one native Git include; never replace the user's global configuration."""
+import os
+from pathlib import Path
+import stat
+import subprocess
+import sys
+
+
+HOME = Path.home()
+GLOBAL = HOME / '.gitconfig'
+DIRECTORY = HOME / '.config/git'
+INCLUDE = DIRECTORY / 'remote-workspace.inc'
+FILES = (INCLUDE, *(DIRECTORY / f'remote-workspace-{route}.inc'
+                    for route in ('work', 'personal', 'conflict')))
+
+
+def admit(path: Path, *, missing: bool = False) -> None:
+    for parent in (path.parent, *path.parent.parents):
+        value = parent.lstat()
+        if (not stat.S_ISDIR(value.st_mode) or value.st_uid not in {0, os.getuid()}
+                or value.st_mode & 0o022 and not value.st_mode & stat.S_ISVTX):
+            raise ValueError('unsafe Git directory')
+        if parent == HOME and value.st_uid != os.getuid():
+            raise ValueError('unsafe Git home')
+    if missing and not os.path.lexists(path):
+        return
+    value = path.lstat()
+    if (not stat.S_ISREG(value.st_mode) or value.st_uid != os.getuid()
+            or value.st_mode & 0o022 or value.st_nlink != 1 or value.st_size > 256 * 1024):
+        raise ValueError('unsafe Git file')
+
+
+def main() -> None:
+    if len(sys.argv) != 1 or not HOME.is_absolute() or '..' in HOME.parts:
+        raise ValueError('unsupported Git include operation')
+    for path in FILES:
+        admit(path)
+    admit(GLOBAL, missing=True)
+    os.umask(0o077)
+    environment = {'HOME': str(HOME), 'PATH': os.defpath,
+                   'XDG_CONFIG_HOME': str(HOME / '.config'),
+                   'GIT_CONFIG_NOSYSTEM': '1', 'GIT_CONFIG_GLOBAL': str(GLOBAL),
+                   'GIT_CEILING_DIRECTORIES': str(HOME), 'GIT_TERMINAL_PROMPT': '0'}
+
+    def config(path: Path, *arguments: str) -> subprocess.CompletedProcess:
+        result = subprocess.run(['git', 'config', '--file', str(path), '--no-includes',
+                                 *arguments], cwd=HOME, env=environment,
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode not in (0, 1) or len(result.stdout) > 1024 * 1024:
+            raise ValueError('invalid Git configuration')
+        return result
+
+    # Validate every file before touching global state. In particular native
+    # hasconfig URL includes must never introduce remote.* settings themselves.
+    for path in FILES:
+        if config(path, '--list').returncode != 0:
+            raise ValueError('invalid Git include')
+        if config(path, '--get-regexp', r'^remote\.').returncode != 1:
+            raise ValueError('remote declaration in Git include')
+    result = config(GLOBAL, '--null', '--path', '--get-all', 'include.path')
+    if str(INCLUDE) not in result.stdout.split('\0'):
+        if config(GLOBAL, '--add', 'include.path', str(INCLUDE)).returncode != 0:
+            raise ValueError('Git include write failed')
+    admit(GLOBAL)
+    print('remote Git include ready')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, subprocess.SubprocessError):
+        raise SystemExit('remote Git include refused; existing configuration retained') from None

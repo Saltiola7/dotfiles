@@ -2,6 +2,15 @@
 
 Personal dotfiles managed with [chezmoi](https://www.chezmoi.io/).
 
+## Repository privacy
+
+Keep source, documentation, examples, filenames, commit messages, and pull request
+titles and descriptions neutral. Client identities, project paths, accounts,
+internal infrastructure, and operational evidence belong in ignored private
+configuration or private storage outside this repository. Use synthetic examples
+and private configuration inputs when describing integrations. Existing Git
+history is retained.
+
 macOS-focused configuration for development workstations. Secrets are managed via 1Password CLI and age encryption — nothing sensitive is stored in plain text in this repo.
 
 ## Not for direct use
@@ -26,6 +35,15 @@ to enable native Git identity profiles and required commit signing. Leaving the
 setting absent or empty preserves the existing name/email configuration. Follow
 the canonical [Git identity and signing guide](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/git-identity-signing.md)
 for profile setup, 1Password signing, and verification.
+
+## Graphify ownership
+
+`dotfiles-ai` owns the global Graphify CLI, dependency recipe and matching
+OpenCode skill. Use its canonical
+[update runbook](https://github.com/Saltiola7/dotfiles-ai/blob/main/docs/UPDATES.md#graphify)
+instead of a host package/skill installer here. Retiring these source declarations
+does not uninstall an existing runtime or remove skills, graphs, caches or DKS.
+Live changes still require their own reviewed apply plan.
 
 ## Zed
 

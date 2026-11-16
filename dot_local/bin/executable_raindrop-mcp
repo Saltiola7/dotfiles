@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+fail() {
+    printf 'raindrop-mcp: %s\n' "$2" >&2
+    exit "$1"
+}
+
+[[ $# == 0 ]] || fail 64 'Usage: raindrop-mcp'
+
+for raindrop_tool in uname mkdir lockf npx node; do
+    command -v "$raindrop_tool" >/dev/null 2>&1 ||
+        fail 69 "Required installed tool unavailable: $raindrop_tool"
+done
+[[ "$(uname -s)" == Darwin ]] || fail 69 'This launcher requires macOS.'
+
+export MCP_REMOTE_CONFIG_DIR="${MCP_REMOTE_CONFIG_DIR:-${CODEX_HOME:-$HOME/.codex}/mcp-auth/raindrop}"
+case "$MCP_REMOTE_CONFIG_DIR" in
+    /*) ;;
+    *) fail 64 'MCP_REMOTE_CONFIG_DIR must be an absolute directory.' ;;
+esac
+
+umask 077
+mkdir -p "$MCP_REMOTE_CONFIG_DIR" 2>/dev/null ||
+    fail 73 'Cannot prepare the authentication-cache directory.'
+# Keep this inode and descriptor through direct exec; Node owns the live lease.
+if ! { exec 9<>"$MCP_REMOTE_CONFIG_DIR/raindrop-mcp.lock"; } 2>/dev/null; then
+    fail 73 'Cannot open the connector lease.'
+fi
+lockf -s -t 0 9 2>/dev/null
+raindrop_lease_status=$?
+case "$raindrop_lease_status" in
+    0) ;;
+    75) fail 75 'A connector already owns this authentication cache; close its session before retrying.' ;;
+    *) fail 69 'Cannot acquire the native connector lease.' ;;
+esac
+
+# Resolve outside project directories. npm exits before the long-lived proxy starts.
+raindrop_proxy="$(
+    cd "$MCP_REMOTE_CONFIG_DIR" || exit 1
+    npx --offline --no --package=mcp-remote@0.15.2 --call 'command -v mcp-remote' 2>/dev/null
+)" || fail 69 'Cached mcp-remote@0.15.2 unavailable; provision its cache through the existing package owner, then retry.'
+
+case "$raindrop_proxy" in
+    /*) ;;
+    *) fail 69 'Cached mcp-remote@0.15.2 did not resolve to an absolute executable.' ;;
+esac
+[[ "$raindrop_proxy" != *$'\n'* && "$raindrop_proxy" != *$'\r'* &&
+   -f "$raindrop_proxy" && -x "$raindrop_proxy" ]] ||
+    fail 69 'Cached mcp-remote@0.15.2 executable is unusable.'
+
+exec "$raindrop_proxy" https://api.raindrop.io/rest/v2/ai/mcp --transport http-only --auth-timeout 300

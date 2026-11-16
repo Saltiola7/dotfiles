@@ -1,0 +1,10 @@
+#!/bin/bash
+# mbp-omarchy: Omarchy presets omarchy-fcitx5.service on; its Finnish QWERTY
+# virtual keyboard rewrites typed symbols (local Colemak, remote RustDesk
+# sessions). Enforce disabled on every apply in case a package update
+# re-enables the preset. No sudo needed; harmless when already off.
+{{ if and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname) -}}
+systemctl --user disable --now omarchy-fcitx5.service >/dev/null 2>&1 || true
+{{ else -}}
+exit 0
+{{ end -}}

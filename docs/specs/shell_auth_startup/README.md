@@ -119,7 +119,7 @@ Glossary:
 - **Startup-safe**: shell/profile path must not block on interactive auth or network credentials.
 - **Fail-fast**: auth command exits with an error after a bounded timeout.
 - **Poll loop**: recurring SketchyBar script execution driven by `update_freq`.
-- **lmsh:** portable personal terminal profile shared by personal and MGM Lima
+- **lmsh:** portable personal terminal profile shared by personal and client Lima
   guests; it does not imply a shared VM filesystem or client identity.
 - **Cold backup:** complete copy of stopped SQLite config storage, including WAL
   companions when present.
@@ -548,11 +548,9 @@ Glossary:
   or offline tamper resistance. Owner: operator. Review before the volume leaves
   trusted custody, another local account gains access, or the storage policy
   changes.
-- `AUTH-009-AR1`: the operator approved synchronizing MGM shell history through
-  the same personal account, making work commands and paths decryptable on
-  personal clients. End-to-end encryption, secret filters, tailnet-only ingress,
-  and local credential isolation compensate but do not satisfy employer policy.
-  Owner: operator. Review by 2026-08-18 or before connecting another work client.
+- Cross-project history synchronization requires explicit private approval and
+  isolation appropriate to each trust boundary. Account mappings, operational
+  evidence, and any organization-specific policy exceptions remain private.
 
 ## Verification
 
@@ -618,7 +616,7 @@ flowchart LR
     D --> A[Atuin SQLite server]
     H[Mac host Atuin client] -->|Tailnet HTTPS sync| A
     P[Personal Lima Atuin client] -->|Tailnet HTTPS sync| A
-    M[MGM Lima Atuin client] -->|Tailnet HTTPS sync| A
+    M[Client Lima Atuin instance] -->|Tailnet HTTPS sync| A
     L[Direct Lima instances] --> E[External Lima home]
     C --> E
 ```
@@ -626,6 +624,6 @@ flowchart LR
 **Text Equivalent:** On the Mac mini, the external-state sentinel authorizes a
 guarded service to start Colima with native external homes. Colima stores the
 Atuin SQLite database in a Docker named volume inside its Linux disk. The Mac,
-personal Lima VM, and MGM Lima VM keep distinct client databases and synchronize
+personal Lima VM, and client Lima VM keep distinct client databases and synchronize
 encrypted records through the tailnet HTTPS endpoint. Direct Lima instances and
 Colima share the external Lima home without filesystem-sharing active databases.

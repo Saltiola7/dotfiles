@@ -26,13 +26,13 @@ Apply equivalent changes to the xonsh `_load_secrets()` function:
 ### 3. One-time manual commands (user runs these)
 ```bash
 # Remove SA credentials from gcloud's persistent store
-gcloud auth revoke sa-dev-admin@enterprise-seo-tools.iam.gserviceaccount.com
+gcloud auth revoke sa-dev-admin@example-project.iam.gserviceaccount.com
 
 # Switch active configuration to 'default' (personal account)
 gcloud config configurations activate default
 
 # Clean up stale cache files
-rm -f ~/.cache/gcp/enterprise-seo-tools-sa.json
+rm -f ~/.cache/gcp/service-account.json
 rm -f ~/.cache/gcp/gws-content-reader-key.json
 rm -f ~/.cache/gcp/gws_content_reader_credentials.json
 ```

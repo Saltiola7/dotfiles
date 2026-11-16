@@ -271,7 +271,7 @@ class RustDesk:
             if not alive:
                 self.error = None
                 return SessionSample(None, False)
-            if app_version(self.app) != "1.5.0":
+            if app_version(self.app) not in {"1.5.0", "1.5.1"}:
                 raise SurfaceError("rustdesk-version-incompatible")
             path = Path(f"/tmp/RustDesk-{os.getuid()}/ipc")
             for target, kind in ((path.parent, stat.S_ISDIR), (path, stat.S_ISSOCK)):

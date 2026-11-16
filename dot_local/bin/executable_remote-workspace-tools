@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Checksum-pinned optional overlay tools; no foundation files are installed."""
+import fcntl
+import gzip
+import hashlib
+import io
+import json
+import os
+from pathlib import Path, PurePosixPath
+import platform
+import re
+import stat
+import sys
+import tarfile
+import tempfile
+import urllib.request
+
+NAMES = {'zoxide', 'direnv', 'rg', 'nvim', 'tree-sitter'}
+
+
+def directory(path: Path) -> None:
+    for parent in reversed((path, *path.parents)):
+        if parent.is_symlink():
+            raise ValueError('unsafe tool directory')
+        if parent.exists():
+            info = parent.stat()
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, os.getuid()}
+                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValueError('unsafe tool directory')
+        else:
+            parent.mkdir(mode=0o700)
+
+
+def relative(value: str) -> bool:
+    path = PurePosixPath(value)
+    return bool(value) and not path.is_absolute() and '..' not in path.parts
+
+
+def download(url: str) -> bytes:
+    if not url.startswith('https://github.com/') or '/releases/download/' not in url:
+        raise ValueError('invalid tool URL')
+    with urllib.request.urlopen(url, timeout=60) as response:
+        if not response.url.startswith('https://'):
+            raise ValueError('invalid tool redirect')
+        raw = response.read(64 * 1024 * 1024 + 1)
+    if len(raw) > 64 * 1024 * 1024:
+        raise ValueError('tool archive too large')
+    return raw
+
+
+def inventory(root: Path) -> dict:
+    result = {}
+    for path in sorted(root.rglob('*')):
+        name = path.relative_to(root).as_posix()
+        if name == '.verified-files.json':
+            continue
+        if path.is_symlink():
+            if not path.resolve().is_relative_to(root):
+                raise ValueError('escaping tool symlink')
+            result[name] = {'link': os.readlink(path)}
+        elif path.is_file():
+            result[name] = {'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                            'mode': stat.S_IMODE(path.stat().st_mode)}
+        elif not path.is_dir():
+            raise ValueError('unsupported tool entry')
+    return result
+
+
+def install_tool(home: Path, name: str, pin: dict) -> dict:
+    if (name not in NAMES or set(pin) != {'version', 'format', 'member', 'url', 'sha256'}
+            or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){1,2}', pin['version'])
+            or not re.fullmatch(r'[0-9a-f]{64}', pin['sha256']) or not relative(pin['member'])):
+        raise ValueError('invalid tool pin')
+    store = home / '.local/share/remote-workspace/tools'
+    directory(store)
+    generation = store / (name + '-' + pin['sha256'])
+    if generation.exists() or generation.is_symlink():
+        directory(generation)
+        marker = generation / '.verified-files.json'
+        if marker.is_symlink() or marker.stat().st_uid != os.getuid():
+            raise ValueError('unsafe tool inventory')
+        saved = json.loads(marker.read_text())
+        if saved != inventory(generation):
+            raise ValueError('installed tool generation changed')
+    else:
+        raw = download(pin['url'])
+        if hashlib.sha256(raw).hexdigest() != pin['sha256']:
+            raise ValueError('tool checksum mismatch')
+        with tempfile.TemporaryDirectory(prefix='.download-', dir=store) as scratch:
+            content = Path(scratch) / 'content'
+            content.mkdir(mode=0o700)
+            if pin['format'] == 'tar.gz':
+                with tarfile.open(fileobj=io.BytesIO(raw), mode='r:gz') as archive:
+                    members = archive.getmembers()
+                    if (len(members) > 20000 or sum(item.size for item in members) > 256 * 1024 * 1024
+                            or any(not relative(item.name) for item in members)):
+                        raise ValueError('unsafe tool archive')
+                    archive.extractall(content, filter='data')
+            elif pin['format'] in {'binary', 'gzip'}:
+                target = content / pin['member']
+                target.parent.mkdir(parents=True, exist_ok=True)
+                payload = gzip.decompress(raw) if pin['format'] == 'gzip' else raw
+                if len(payload) > 64 * 1024 * 1024:
+                    raise ValueError('tool binary too large')
+                target.write_bytes(payload)
+            else:
+                raise ValueError('unsupported tool archive')
+            binary = content / pin['member']
+            if binary.is_symlink() or not binary.is_file():
+                raise ValueError('tool binary missing')
+            binary.chmod(0o755)
+            saved = inventory(content)
+            (content / '.verified-files.json').write_text(json.dumps(saved, sort_keys=True))
+            content.rename(generation)
+    binary = generation / pin['member']
+    destination = home / ('.local/libexec/remote-workspace' if name == 'tree-sitter' else '.local/bin') / name
+    directory(destination.parent)
+    if destination.is_symlink():
+        if not destination.resolve().is_relative_to(store):
+            raise ValueError('unowned tool link')
+    elif destination.exists():
+        raise ValueError('existing binary is not an overlay-owned link')
+    if not destination.is_symlink() or destination.resolve() != binary:
+        fd, temporary = tempfile.mkstemp(prefix='.' + name + '-', dir=destination.parent)
+        os.close(fd)
+        os.unlink(temporary)
+        try:
+            os.symlink(binary, temporary)
+            os.replace(temporary, destination)
+        finally:
+            if os.path.lexists(temporary):
+                os.unlink(temporary)
+    return {'generation': str(generation.relative_to(home)), 'files': saved,
+            'executable': str(destination.relative_to(home))}
+
+
+def main() -> None:
+    if len(sys.argv) != 1 or platform.system() != 'Linux' or platform.machine() != 'x86_64':
+        raise ValueError('unsupported overlay platform')
+    home = Path.home()
+    directory(home)
+    state = home / '.local/state/remote-workspace'
+    directory(state)
+    lock = os.open(state / 'tools.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        info = os.fstat(lock)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1 or info.st_mode & 0o077:
+            raise ValueError('unsafe tool lock')
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        pinfile = home / '.config/remote-workspace/tools.json'
+        if pinfile.is_symlink() or not pinfile.is_file() or pinfile.stat().st_uid != os.getuid():
+            raise ValueError('unsafe tool pins')
+        pins = json.loads(pinfile.read_text())
+        if set(pins) != NAMES:
+            raise ValueError('unexpected overlay tools')
+        installed = {name: install_tool(home, name, pin) for name, pin in pins.items()}
+        target = state / 'installed-tools.json'
+        if target.is_symlink() or (target.exists() and (
+                not target.is_file() or target.stat().st_uid != os.getuid() or target.stat().st_nlink != 1)):
+            raise ValueError('unsafe tool manifest')
+        target.write_text(json.dumps(installed, sort_keys=True) + '\n')
+        target.chmod(0o600)
+    finally:
+        os.close(lock)
+    print('remote overlay tools verified')
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError, tarfile.TarError):
+        raise SystemExit('remote overlay tool installation failed; prior generations retained') from None

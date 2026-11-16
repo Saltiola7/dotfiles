@@ -132,7 +132,7 @@ aliases['ch'] = _ch_alias
 # where the atexit handler couldn't fire). Runs at every shell startup — before secret.
 def _cleanup_gcp_cache():
     import os
-    for _f in ('enterprise-seo-tools-sa.json', 'gws-content-reader-key.json'):
+    for _f in ('service-account.json', 'gws-content-reader-key.json'):
         try:
             os.remove(os.path.expanduser(f'~/.cache/gcp/{_f}'))
         except FileNotFoundError:
@@ -141,7 +141,7 @@ def _cleanup_gcp_cache():
 _cleanup_gcp_cache()
 
 # AWS SSO credentials are owned by the AWS CLI cache and refresh service.
-$AWS_PROFILE = 'BedrockDeveloperAccess-302432775606'
+$AWS_PROFILE = 'ClientAccess-000000000000'
 $AWS_REGION = 'us-west-2'
 
 # ── Secrets (lazy-loaded via 1Password CLI) ───────────────────────────────────
@@ -165,13 +165,13 @@ def _load_secrets(args=None, stdin=None):
         # GCP Service Account
         import os
         os.makedirs(os.path.expanduser('~/.cache/gcp'), exist_ok=True)
-        _sa_path = os.path.expanduser('~/.cache/gcp/enterprise-seo-tools-sa.json')
+        _sa_path = os.path.expanduser('~/.cache/gcp/service-account.json')
         with open(_sa_path, 'w') as f:
-            f.write($(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/credential'))
+            f.write($(op read 'op://Personal/GCP Service Account/credential'))
         os.chmod(_sa_path, 0o600)
         $GOOGLE_APPLICATION_CREDENTIALS = _sa_path
-        $GOOGLE_VERTEX_PROJECT = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/project').strip()
-        $GOOGLE_VERTEX_LOCATION = $(op read 'op://Personal/GCP Service Account - Enterprise SEO Tools/location').strip()
+        $GOOGLE_VERTEX_PROJECT = $(op read 'op://Personal/GCP Service Account/project').strip()
+        $GOOGLE_VERTEX_LOCATION = $(op read 'op://Personal/GCP Service Account/location').strip()
         $GOOGLE_CLOUD_PROJECT = $GOOGLE_VERTEX_PROJECT
         $GOOGLE_PROJECT = $GOOGLE_VERTEX_PROJECT
 
@@ -179,17 +179,17 @@ def _load_secrets(args=None, stdin=None):
         $CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE = _sa_path
         $CLOUDSDK_ACTIVE_CONFIG_NAME = 'sa-dev-admin'
 
-        # SEO Data Science (MGM)
-        $CLICKHOUSE_HOST = $(op read 'op://Personal/ClickHouse MGM Cloud/host').strip()
-        $CLICKHOUSE_USER = $(op read 'op://Personal/ClickHouse MGM Cloud/user').strip()
-        $CLICKHOUSE_PORT = $(op read 'op://Personal/ClickHouse MGM Cloud/port').strip()
-        $CLICKHOUSE_PASSWORD = $(op read 'op://Personal/ClickHouse MGM Cloud/password').strip()
+        # Client data services
+        $CLICKHOUSE_HOST = $(op read 'op://Personal/ClickHouse Cloud/host').strip()
+        $CLICKHOUSE_USER = $(op read 'op://Personal/ClickHouse Cloud/user').strip()
+        $CLICKHOUSE_PORT = $(op read 'op://Personal/ClickHouse Cloud/port').strip()
+        $CLICKHOUSE_PASSWORD = $(op read 'op://Personal/ClickHouse Cloud/password').strip()
         $SEMRUSH_API = $(op read 'op://Personal/SEMRUSH API/credential').strip()
         $SEMRUSH_ENTERPRISE_API = $(op read 'op://Personal/SEMRUSH API/enterprise').strip()
         $PAGESPEED_API_KEY = $(op read 'op://Personal/PageSpeed API/credential').strip()
         $AI_STUDIO_KEY = $GOOGLE_GENERATIVE_AI_API_KEY
-        $GCS_AKAMAI_ACCESS_KEY = $(op read 'op://Personal/Akamai GCS HMAC/access_key').strip()
-        $GCS_AKAMAI_SECRET_KEY = $(op read 'op://Personal/Akamai GCS HMAC/secret_key').strip()
+        $GCS_HMAC_ACCESS_KEY = $(op read 'op://Personal/GCS HMAC/access_key').strip()
+        $GCS_HMAC_SECRET_KEY = $(op read 'op://Personal/GCS HMAC/secret_key').strip()
         $GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC = $(op read 'op://Personal/GitHub PAT Classic/credential').strip()
         $ATLASSIAN_API = $(op read 'op://Personal/Atlassian API Token/credential').strip()
         $ROVODEV = $ATLASSIAN_API
