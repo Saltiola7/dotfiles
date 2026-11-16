@@ -460,3 +460,9 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 {{ if eq .machine_type "macbook" }}
 .config/sketchybar
 {{ end }}
+
+{{ if not (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
+.local/bin/mbp-omarchy-borg-backup
+.config/systemd/user/mbp-omarchy-borg-backup.service
+.config/systemd/user/mbp-omarchy-borg-backup.timer
+{{ end }}
