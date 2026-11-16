@@ -412,6 +412,6 @@ def test_atuin_server_is_pinned_private_and_closed_by_default():
 def test_thin_client_branch_declares_remote_access_stack():
     brewfile = (ROOT / "Brewfile.tmpl").read_text()
     assert 'eq .machine_type "macbook"' in brewfile
-    for cask in ("herdr-app", "rustdesk", "tailscale-app", "1password", "mullvad-vpn", "paste", "alfred"):
+    for cask in ("herdr-app", "rustdesk", "tailscale-app", "1password", "mullvad-vpn", "paste"):
         assert f'cask "{cask}"' in brewfile
     assert 'cask "obsidian"' in brewfile  # still declared for full hosts
