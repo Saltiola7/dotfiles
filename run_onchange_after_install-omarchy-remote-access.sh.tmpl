@@ -1,0 +1,15 @@
+#!/bin/bash
+# Remote access for omarchy hosts: RustDesk. Idempotent; needs a terminal
+# so the AUR install can prompt for sudo.
+{{ if eq .machine_type "omarchy" -}}
+[[ -t 0 ]] || { echo "[remote-access] Run from a terminal so sudo can prompt." >&2; exit 0; }
+set -euo pipefail
+
+if ! command -v rustdesk >/dev/null; then
+    omarchy pkg aur add rustdesk-bin
+fi
+
+echo "[remote-access] RustDesk present. Set your permanent password in its GUI once."
+{{ else -}}
+exit 0
+{{ end -}}
