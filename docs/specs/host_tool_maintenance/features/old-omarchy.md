@@ -57,7 +57,23 @@ can; an ordinary local KVM cannot provide network access.
   Wayland portal capture approval have **not been qualified**. Do not claim
   RustDesk unattended headless readiness based on gliff's successful test.
 
-## Kanex and HDD: unresolved
+## Storage
+
+Formatted 2026-11-16 after explicit erase confirmation: single ext4 partition,
+label `old-storage`, filesystem UUID
+`d7c7ee45-ee7f-4e73-8075-958b1f488b72`, mounted at `/srv/storage` via fstab
+with `nofail,x-systemd.device-timeout=10s` so an unplugged drive never blocks
+boot. Ownership set to the user only while mounted.
+
+SMART: zero reallocated/pending/uncorrectable sectors; historical
+`UDMA_CRC_Error_Count` 13762 points at earlier cabling, not current errors.
+A full surface verification (`smartctl -t long`, ~6 h) is recommended before
+trusting the drive with important data; not yet run.
+
+Kanex note: the HDD only enumerates through the direct USB-SATA cable
+(JMicron JMS579). The Kanex path remains undiagnosed.
+
+## Kanex and HDD history
 
 Only the selected Kanex UUID `0005001a-5404-a700-ffff-ffffffffffff` is enrolled
 with automatic policy. Reboot established its ASM1042A USB and ASM1061 SATA
