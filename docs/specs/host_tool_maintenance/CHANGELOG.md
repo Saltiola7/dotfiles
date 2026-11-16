@@ -1,5 +1,16 @@
 # Host maintenance changelog
 
+## 2026-11-16 — mbp-omarchy synergy client and input-method hygiene
+
+- Waynergy managed package now builds on aarch64 (the M1 host joins the
+  mini's Synergy desktop as screen mbp-omarchy; server-side screen list
+  stays app-owned in Synergy 3).
+- fcitx5 fully retired on mbp-omarchy: uwsm env clears every IM_MODULE
+  for future sessions, and a run_always script re-disables
+  omarchy-fcitx5.service on each apply in case a preset update re-enables
+  it (its Finnish QWERTY virtual keyboard rewrote local Colemak and
+  remote-session typing).
+
 ## 2026-11-16 — mbp-omarchy daily-driver enablement
 
 - Backup declared: `mbp-omarchy-borg-backup` script + systemd user

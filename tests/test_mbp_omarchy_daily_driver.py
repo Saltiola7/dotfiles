@@ -72,3 +72,20 @@ def test_fcitx5_dbus_activation_masked():
     mask = ROOT / "symlink_.config/systemd/user/org.fcitx.FcitX5.service"
     assert mask.read_text().strip() == "/dev/null"
     assert "org.fcitx.FcitX5.service" in (ROOT / ".chezmoiignore").read_text()
+
+
+def test_waynergy_package_builds_on_apple_silicon():
+    pkgbuild = (ROOT / "private_dot_config/omarchy-host/waynergy-package/PKGBUILD").read_text()
+    assert "aarch64" in pkgbuild
+
+
+def test_uwsm_env_clears_ime_and_is_gated():
+    env = (ROOT / "private_dot_config/uwsm/env").read_text()
+    assert "QT_IM_MODULE=" in env and "GTK_IM_MODULE=" in env
+    assert ".config/uwsm/env" in (ROOT / ".chezmoiignore").read_text()
+
+
+def test_fcitx5_disable_enforced_on_every_apply():
+    script = (ROOT / "run_always_disable-fcitx5-mbp.sh.tmpl").read_text()
+    assert "omarchy-fcitx5.service" in script
+    assert "disable --now" in script
