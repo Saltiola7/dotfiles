@@ -10,7 +10,7 @@ def test_retired_host_tools_cannot_be_reintroduced():
     brewfile = (ROOT / "Brewfile.tmpl").read_text()
     for name in ("colima", "docker", "docker-buildx", "docker-compose", "docker-credential-helper"):
         assert f'brew "{name}"' not in brewfile
-    for name in ("loop", "shortcat"):
+    for name in ("loop", "shortcat", "parallels"):
         assert f'cask "{name}"' not in brewfile
     for name in (
         "run_onchange_after_bootstrap-colima-atuin.sh.tmpl",

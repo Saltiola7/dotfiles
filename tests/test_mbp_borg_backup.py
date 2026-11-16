@@ -14,6 +14,7 @@ def test_script_gates_to_host_and_keeps_alive():
     assert "ServerAliveInterval=15" in text and "ServerAliveCountMax=4" in text
     assert "--keep-daily 7" in text and "--keep-weekly 4" in text
     assert "--keep-monthly 6" in text
+    assert "--glob-archives 'ts-mbp-*'" in text  # golden image shares the repo; prune must not touch it
     assert "ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-macos/borg" in text
 
 

@@ -17,5 +17,7 @@ REPO='ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-macos/borg'
   --exclude 'sh:/Users/tis/Library/Application Support/Google/DriveFS' \
   "$REPO::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" /Users/tis || exit 1
 
-"$BORG" prune --keep-daily 7 --keep-weekly 4 --keep-monthly 6 "$REPO"
+# Only ever prune this timer's own archives; the preinstall golden image
+# (mbp-macos-preinstall-final) shares this repository and must survive.
+"$BORG" prune --glob-archives 'ts-mbp-*' --keep-daily 7 --keep-weekly 4 --keep-monthly 6 "$REPO"
 "$BORG" compact "$REPO"
