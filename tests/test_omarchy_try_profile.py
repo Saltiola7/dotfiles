@@ -67,7 +67,8 @@ def test_guest_workspace_bindings_do_not_capture_hp_at_macro():
     hp = render("private_dot_config/hypr/bindings.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
     assert 'pending_at' in hp
     assert 'for workspace = 1, 7 do' in hp
-    assert 'colemak_dh_ortho' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
+    assert 'kb_variant = "colemak_dh"' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
+    assert 'natural_scroll = true' in render("private_dot_config/hypr/input.lua.tmpl", {**DATA, 'machine_type': 'omarchy'})
 
 
 def test_recipes_select_native_architecture_and_essentials_only():
