@@ -437,6 +437,7 @@ start-omarchy-deskflow.sh
 !.config/deskflow/
 .config/deskflow/*
 !.config/deskflow/deskflow.conf
+!.config/deskflow/deskflow-core.conf
 !.config/systemd/
 .config/systemd/*
 !.config/systemd/user/
