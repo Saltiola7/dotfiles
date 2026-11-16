@@ -1,0 +1,7 @@
+openssh
+tailscale
+rustdesk
+gliff
+bolt
+smartmontools
+usbutils

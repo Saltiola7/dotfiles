@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.hostname "old-omarchy") -}}
+set -euo pipefail
+if [[ -t 0 ]]; then
+    exec "$HOME/.local/bin/old-omarchy-setup"
+fi
+echo "[old-omarchy] Privileged reconciliation pending: run old-omarchy-setup in a terminal." >&2
+{{ else -}}
+exit 0
+{{ end -}}

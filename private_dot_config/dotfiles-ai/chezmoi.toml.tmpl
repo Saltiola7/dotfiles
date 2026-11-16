@@ -1,0 +1,21 @@
+# Independent AI distribution; personal dotfiles do not own AI credentials.
+sourceDir = "{{ .chezmoi.homeDir }}/Projects/dotfiles-ai"
+persistentState = "{{ .chezmoi.homeDir }}/.config/dotfiles-ai/chezmoi.boltdb"
+
+[data.dotfiles_ai.state]
+root = "/var/lib/dotfiles-ai/{{ .chezmoi.username }}"
+
+[data.dotfiles_ai.linux_workstation]
+enabled = true
+
+[data.dotfiles_ai.herdr]
+launchagent = false
+host_enabled = false
+# Preserve Omarchy's existing pacman provider, not a second PATH binary.
+executable = "/usr/bin/herdr"
+
+[data.dotfiles_ai.sandbox]
+enabled = false
+
+[data.dotfiles_ai.remote_user_environment]
+enabled = false
