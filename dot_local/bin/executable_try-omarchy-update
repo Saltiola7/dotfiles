@@ -1,0 +1,46 @@
+#!/bin/bash
+set -euo pipefail
+[[ $# == 0 && -t 0 && -t 1 ]] || { echo 'Run try-omarchy-update without arguments in a guest terminal.' >&2; exit 2; }
+audit=$HOME/.local/bin/try-omarchy-efi-audit
+hook=/etc/pacman.d/hooks/00-try-omarchy-preserve-factory.hook
+expected_hook=7911245b7ebdd4a5882e5f54149d592db42bdf070275f07f41153aba314687ec
+[[ -f $hook && ! -L $hook ]] && [[ $(sha256sum "$hook" | cut -d' ' -f1) == "$expected_hook" ]] || {
+  echo 'The factory recovery safeguard is missing or changed; review it before updating.' >&2; exit 1;
+}
+[[ -x $audit && -f /usr/bin/omarchy-update && -f /usr/bin/omarchy-update-boot ]] || {
+  echo 'Expected Omarchy updater or EFI audit is missing.' >&2; exit 1;
+}
+grep -Fq 'omarchy-update-boot || boot_verified=0' /usr/bin/omarchy-update || {
+  echo 'Omarchy changed its final boot verification; review this update tool first.' >&2; exit 1;
+}
+grep -Fq 'OMARCHY_UPDATE_UNATTENDED' /usr/bin/omarchy-update-restart || {
+  echo 'Omarchy changed its reboot control; review this update tool first.' >&2; exit 1;
+}
+printf '%s\n' 'Before updating, ensure you have a current stopped-VM backup on the Mac.' 'If any reboot prompt appears, choose No until this command finishes its EFI audit.'
+sudo /bin/bash "$audit"
+backup=$(sudo mktemp -d /var/backups/try-omarchy-update.XXXXXXXX)
+printf 'Backing up the EFI partition to %s/boot.tar\n' "$backup"
+sudo tar -C /boot -cf "$backup/boot.tar" .
+sudo sh -c 'cd "$1" && sha256sum boot.tar > boot.tar.sha256 && sha256sum -c boot.tar.sha256' sh "$backup"
+snapshot=$(sudo snapper -c root create --print-number --description 'Before guarded Try Omarchy update')
+[[ $snapshot =~ ^[0-9]+$ ]] || { echo 'Snapshot creation did not return an ID; refusing to update.' >&2; exit 1; }
+printf 'Guest root snapshot: %s\n' "$snapshot"
+work=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/try-omarchy-update.XXXXXXXX")
+trap 'rm -rf -- "$work"' EXIT
+export TRY_OMARCHY_UPDATE_MARKER="$work/verified" TRY_OMARCHY_UPDATE_AUDIT="$audit"
+function omarchy-update-boot() {
+  /usr/bin/omarchy-update-boot "$@" || return
+  sudo /bin/bash "$TRY_OMARCHY_UPDATE_AUDIT" || return
+  printf 'verified\n' > "$TRY_OMARCHY_UPDATE_MARKER"
+}
+export -f omarchy-update-boot
+export OMARCHY_UPDATE_UNATTENDED=1
+if ! /usr/bin/omarchy-update; then
+  echo 'Update did not complete. Do not reboot; inspect the output and EFI audit.' >&2
+  exit 1
+fi
+[[ -f $TRY_OMARCHY_UPDATE_MARKER ]] || {
+  echo 'The final EFI audit did not run. Do not reboot until the update tool is reviewed.' >&2; exit 1;
+}
+printf '\nUpdate and final EFI audit passed. Restart when ready; then verify kernel, desktop and integrations.\n'
+printf 'EFI backup: %s/boot.tar; root snapshot: %s\n' "$backup" "$snapshot"

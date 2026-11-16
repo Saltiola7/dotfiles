@@ -1,0 +1,51 @@
+#!/bin/bash
+set -euo pipefail
+[[ $EUID == 0 ]] || { echo 'Run with sudo inside the guest.' >&2; exit 1; }
+[[ $(uname -m) == aarch64 ]] || { echo 'Expected an ARM64 guest.' >&2; exit 1; }
+[[ $(findmnt -n -o FSTYPE --mountpoint /boot) == vfat ]] || { echo 'EFI partition is not mounted at /boot.' >&2; exit 1; }
+work=$(mktemp -d /tmp/omarchy-efi-audit.XXXXXXXX)
+trap 'rm -rf -- "$work"' EXIT
+uki=/boot/EFI/Linux/omarchy_linux-omarchy.efi
+[[ -f /boot/limine.conf && -f "$uki" ]] || { echo 'Missing Limine config or current UKI.' >&2; exit 1; }
+export AUDIT_WORK="$work" AUDIT_UKI="$uki"
+python3 - <<'PY'
+from pathlib import Path
+import hashlib,os,re,sys
+s=Path('/boot/limine.conf').read_text(); machine=Path('/etc/machine-id').read_text().strip()
+blocks=re.split(r'(?m)(?=^/[^/])',s)
+entries=[b for b in blocks if re.search(r'(?m)^\s*comment:\s*machine-id='+re.escape(machine)+r'(?:\s|$)',b)]
+assert len(entries)==1, 'Current machine does not have exactly one top-level entry'
+m=re.search(r'(?m)^\s*path:\s*boot\(\):/EFI/Linux/omarchy_linux-omarchy\.efi#([0-9a-f]+)\s*$',entries[0]);assert m,'Expected current UKI entry not found'
+h=hashlib.blake2b()
+with open(os.environ['AUDIT_UKI'],'rb') as f:
+ for b in iter(lambda:f.read(4*1024*1024),b''):h.update(b)
+hash_ok = h.hexdigest()==m.group(1)
+print('Current machine EFI hash:', 'MATCH' if hash_ok else 'MISMATCH')
+defaults=[x.strip() for x in s.splitlines() if x.startswith('default_entry:')]
+print('Default entry:',defaults[0] if len(defaults)==1 else 'INVALID')
+if defaults != ['default_entry: Omarchy/linux-omarchy']:
+ sys.exit('Unexpected default boot entry: do not reboot')
+print('Factory recovery entry:', 'PRESENT' if 'Omarchy (factory recovery)' in s else 'NOT PRESENT')
+print('Direct recovery entry:', 'PRESENT' if '/Omarchy (current kernel recovery)' in s else 'NOT PRESENT')
+print('Running kernel:',os.uname().release)
+if not hash_ok: sys.exit('EFI checksum mismatch: do not reboot')
+PY
+for section in uname linux initrd; do
+ objcopy --dump-section ".$section=$work/$section" "$uki" "$work/objcopy-output.efi"
+ rm -f -- "$work/objcopy-output.efi"
+ [[ -s "$work/$section" ]] || { echo "UKI section .$section missing or empty" >&2; exit 1; }
+done
+release=$(tr -d '\000\n' < "$work/uname")
+printf 'UKI kernel release: %s\n' "$release"
+[[ $release =~ ^[A-Za-z0-9._+-]+$ ]] || { echo 'Invalid UKI kernel release; do not reboot.' >&2; exit 1; }
+printf 'Installed module directory: '; [[ -d "/usr/lib/modules/$release" ]] && echo PRESENT || { echo MISSING; exit 1; }
+if [[ -f "/usr/lib/modules/$release/vmlinuz" ]]; then
+ if cmp -s "$work/linux" "/usr/lib/modules/$release/vmlinuz"; then echo 'UKI kernel matches installed vmlinuz: YES'; else echo 'UKI kernel matches installed vmlinuz: NO'; exit 1; fi
+else
+ echo 'Installed vmlinuz missing; do not reboot.' >&2
+ exit 1
+fi
+if lsinitcpio -a "$work/initrd" >/dev/null 2>&1; then echo 'UKI initramfs listing: OK'; else echo 'UKI initramfs listing: FAILED'; exit 1; fi
+printf 'Kernel package: '; pacman -Q linux-omarchy
+printf 'Integration package: '; pacman -Q try-omarchy
+printf 'Boot filesystem: '; findmnt -n -o SOURCE,FSTYPE /boot

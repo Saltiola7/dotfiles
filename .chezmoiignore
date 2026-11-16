@@ -357,6 +357,8 @@ load-smb-reconnect.sh
 {{ end }}
 
 {{ if ne .machine_type "omarchy-try" }}
+.local/bin/try-omarchy-update
+.local/bin/try-omarchy-efi-audit
 .config/omarchy-apps/
 .local/bin/omarchy-apps
 .local/lib/omarchy-apps/
@@ -396,6 +398,8 @@ install-omarchy-apps
 .local/bin/*
 !.local/bin/omarchy-apps
 !.local/bin/omarchy-rustdesk-client-setup
+!.local/bin/try-omarchy-update
+!.local/bin/try-omarchy-efi-audit
 !.local/lib/
 .local/lib/*
 !.local/lib/omarchy-apps/
