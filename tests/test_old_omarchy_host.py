@@ -32,7 +32,7 @@ def test_host_files_are_actually_managed_and_isolated():
         ".config/old-omarchy/packages.txt",
         ".config/old-omarchy/authorized_keys",
         ".local/bin/old-omarchy-setup",
-        "configure-old-omarchy.sh",
+        "always_configure-old-omarchy.sh",
     }
     managed = set(chezmoi("old-omarchy", "managed", "--include", "files,scripts").splitlines())
     assert targets <= managed
@@ -87,7 +87,7 @@ def test_storage_mount_is_declared_removable_safe_and_ordered_before_ai_apply():
 
 
 def test_reconcile_script_is_a_noop_on_other_hosts():
-    source = ROOT / "run_after_configure-old-omarchy.sh.tmpl"
+    source = ROOT / "run_always_configure-old-omarchy.sh.tmpl"
     for host in ("omarchy", "mbp-omarchy"):
         rendered = chezmoi(host, "execute-template", text=source.read_text())
         assert rendered.strip() == "#!/usr/bin/env bash\nexit 0"
