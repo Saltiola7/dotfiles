@@ -89,3 +89,11 @@ def test_fcitx5_disable_enforced_on_every_apply():
     script = (ROOT / "run_always_disable-fcitx5-mbp.sh.tmpl").read_text()
     assert "omarchy-fcitx5.service" in script
     assert "disable --now" in script
+
+
+def test_waynergy_install_converges_via_apply():
+    script = (ROOT / "run_onchange_install-waynergy.sh.tmpl").read_text()
+    assert 'eq .machine_type "omarchy"' in script
+    assert "[[ -t 0 ]]" in script
+    assert "omarchy-waynergy-install" in script
+    assert "enable --now omarchy-waynergy.service" in script

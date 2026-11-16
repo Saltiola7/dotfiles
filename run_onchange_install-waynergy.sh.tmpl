@@ -1,0 +1,16 @@
+#!/bin/bash
+# Build and install the managed waynergy package on omarchy hosts, then
+# enable the client service. Package installation needs a terminal for
+# the sudo prompt; silently skipped otherwise.
+# PKGBUILD hash: {{ include "private_dot_config/omarchy-host/waynergy-package/PKGBUILD" | sha256sum }}
+{{ if eq .machine_type "omarchy" -}}
+[[ -t 0 ]] || { echo "[waynergy] Run chezmoi apply from a terminal for the sudo prompt." >&2; exit 0; }
+set -euo pipefail
+if ! command -v waynergy >/dev/null; then
+    "$HOME/.local/bin/omarchy-waynergy-install"
+fi
+systemctl --user enable --now omarchy-waynergy.service
+echo "[waynergy] client service enabled."
+{{ else -}}
+exit 0
+{{ end -}}
