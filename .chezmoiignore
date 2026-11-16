@@ -122,11 +122,15 @@ Library/LaunchAgents/dev.client.aws-sso-login.plist
 {{ end }}
 {{ if or (ne .chezmoi.os "darwin") (ne .machine_type "mac-mini") }}
 .config/synergy-recovery/
+.config/synergy-screens-ensure/
 Library/LaunchAgents/dev.dotfiles.synergy-login.plist
 Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist
+Library/LaunchAgents/dev.dotfiles.synergy-screens-ensure.plist
 .local/bin/synergy-recovery
+.local/bin/synergy-screens-ensure
 .local/bin/synergy-setup
 load-synergy-launchagents.sh
+load-synergy-screens-ensure.sh
 .config/synergy-handoff/
 Library/LaunchAgents/dev.dotfiles.synergy-handoff.plist
 .local/bin/synergy-handoff
