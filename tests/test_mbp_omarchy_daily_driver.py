@@ -66,3 +66,9 @@ def test_mbp_binds_brightness_directly_to_dcp_backlight():
     assert 'hasPrefix "mbp-omarchy" .chezmoi.hostname' in tmpl
     assert "brightnessctl -d apple-panel-bl set +5%" in tmpl
     assert "XF86MonBrightnessDown" in tmpl
+
+
+def test_fcitx5_dbus_activation_masked():
+    mask = ROOT / "symlink_.config/systemd/user/org.fcitx.FcitX5.service"
+    assert mask.read_text().strip() == "/dev/null"
+    assert "org.fcitx.FcitX5.service" in (ROOT / ".chezmoiignore").read_text()

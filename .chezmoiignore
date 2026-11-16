@@ -470,3 +470,7 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 {{ if not (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
 .config/autostart/org.fcitx.Fcitx5.desktop
 {{ end }}
+
+{{ if not (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
+.config/systemd/user/org.fcitx.FcitX5.service
+{{ end }}
