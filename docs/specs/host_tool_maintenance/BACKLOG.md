@@ -22,3 +22,11 @@
   official Linux builds are x86_64-only; interim path is ib_async from Linux
   against Trader Workstation kept on the macOS thin client (allowlist Omarchy
   IP in TWS); alternative is IB Gateway in an x86_64 container under qemu.
+
+- DOTFILES-AI-AARCH64-001: dotfiles-ai's herdr data declares linux x86_64 only
+  (`linux_amd64_asset_url`) but upstream v0.9.5 ships `herdr-linux-aarch64`;
+  the install script selects by fixed URL, so the omarchy profile would install
+  a broken binary on ARM hosts. Add `linux_aarch64_asset_url` and make the
+  installer arch-aware, then run `dotfiles-ai-omarchy-setup` on mbp-omarchy
+  (state root /var/lib/dotfiles-ai/tis; provider logins interactive). mbp-omarchy
+  runs herdr 0.9.5 aarch64 via a manual install + /usr/local/bin shim until then.
