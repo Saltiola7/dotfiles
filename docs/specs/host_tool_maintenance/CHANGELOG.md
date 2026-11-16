@@ -1,5 +1,16 @@
 # Host maintenance changelog
 
+## 2026-11-16 — macbook native menu bar
+
+- SketchyBar removed from the macbook thin client after repeated
+  native-menu-bar conflicts: AeroSpace's after-startup-command no longer
+  launches it, its formulas left the macbook Brewfile branch, the
+  sketchybar config tree is ignore-gated off the host, and the stack hook
+  restores Apple menu-bar defaults (bar always visible) while stopping any
+  brew-services resurrect agent. mac-mini hosts keep the SketchyBar stack
+  unchanged. AeroSpace outer.gaps.top is 5 on macbook (native bar visible)
+  and 30 elsewhere.
+
 ## 2026-11-15 — macOS thin-client transition
 
 - Retired roughly 45 GB of applications for the thin-client role with an

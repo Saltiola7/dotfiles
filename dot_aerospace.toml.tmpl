@@ -10,16 +10,23 @@ after-login-command = []
 # 'after-startup-command' is run after 'after-login-command'
 # Available commands : https://nikitabobko.github.io/AeroSpace/commands
 after-startup-command = [
+{{- if ne .machine_type "macbook" }}
     # Start SketchyBar (has built-in duplicate detection)
     'exec-and-forget sketchybar',
+{{- end }}
     # Start JankyBorders with Catppuccin Mocha colors
     'exec-and-forget borders active_color=0xffcba6f7 inactive_color=0xff45475a width=5.0',
 ]
 
+{{- if ne .machine_type "macbook" }}
 # Notify SketchyBar about workspace changes
 exec-on-workspace-change = ['/bin/bash', '-c',
     'sketchybar --trigger aerospace_workspace_change FOCUSED_WORKSPACE=$AEROSPACE_FOCUSED_WORKSPACE'
 ]
+{{- else }}
+# macbook thin client: native menu bar, no SketchyBar hooks.
+exec-on-workspace-change = []
+{{- end }}
 
 # Start AeroSpace at login
 start-at-login = true
@@ -84,7 +91,11 @@ automatically-unhide-macos-hidden-apps = true
     inner.vertical =   5
     outer.left =       5
     outer.bottom =     5
+{{- if eq .machine_type "macbook" }}
+    outer.top =        5   # Native menu bar always visible; macOS already offsets it.
+{{- else }}
     outer.top =        30  # SketchyBar height(25) + 5 px gap; native menu bar overlays on hover.
+{{- end }}
     outer.right =      5
 
 # 'main' binding mode declaration
