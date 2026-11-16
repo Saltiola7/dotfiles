@@ -458,6 +458,11 @@ start-omarchy-deskflow.sh
 .local/lib/*
 !.local/lib/omarchy-apps/
 !.local/lib/omarchy-apps/**
+!.local/share/
+.local/share/*
+!.local/share/applications/
+.local/share/applications/*
+!.local/share/applications/zen.desktop
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
