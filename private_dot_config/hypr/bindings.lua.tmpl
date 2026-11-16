@@ -55,3 +55,6 @@ replace("SUPER + CTRL + T", "Toggle window floating/tiling", hl.dsp.window.float
 -- Quit menu (macOS confirm dialog steals focus). The SHIFT variant misses the
 -- menu accelerator and passes through; keep SUPER+Q for grabbed/remote use.
 replace("SUPER + SHIFT + Q", "Close window (no-grab safe)", hl.dsp.window.close())
+-- Citrix VDI (omarchy-try): keep the ICA session inside the tiling layout
+-- instead of letting wfica request fullscreen/maximize takeover.
+o.window({ class = "Wfica" }, { suppressevent = "maximize fullscreen" })
