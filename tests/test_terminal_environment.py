@@ -7,7 +7,7 @@ ROOT = Path(__file__).parents[1]
 
 
 def test_retired_host_tools_cannot_be_reintroduced():
-    brewfile = (ROOT / "Brewfile").read_text()
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
     for name in ("colima", "docker", "docker-buildx", "docker-compose", "docker-credential-helper"):
         assert f'brew "{name}"' not in brewfile
     for name in ("loop", "shortcat"):
@@ -78,7 +78,7 @@ def test_opencode_wrapper_survives_later_path_updates(tmp_path):
 
 
 def test_yazi_is_managed_across_terminal_targets(tmp_path):
-    brewfile = text("Brewfile")
+    brewfile = text("Brewfile.tmpl")
     for formula in ("yazi", "sevenzip", "fd", "ripgrep", "resvg"):
         assert f'brew "{formula}"' in brewfile
 
@@ -404,6 +404,14 @@ def test_atuin_server_is_pinned_private_and_closed_by_default():
     assert "${HOME}" not in compose
     assert "latest" not in compose
 
-    brewfile = text("Brewfile")
+    brewfile = text("Brewfile.tmpl")
     assert 'brew "atuin"' in brewfile
     assert 'brew "atuin", restart_service:' not in brewfile
+
+
+def test_thin_client_branch_declares_remote_access_stack():
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
+    assert 'eq .machine_type "macbook"' in brewfile
+    for cask in ("herdr-app", "rustdesk", "tailscale-app", "1password", "mullvad-vpn", "paste", "alfred"):
+        assert f'cask "{cask}"' in brewfile
+    assert 'cask "obsidian"' in brewfile  # still declared for full hosts

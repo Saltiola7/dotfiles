@@ -1,5 +1,5 @@
 #!/bin/bash
-# Brewfile hash: {{ include "Brewfile" | sha256sum }}
+# Brewfile hash: {{ include "Brewfile.tmpl" | sha256sum }}
 # Runs before other chezmoi scripts to ensure Homebrew packages are installed.
 # Re-runs automatically when the Brewfile changes.
 
@@ -14,7 +14,7 @@ if ! command -v brew &>/dev/null; then
 fi
 
 echo "Running brew bundle..."
-MAS_NO_AUTO_INDEX=1 brew bundle --file="{{ .chezmoi.sourceDir }}/Brewfile" || {
+MAS_NO_AUTO_INDEX=1 brew bundle --file="{{ .chezmoi.homeDir }}/Brewfile" || {
     echo "brew bundle completed with some failures (this is normal for MAS apps)." >&2
     exit 0
 }
