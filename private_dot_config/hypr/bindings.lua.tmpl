@@ -51,3 +51,7 @@ replace("SUPER + Q", "Close window", hl.dsp.window.close())
 -- Cmd+T belongs to Kitty tabs; keep the desktop action on Ctrl+Cmd+T.
 hl.unbind("SUPER + T")
 replace("SUPER + CTRL + T", "Toggle window floating/tiling", hl.dsp.window.float({ action = "toggle" }))
+-- No-grab VM (Try Omarchy on the mini): plain SUPER+Q matches the host QEMU
+-- Quit menu (macOS confirm dialog steals focus). The SHIFT variant misses the
+-- menu accelerator and passes through; keep SUPER+Q for grabbed/remote use.
+replace("SUPER + SHIFT + Q", "Close window (no-grab safe)", hl.dsp.window.close())

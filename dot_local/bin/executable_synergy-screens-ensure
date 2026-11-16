@@ -1,0 +1,104 @@
+#!/bin/bash
+# Keep the managed Synergy layout and TLS trust entries in place.
+#
+# The Synergy app regenerates ~/Library/Preferences/Synergy/synergy.conf from
+# its GUI database (LevelDB, not editable while the app must stay healthy) on
+# service restarts, reinstalls and updates, and rewrites tls/trusted-clients
+# on updates — silently dropping hand-managed client screens and trust
+# entries (verified 2026-11-16: an auto-update dropped a client fingerprint;
+# a reinstall regenerated the layout to two screens).
+#
+# This agent holds a complete managed synergy.conf (rendered by chezmoi) and
+# restores it verbatim when the live file drifts, then restarts the core with
+# a bare killall: the service-owned core respawns and re-reads the file.
+# Bare core respawns do not regenerate the file (verified); only
+# service-level restarts do, and those trigger this agent again.
+# Trust entries are only ever appended, never removed.
+# macOS /bin/bash 3.2 and BSD tools; no network probes.
+set -u
+export LC_ALL=C
+
+state_dir="$HOME/Library/Application Support/dotfiles/synergy-screens-ensure"
+conf_live="$HOME/Library/Preferences/Synergy/synergy.conf"
+trust_live="$HOME/Library/Preferences/Synergy/tls/trusted-clients"
+conf_managed="$HOME/.config/synergy-screens-ensure/synergy.conf.managed"
+trust_managed="$HOME/.config/synergy-screens-ensure/trusted-clients.managed"
+
+log() { /usr/bin/printf '%s %s\n' "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" >>"$state_dir/activity.log"; /usr/bin/tail -n 50 "$state_dir/activity.log" >"$state_dir/.t" 2>/dev/null && /bin/mv -f "$state_dir/.t" "$state_dir/activity.log"; }
+
+atomic_install() { # $1 source, $2 destination
+    local tmp
+    tmp=$(/usr/bin/mktemp "${2%/*}/.screens-ensure.XXXXXX") || return 1
+    /bin/cp "$1" "$tmp" || { /bin/rm -f "$tmp"; return 1; }
+    /bin/chmod 644 "$tmp" || { /bin/rm -f "$tmp"; return 1; }
+    /bin/mv -f "$tmp" "$2" || { /bin/rm -f "$tmp"; return 1; }
+}
+
+append_missing() { # $1 managed lines file, $2 live trust file
+    local line added=0 new=""
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        if ! /usr/bin/grep -qxF "$line" "$2" 2>/dev/null; then
+            new="$new$line
+"
+            added=1
+        fi
+    done <"$1"
+    if (( added )); then
+        /usr/bin/printf '%s' "$new" >>"$2"
+    fi
+    return $added
+}
+
+main() {
+    if [[ "${1:-}" == "--check" ]]; then
+        # Dry run: exit 10 when changes would be applied, 0 when clean, 2 on missing prerequisites.
+        [[ -f "$conf_managed" && -f "$conf_live" ]] || return 2
+        /usr/bin/cmp -s "$conf_managed" "$conf_live" || return 10
+        [[ -f "$trust_managed" && -f "$trust_live" ]] || return 2
+        append_missing_check=0
+        local line bad=0
+        while IFS= read -r line; do
+            [[ -n "$line" ]] || continue
+            /usr/bin/grep -qxF "$line" "$trust_live" 2>/dev/null || bad=1
+        done <"$trust_managed"
+        (( bad )) && return 10
+        return 0
+    fi
+    [[ $# -eq 0 && $(/usr/bin/uname -s) == Darwin ]] || { echo "Usage: synergy-screens-ensure [--check]" >&2; exit 2; }
+    [[ -f "$conf_managed" ]] || exit 0
+    /bin/mkdir -p "$state_dir" || exit 1
+    if ! /bin/mkdir "$state_dir/run.lock" 2>/dev/null; then
+        local age
+        age=$(( $(/bin/date +%s) - $(/usr/bin/stat -f %m "$state_dir/run.lock" 2>/dev/null || /bin/date +%s) ))
+        (( age > 120 )) && { /bin/rm -rf "$state_dir/run.lock" && /bin/mkdir "$state_dir/run.lock"; } || exit 0
+    fi
+    trap '/bin/rm -rf "$state_dir/run.lock"' EXIT
+
+    local acted=0 conf_changed=0
+    if [[ -f "$conf_live" ]] && ! /usr/bin/cmp -s "$conf_managed" "$conf_live"; then
+        atomic_install "$conf_managed" "$conf_live" || { log "conf-install-failed"; exit 1; }
+        log "restored managed synergy.conf"
+        acted=1
+        conf_changed=1
+    fi
+    if [[ -f "$trust_live" ]] && append_missing "$trust_managed" "$trust_live"; then
+        log "appended missing trust entries"
+        acted=1
+    fi
+    if (( conf_changed )); then
+        # Only a config change needs a core restart; the core re-reads
+        # synergy.conf on bare respawn, while trusted-clients is live-reloaded
+        # per connection (both verified 2026-11-16). Restarting for trust
+        # appends would loop with the service's trust rewrites.
+        /usr/bin/killall synergy-core 2>/dev/null || true
+        log "restarted core (bare killall; service respawns)"
+    elif (( acted )); then
+        log "trust-only change; core left running (live reload)"
+    else
+        log "clean"
+    fi
+    exit 0
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

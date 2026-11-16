@@ -1,0 +1,44 @@
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+#!/bin/bash
+set -eu
+# Deskflow server unit: {{ include "private_Library/LaunchAgents/dev.dotfiles.deskflow-server.plist.tmpl" | sha256sum }}
+# Deskflow settings: {{ include "private_Library/Deskflow/deskflow-core.conf.tmpl" | sha256sum }}
+# Deskflow layout: {{ include "private_Library/Deskflow/deskflow-server.conf" | sha256sum }}
+label="dev.dotfiles.deskflow-server"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+[[ -f "$plist" ]] || { echo "Missing rendered $label.plist; run chezmoi apply." >&2; exit 1; }
+/usr/bin/plutil -lint "$plist" >/dev/null
+
+# TLS cert bootstrap: reuse the Synergy workspace certificate so clients'
+# pinned TOFU hashes and presented client certs keep matching; generate a
+# fresh self-signed one only when no Synergy cert exists (new machines).
+cert_dir="$HOME/Library/Deskflow/tls"
+cert="$cert_dir/deskflow.pem"
+if [[ ! -f "$cert" ]]; then
+    mkdir -p "$cert_dir"
+    if [[ -f "$HOME/Library/Preferences/Synergy/synergyCert.pem" ]]; then
+        cp "$HOME/Library/Preferences/Synergy/synergyCert.pem" "$cert"
+    else
+        /usr/bin/openssl req -x509 -newkey rsa:2048 -keyout "$cert" -out "$cert" \
+            -days 3650 -nodes -subj "/CN=macmini-37c28f86" >/dev/null 2>&1
+    fi
+    chmod 600 "$cert"
+fi
+
+# Requires the one-time Device Control and Data Access grant for Deskflow
+# (macOS 27 name; formerly Accessibility) and Deskflow installed:
+#   brew trust deskflow/tap && brew install deskflow
+command -v /Applications/Deskflow.app/Contents/MacOS/deskflow-core >/dev/null || {
+    echo "Deskflow not installed (brew install deskflow); skipping service load." >&2
+    exit 0
+}
+domain="gui/$(id -u)"
+if /bin/launchctl print "$domain/$label" >/dev/null 2>&1; then
+    /bin/launchctl bootout "$domain/$label"
+fi
+/bin/launchctl bootstrap "$domain" "$plist"
+/bin/launchctl kickstart "$domain/$label"
+echo "$label loaded and started"
+{{ else -}}
+exit 0
+{{ end -}}

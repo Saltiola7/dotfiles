@@ -3,3 +3,5 @@ python
 curl
 git
 podman
+# Deskflow server (extra repo, prebuilt aarch64) for the desk-sharing pilot.
+deskflow

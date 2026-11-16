@@ -122,11 +122,18 @@ Library/LaunchAgents/dev.client.aws-sso-login.plist
 {{ end }}
 {{ if or (ne .chezmoi.os "darwin") (ne .machine_type "mac-mini") }}
 .config/synergy-recovery/
+.config/synergy-screens-ensure/
+Library/Deskflow/
 Library/LaunchAgents/dev.dotfiles.synergy-login.plist
 Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist
+Library/LaunchAgents/dev.dotfiles.synergy-screens-ensure.plist
+Library/LaunchAgents/dev.dotfiles.deskflow-server.plist
 .local/bin/synergy-recovery
+.local/bin/synergy-screens-ensure
 .local/bin/synergy-setup
 load-synergy-launchagents.sh
+load-synergy-screens-ensure.sh
+load-deskflow-server.sh
 .config/synergy-handoff/
 Library/LaunchAgents/dev.dotfiles.synergy-handoff.plist
 .local/bin/synergy-handoff
@@ -395,9 +402,12 @@ load-smb-reconnect.sh
 .local/bin/try-omarchy-update
 .local/bin/try-omarchy-efi-audit
 .config/omarchy-apps/
+.config/deskflow/
+.config/systemd/user/omarchy-deskflow.service
 .local/bin/omarchy-apps
 .local/lib/omarchy-apps/
 install-omarchy-apps
+start-omarchy-deskflow.sh
 {{ end }}
 {{ if eq .machine_type "omarchy-try" }}
 # A separate VM role: never inherit HP hardware/services or host/private state.
@@ -427,6 +437,15 @@ install-omarchy-apps
 .config/omarchy-apps/*
 !.config/omarchy-apps/repository.txt
 !.config/omarchy-apps/recipes.json
+!.config/deskflow/
+.config/deskflow/*
+!.config/deskflow/deskflow.conf
+!.config/deskflow/deskflow-core.conf
+!.config/systemd/
+.config/systemd/*
+!.config/systemd/user/
+.config/systemd/user/*
+!.config/systemd/user/omarchy-deskflow.service
 !.local/
 .local/*
 !.local/bin/
@@ -439,6 +458,15 @@ install-omarchy-apps
 .local/lib/*
 !.local/lib/omarchy-apps/
 !.local/lib/omarchy-apps/**
+!.local/share/
+.local/share/*
+!.local/share/applications/
+.local/share/applications/*
+!.local/share/applications/zen.desktop
+!.local/share/icons/
+.local/share/icons/*
+!.local/share/icons/hicolor/
+!.local/share/icons/hicolor/**
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
@@ -447,6 +475,7 @@ install-omarchy-apps
 .local/state/omarchy/indicators/*
 !.local/state/omarchy/indicators/stay-awake
 !install-omarchy-apps
+!start-omarchy-deskflow.sh
 {{ end }}
 
 # Public example input, never a home-directory target.

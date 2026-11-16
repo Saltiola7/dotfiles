@@ -1,0 +1,20 @@
+[Unit]
+Description=Deskflow server: share this screen's keyboard and mouse
+After=graphical-session.target
+PartOf=graphical-session.target
+StartLimitIntervalSec=0
+
+[Service]
+# deskflow-core is the CLI binary; the GUI binary aborts without a display.
+# offscreen QPA keeps Qt happy from the user manager; the input path is the
+# Wayland input-capture portal, not Qt GUI. Server screen name is forced:
+# the guest hostname is "omarchy" and must not collide with the HP client
+# identity (omarchy-5849dc63).
+Environment=QT_QPA_PLATFORM=offscreen
+ExecStart=/usr/bin/deskflow-core server -s %h/.config/deskflow/deskflow-core.conf
+Restart=always
+RestartSec=5
+TimeoutStopSec=5
+
+[Install]
+WantedBy=graphical-session.target

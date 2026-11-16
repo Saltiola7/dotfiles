@@ -31,6 +31,39 @@
         "gst-plugins-base",
         "gst-plugin-pipewire"
       ]
+    },
+    {
+      "name": "icaclient",
+      "command": "wfica",
+      "method": "aur",
+      "recipe": "icaclient",
+      "dependencies": [
+        "base-devel",
+        "alsa-lib",
+        "curl",
+        "gst-plugins-base-libs",
+        "libc++",
+        "libc++abi",
+        "libsecret",
+        "libvorbis",
+        "libxaw",
+        "libxml2-legacy",
+        "libxp",
+        "openssl",
+        "speex",
+        "webkit2gtk-4.1",
+        "libsoup3"
+      ]
+    },
+    {
+      "name": "zen",
+      "command": "zen",
+      "method": "archive",
+      "version": "1.24.2b",
+      "url": "https://github.com/zen-browser/desktop/releases/download/1.24.2b/zen.linux-aarch64.tar.xz",
+      "sha256": "8591434fcf498a836a32bc7314eb89fbdc4bdc8f03a2d735774b1ae69b6b21d5",
+      "binary": "zen/zen",
+      "gui": true
     }
   ]
 }

@@ -24,7 +24,7 @@ if (xdg / 'profiles.ini').exists() and xdg not in roots:
 backup = home / '.local/state/omarchy-zen' / str(time.time_ns())
 
 def load(path):
-    config = configparser.ConfigParser(interpolation=None)
+    config = configparser.ConfigParser(interpolation=None, strict=False)
     config.optionxform = str
     if path.exists():
         config.read(path)
