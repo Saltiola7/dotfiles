@@ -485,8 +485,8 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !.config/uwsm/env
 !install-waynergy.sh
 !install-omarchy-remote-access.sh
-!after_mbp-asahi-hardware.sh
-!disable-fcitx5-mbp.sh
+!mbp-asahi-hardware.sh
+!always_disable-fcitx5-mbp.sh
 !.local/bin/mbp-omarchy-borg-backup
 !.config/systemd/user/mbp-omarchy-borg-backup.service
 !.config/systemd/user/mbp-omarchy-borg-backup.timer
