@@ -46,3 +46,9 @@ def test_omarchy_remote_access_script_gates_and_is_idempotent():
     assert 'eq .machine_type "omarchy"' in script
     assert "[[ -t 0 ]]" in script
     assert "rustdesk-bin" in script
+
+
+def test_input_template_maps_both_builtin_keyboard_transports():
+    tmpl = (ROOT / "private_dot_config/hypr/input.lua.tmpl").read_text()
+    assert '"at-translated-set-2-keyboard"' in tmpl  # x86 (HP)
+    assert '"apple-spi-keyboard"' in tmpl  # M1 Apple Silicon
