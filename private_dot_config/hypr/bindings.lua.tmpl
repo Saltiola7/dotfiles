@@ -57,4 +57,4 @@ replace("SUPER + CTRL + T", "Toggle window floating/tiling", hl.dsp.window.float
 replace("SUPER + SHIFT + Q", "Close window (no-grab safe)", hl.dsp.window.close())
 -- Citrix VDI (omarchy-try): keep the ICA session inside the tiling layout
 -- instead of letting wfica request fullscreen/maximize takeover.
-o.window({ class = "Wfica" }, { suppressevent = "maximize fullscreen" })
+o.window({ class = "Wfica" }, { suppress_event = "maximize fullscreen" })
