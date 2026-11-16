@@ -111,6 +111,25 @@ brew "malpern/tap/sketchybar-toggle"
 brew "switchaudio-osx"
 brew "lawzava/scrape/scrape"
 brew "shopify/shopify/themekit"
+{{ if eq .machine_type "macbook" -}}
+# Thin-client casks (ts-mbp): installer-only macOS with remote access and
+# the agent desktop stack; everything else retired 2026-11-15.
+cask "1password"
+cask "1password-cli"
+cask "nikitabobko/tap/aerospace"
+cask "alfred"
+cask "herdr-app"
+cask "macs-fan-control"
+cask "mac-mouse-fix"
+cask "mouseless"
+cask "mullvad-vpn"
+cask "paste"
+cask "rustdesk"
+cask "tailscale-app"
+cask "font-jetbrains-mono-nerd-font"
+cask "font-monofur-nerd-font"
+mas "Amphetamine", id: 937984704
+{{- else }}
 cask "1password"
 cask "1password-cli"
 cask "nikitabobko/tap/aerospace"
@@ -153,3 +172,4 @@ go "golang.org/x/tools/gopls"
 go "honnef.co/go/tools/cmd/staticcheck"
 uv "specify-cli"
 uv "xonsh[full]", with: ["xontrib-kitty"]
+{{- end }}
