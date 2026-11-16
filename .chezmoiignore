@@ -493,3 +493,19 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !.config/systemd/user/org.fcitx.FcitX5.service
 !.config/autostart/org.fcitx.Fcitx5.desktop
 {{ end }}
+
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.hostname "old-omarchy") }}
+!.config/dotfiles-ai/
+.config/dotfiles-ai/*
+!.config/dotfiles-ai/chezmoi.toml
+!.config/old-omarchy/
+!.config/old-omarchy/**
+!.local/bin/old-omarchy-setup
+!configure-old-omarchy.sh
+{{ else }}
+.config/dotfiles-ai/chezmoi.toml
+.config/old-omarchy/
+.config/old-omarchy/**
+.local/bin/old-omarchy-setup
+configure-old-omarchy.sh
+{{ end }}
