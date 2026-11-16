@@ -77,6 +77,15 @@ def test_authorized_key_merge_preserves_local_keys_and_is_idempotent(tmp_path):
     assert authorized.stat().st_mode & 0o777 == 0o600
 
 
+def test_storage_mount_is_declared_removable_safe_and_ordered_before_ai_apply():
+    script = HELPER.read_text()
+    assert "d7c7ee45-ee7f-4e73-8075-958b1f488b72" in script
+    assert "/srv/storage ext4 defaults,nofail,x-systemd.device-timeout=10s" in script
+    assert "mountpoint -q /srv/storage && sudo chown" in script
+    assert "grep -q \"$storage_uuid\" /etc/fstab" in script
+    assert script.index("srv/storage") < script.index("dotfiles-ai/chezmoi.toml")
+
+
 def test_reconcile_script_is_a_noop_on_other_hosts():
     source = ROOT / "run_after_configure-old-omarchy.sh.tmpl"
     for host in ("omarchy", "mbp-omarchy"):

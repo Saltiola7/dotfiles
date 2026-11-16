@@ -48,6 +48,18 @@ if target.exists():
     target.chmod(0o600)
 PY
 
+# 2 TB ext4 storage (Seagate ST2000LM003, S/N S382J9BH800825) on USB.
+# Removable: nofail plus a short device timeout keeps boot working when absent.
+storage_uuid=d7c7ee45-ee7f-4e73-8075-958b1f488b72
+sudo mkdir -p /srv/storage
+if ! grep -q "$storage_uuid" /etc/fstab; then
+    printf 'UUID=%s /srv/storage ext4 defaults,nofail,x-systemd.device-timeout=10s 0 0\n' \
+        "$storage_uuid" | sudo tee -a /etc/fstab >/dev/null
+fi
+sudo systemctl daemon-reload
+sudo mount /srv/storage 2>/dev/null || true
+mountpoint -q /srv/storage && sudo chown "$(id -un):$(id -gn)" /srv/storage
+
 # Trust this particular adapter, never all Thunderbolt peripherals.
 uuid=0005001a-5404-a700-ffff-ffffffffffff
 if info=$(LC_ALL=C boltctl info "$uuid" 2>/dev/null); then
