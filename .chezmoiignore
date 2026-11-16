@@ -467,6 +467,11 @@ start-omarchy-deskflow.sh
 .local/share/icons/*
 !.local/share/icons/hicolor/
 !.local/share/icons/hicolor/**
+!.local/share/mime/
+.local/share/mime/*
+!.local/share/mime/packages/
+.local/share/mime/packages/*
+!.local/share/mime/packages/ica.xml
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
