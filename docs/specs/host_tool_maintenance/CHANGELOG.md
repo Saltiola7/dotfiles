@@ -1,5 +1,16 @@
 # Host maintenance changelog
 
+## 2026-11-16 — omarchy allowlist re-includes for mbp additions
+
+The omarchy profile ignores everything and re-includes targets
+explicitly; the mbp-omarchy additions (waynergy install script, uwsm
+input-method env, fcitx5 suppress/mask, borg backup script and timer,
+asahi hardware and remote-access scripts) were never re-included, so
+chezmoi silently skipped them — the files existed on the host only from
+manual setup. Re-include them behind the mbp-omarchy hostname gate and
+pin the allowlist with a test so new additions cannot silently vanish
+again.
+
 ## 2026-11-16 — mbp-omarchy synergy client and input-method hygiene
 
 - Waynergy managed package now builds on aarch64 (the M1 host joins the
