@@ -1,0 +1,13 @@
+{{ if and (eq .chezmoi.os "linux") (eq .machine_type "omarchy-try") -}}
+#!/bin/bash
+set -eu
+# Deskflow unit: {{ include "private_dot_config/systemd/user/omarchy-deskflow.service" | sha256sum }}
+# Deskflow layout: {{ include "private_dot_config/deskflow/deskflow.conf" | sha256sum }}
+if ! command -v deskflow >/dev/null 2>&1; then
+    echo "deskflow not installed yet; omarchy-apps --install handles repository.txt. Skipping enable." >&2
+    exit 0
+fi
+systemctl --user daemon-reload
+systemctl --user enable omarchy-deskflow.service
+systemctl --user restart omarchy-deskflow.service
+{{ end }}

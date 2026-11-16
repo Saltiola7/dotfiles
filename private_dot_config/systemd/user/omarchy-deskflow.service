@@ -1,0 +1,16 @@
+[Unit]
+Description=Deskflow server: share this screen's keyboard and mouse
+After=graphical-session.target
+PartOf=graphical-session.target
+StartLimitIntervalSec=0
+
+[Service]
+# Server screen name is forced: the guest hostname is "omarchy" and must not
+# shadow or collide with the HP client identity (omarchy-5849dc63).
+ExecStart=/usr/bin/deskflow server --name try-omarchy -c %h/.config/deskflow/deskflow.conf
+Restart=always
+RestartSec=5
+TimeoutStopSec=5
+
+[Install]
+WantedBy=graphical-session.target
