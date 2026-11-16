@@ -501,11 +501,11 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !.config/old-omarchy/
 !.config/old-omarchy/**
 !.local/bin/old-omarchy-setup
-!configure-old-omarchy.sh
+!always_configure-old-omarchy.sh
 {{ else }}
 .config/dotfiles-ai/chezmoi.toml
 .config/old-omarchy/
 .config/old-omarchy/**
 .local/bin/old-omarchy-setup
-configure-old-omarchy.sh
+always_configure-old-omarchy.sh
 {{ end }}
