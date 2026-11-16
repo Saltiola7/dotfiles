@@ -415,3 +415,17 @@ def test_thin_client_branch_declares_remote_access_stack():
     for cask in ("herdr-app", "rustdesk", "tailscale-app", "1password", "mullvad-vpn", "paste"):
         assert f'cask "{cask}"' in brewfile
     assert 'cask "obsidian"' in brewfile  # still declared for full hosts
+
+def test_macbook_thin_branch_excludes_sketchybar_stack():
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
+    thin = brewfile.split('{{ if eq .machine_type "macbook" -}}')[1].split('{{- else }}')[0]
+    assert 'brew "sketchybar"' not in thin
+    assert 'brew "sketchybar-toggle"' not in thin
+    assert 'brew "borders"' in thin  # window borders stay on the thin client
+
+
+def test_aerospace_sketchybar_hooks_are_gated_to_macbook():
+    tmpl = (ROOT / "dot_aerospace.toml.tmpl").read_text()
+    assert 'exec-and-forget sketchybar' in tmpl  # kept for mac-mini
+    assert "exec-on-workspace-change = []" in tmpl  # macbook: no SketchyBar trigger
+    assert 'outer.top =        5' in tmpl  # macbook: native bar visible

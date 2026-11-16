@@ -456,3 +456,7 @@ config.omarchy-try.example.toml
 Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 .local/bin/mbp-borg-backup
 {{ end }}
+
+{{ if eq .machine_type "macbook" }}
+.config/sketchybar
+{{ end }}
