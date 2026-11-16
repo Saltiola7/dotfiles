@@ -1,0 +1,34 @@
+#!/bin/bash
+# mbp-omarchy M1 hardware enablement: display brightness permissions,
+# keyboard backlight off, Touch Bar via tiny-dfr. Idempotent; needs a
+# terminal so sudo can prompt.
+{{ if and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname) -}}
+[[ -t 0 ]] || { echo "[mbp-asahi] Run from a terminal so sudo can prompt." >&2; exit 0; }
+set -euo pipefail
+
+sudo usermod -aG video "$USER"
+
+sudo tee /etc/udev/rules.d/90-mbp-backlight.rules > /dev/null << 'RULE'
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+RULE
+
+sudo tee /etc/udev/rules.d/90-kbd-backlight-off.rules > /dev/null << 'RULE'
+ACTION=="add", SUBSYSTEM=="leds", KERNEL=="kbd_backlight", RUN+="/bin/sh -c 'echo 0 > /sys/class/leds/kbd_backlight/brightness'"
+RULE
+
+sudo udevadm control --reload
+sudo udevadm trigger --subsystem-match=backlight --subsystem-match=leds || true
+sudo sh -c 'echo 0 > /sys/class/leds/kbd_backlight/brightness' 2>/dev/null || true
+
+if ! command -v tiny-dfr >/dev/null; then
+    sudo pacman -S --needed --noconfirm tiny-dfr
+fi
+[ -e /etc/systemd/system/multi-user.target.wants/tiny-dfr.service ] || {
+    sudo ln -s /usr/lib/systemd/system/tiny-dfr.service /etc/systemd/system/multi-user.target.wants/tiny-dfr.service
+}
+sudo systemctl reset-failed tiny-dfr 2>/dev/null || true
+
+echo "[mbp-asahi] applied; re-login so the video group reaches the session."
+{{ else -}}
+exit 0
+{{ end -}}

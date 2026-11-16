@@ -91,3 +91,26 @@ remaining 136 GiB free; a dated dump copy to the 8 TB (or `ext-2`/`ext-3`
 overflow) unblocks reuse. Same-folder candidates `ext-3/DCIM/110AF000`
 (597 files) and `4TB WD/110AF000` (4 movies) share zero filenames with the
 card and are different shoots that reused the folder number.
+
+## Daily driver (post-install, 2026-11-16)
+
+The M1 host (mbp-omarchy) is the daily driver. Host-specific enablement
+all lives in the repo:
+
+- Input: global Finnish base (ZSA firmware owns Colemak-DH and types
+  native ä/ö); the built-in keyboard runs software Colemak-DH Matrix
+  with Right-Alt held selecting the Finnish group; natural touchpad
+  scrolling. See `private_dot_config/hypr/input.lua.tmpl`.
+- Backup: `mbp-omarchy-borg-backup` script + user timer (04:00,
+  Persistent) into `ssh://tis@mac-mini/.../mbp-omarchy/borg`; prune is
+  glob-scoped to `mbp-omarchy-*` so the macOS golden image in the other
+  repository is untouched.
+- M1 hardware (`run_onchange_after_mbp-asahi-hardware.sh`): udev grants
+  for `apple-panel-bl` (brightness via logind-free brightnessctl),
+  keyboard backlight forced off at boot, and tiny-dfr for the Touch Bar
+  (must start before the compositor; the unit is wanted by
+  multi-user.target). Run it from a terminal; re-login afterwards.
+- dotfiles-ai: clone to `~/Projects/dotfiles-ai`, config at
+  `~/.config/dotfiles-ai/chezmoi.toml` (state root
+  `/var/lib/dotfiles-ai/tis`), then `dotfiles-ai-omarchy-setup` from a
+  terminal. main carries ARM assets since 988f7f15.

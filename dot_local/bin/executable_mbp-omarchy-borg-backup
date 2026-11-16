@@ -1,0 +1,15 @@
+#!/bin/bash
+# Nightly backup of /home/tis to the mini (ext-2), repokey-blake2.
+# Passphrase never lands on this host; fetched over SSH via BORG_PASSCOMMAND.
+set -u
+export BORG_RSH="ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4"
+export BORG_PASSCOMMAND="ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 tis@mac-mini cat /Volumes/ext-2/Users/Shared/mbp-omarchy/passphrase"
+export BORG_REMOTE_PATH=/opt/homebrew/bin/borg
+REPO=ssh://tis@mac-mini/Volumes/ext-2/Users/Shared/mbp-omarchy/borg
+
+borg create --compression zstd,3 --exclude-caches \
+  --exclude "sh:/home/tis/.cache" \
+  --exclude "sh:/home/tis/.local/share/borg" \
+  --stats "$REPO::{hostname}-{now:%Y-%m-%dT%H:%M:%S}" /home/tis || exit 1
+borg prune --glob-archives "mbp-omarchy-*" --keep-daily 7 --keep-weekly 4 --keep-monthly 6 "$REPO"
+borg compact "$REPO"

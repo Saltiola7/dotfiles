@@ -1,5 +1,16 @@
 # Host maintenance changelog
 
+## 2026-11-16 — mbp-omarchy daily-driver enablement
+
+- Backup declared: `mbp-omarchy-borg-backup` script + systemd user
+  timer moved into the repo, hostname-gated, prune scoped to the
+  omarchy archives.
+- M1 hardware declared: TTY-gated `run_onchange_after_mbp-asahi-hardware`
+  applies the brightness udev grants, keeps the keyboard backlight off,
+  and installs/enables tiny-dfr for the Touch Bar.
+- Input finalized on main (fi base, DH Matrix internal, natural scroll)
+  and deployed live to mbp-omarchy.
+
 ## 2026-11-16 — macbook native menu bar
 
 - SketchyBar removed from the macbook thin client after repeated
