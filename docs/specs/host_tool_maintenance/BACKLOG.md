@@ -30,3 +30,9 @@
   installer arch-aware, then run `dotfiles-ai-omarchy-setup` on mbp-omarchy
   (state root /var/lib/dotfiles-ai/tis; provider logins interactive). mbp-omarchy
   runs herdr 0.9.5 aarch64 via a manual install + /usr/local/bin shim until then.
+
+- SYNERGY-MBP-TRY-001: add mbp-omarchy (and/or the Try Omarchy VM) to the
+  mini's Synergy 3 server. The GUI rejects every add path and regenerates
+  its server config from an opaque database; client side (waynergy aarch64,
+  TLS trust, service) is complete and waiting. Full state and avenues in
+  features/synergy-mbp-handoff.md.

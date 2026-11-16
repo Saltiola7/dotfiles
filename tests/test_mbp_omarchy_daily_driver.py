@@ -32,7 +32,7 @@ def test_ignore_gates_mbp_omarchy_targets_to_the_laptop():
 
 
 def test_asahi_hardware_script_guards_and_applies_idempotently():
-    script = (ROOT / "run_onchange_after_mbp-asahi-hardware.sh.tmpl").read_text()
+    script = (ROOT / "run_always_mbp-asahi-hardware.sh.tmpl").read_text()
     assert 'hasPrefix "mbp-omarchy" .chezmoi.hostname' in script
     assert "[[ -t 0 ]]" in script  # sudo needs a terminal; stay silent otherwise
     assert "90-mbp-backlight.rules" in script
@@ -42,7 +42,7 @@ def test_asahi_hardware_script_guards_and_applies_idempotently():
 
 
 def test_omarchy_remote_access_script_gates_and_is_idempotent():
-    script = (ROOT / "run_onchange_after_install-omarchy-remote-access.sh.tmpl").read_text()
+    script = (ROOT / "run_always_install-omarchy-remote-access.sh.tmpl").read_text()
     assert 'eq .machine_type "omarchy"' in script
     assert "[[ -t 0 ]]" in script
     assert "rustdesk-bin" in script
@@ -92,7 +92,7 @@ def test_fcitx5_disable_enforced_on_every_apply():
 
 
 def test_waynergy_install_converges_via_apply():
-    script = (ROOT / "run_onchange_install-waynergy.sh.tmpl").read_text()
+    script = (ROOT / "run_always_install-waynergy.sh.tmpl").read_text()
     assert 'eq .machine_type "omarchy"' in script
     assert "[[ -t 0 ]]" in script
     assert "omarchy-waynergy-install" in script
@@ -104,9 +104,9 @@ def test_omarchy_allowlist_actually_reincludes_mbp_targets():
     # missing here silently never deploys on the host.
     ignore = (ROOT / ".chezmoiignore").read_text()
     for entry in (
-        "!install-waynergy.sh",
-        "!install-omarchy-remote-access.sh",
-        "!mbp-asahi-hardware.sh",
+        "!always_install-waynergy.sh",
+        "!always_install-omarchy-remote-access.sh",
+        "!always_mbp-asahi-hardware.sh",
         "!always_disable-fcitx5-mbp.sh",
         "!.config/uwsm/env",
         "!.local/bin/mbp-omarchy-borg-backup",
