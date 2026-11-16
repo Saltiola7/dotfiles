@@ -15,7 +15,7 @@ sketchybar --bar \
     blur_radius=30 \
     position=top \
     sticky=on \
-    topmost=off \
+    topmost=window \
     padding_left=10 \
     padding_right=10 \
     color=$BAR_COLOR \
@@ -67,7 +67,9 @@ source "$ITEM_DIR/memory.sh"
 ##### Force refresh #####
 sketchybar --update
 
-# Hide SketchyBar at the top edge without placing it above Apple's menu bar.
+# Hover helper: hides SketchyBar when the pointer nears the top edge so the
+# auto-hidden native menu bar can reveal cleanly. Requires topmost=window and
+# menu bar auto-hide = "Always" (set by the sketchybar-stack chezmoi hook).
 # Start with the bar, not with the coding session or an independent WM hook.
 if command -v sketchybar-toggle >/dev/null 2>&1 && ! pgrep -x sketchybar-toggle >/dev/null; then
     sketchybar-toggle >/dev/null 2>&1 &
