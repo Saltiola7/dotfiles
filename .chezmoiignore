@@ -466,3 +466,7 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 .config/systemd/user/mbp-omarchy-borg-backup.service
 .config/systemd/user/mbp-omarchy-borg-backup.timer
 {{ end }}
+
+{{ if not (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
+.config/autostart/org.fcitx.Fcitx5.desktop
+{{ end }}

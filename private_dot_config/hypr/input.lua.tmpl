@@ -23,7 +23,7 @@ hl.config({ input = {
 hl.device({
   name = "at-translated-set-2-keyboard",
   kb_layout = "us,fi",
-  kb_variant = "{{ default "colemak_dh" (get . "omarchy_builtin_keyboard_variant") }},",
+  kb_variant = "{{ default "colemak_dh_ortho" (get . "omarchy_builtin_keyboard_variant") }},",
   kb_options = "grp:ralt_switch",
 })
 -- M1 Apple Silicon laptops expose the built-in keyboard over SPI under a
@@ -31,7 +31,7 @@ hl.device({
 hl.device({
   name = "apple-spi-keyboard",
   kb_layout = "us,fi",
-  kb_variant = "{{ default "colemak_dh" (get . "omarchy_builtin_keyboard_variant") }},",
+  kb_variant = "{{ default "colemak_dh_ortho" (get . "omarchy_builtin_keyboard_variant") }},",
   kb_options = "grp:ralt_switch",
 })
 -- Literal text injection must not invoke the desktop's shortcut bindings.

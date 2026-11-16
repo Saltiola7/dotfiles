@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Fcitx5 (suppressed on mbp-omarchy)
+Hidden=true
+NoDisplay=true
+X-Generated-By=dotfiles

@@ -52,3 +52,10 @@ def test_input_template_maps_both_builtin_keyboard_transports():
     tmpl = (ROOT / "private_dot_config/hypr/input.lua.tmpl").read_text()
     assert '"at-translated-set-2-keyboard"' in tmpl  # x86 (HP)
     assert '"apple-spi-keyboard"' in tmpl  # M1 Apple Silicon
+
+
+def test_fcitx5_autostart_suppressed_on_mbp():
+    ignore = (ROOT / ".chezmoiignore").read_text()
+    desktop = (ROOT / "private_dot_config/autostart/org.fcitx.Fcitx5.desktop").read_text()
+    assert "org.fcitx.Fcitx5.desktop" in ignore
+    assert "Hidden=true" in desktop  # fcitx5 feeds apps its own fi/QWERTY layout
