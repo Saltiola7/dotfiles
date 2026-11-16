@@ -463,6 +463,10 @@ start-omarchy-deskflow.sh
 !.local/share/applications/
 .local/share/applications/*
 !.local/share/applications/zen.desktop
+!.local/share/icons/
+.local/share/icons/*
+!.local/share/icons/hicolor/
+!.local/share/icons/hicolor/**
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
