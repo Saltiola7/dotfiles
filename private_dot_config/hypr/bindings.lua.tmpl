@@ -23,6 +23,12 @@ replace("ALT + MINUS", "AeroSpace: shrink window", hl.dsp.window.resize({ x = -5
 replace("ALT + EQUAL", "AeroSpace: grow window", hl.dsp.window.resize({ x = 50, y = 0, relative = true }))
 -- Previously the Omarchy root menu.
 replace("SUPER + SPACE", "Application launcher", "omarchy-menu toggle apps")
+{{ if and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname) -}}
+-- M1: the omarchy brightness pipeline is unreliable for this panel; drive
+-- the DCP backlight (apple-panel-bl) directly and unbind the defaults.
+replace("XF86MonBrightnessUp", "Brightness up", "brightnessctl -d apple-panel-bl set +5%", { locked = true, repeating = true })
+replace("XF86MonBrightnessDown", "Brightness down", "brightnessctl -d apple-panel-bl set 5%-", { locked = true, repeating = true })
+{{ end -}}
 {{ if eq .machine_type "omarchy" -}}
 -- The Finnish Mac/ZSA @ macro sends left Option+2 over Synergy.
 -- Insert the character directly instead of forwarding an application shortcut.

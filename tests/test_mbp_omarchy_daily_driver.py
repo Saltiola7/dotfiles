@@ -59,3 +59,10 @@ def test_fcitx5_autostart_suppressed_on_mbp():
     desktop = (ROOT / "private_dot_config/autostart/org.fcitx.Fcitx5.desktop").read_text()
     assert "org.fcitx.Fcitx5.desktop" in ignore
     assert "Hidden=true" in desktop  # fcitx5 feeds apps its own fi/QWERTY layout
+
+
+def test_mbp_binds_brightness_directly_to_dcp_backlight():
+    tmpl = (ROOT / "private_dot_config/hypr/bindings.lua.tmpl").read_text()
+    assert 'hasPrefix "mbp-omarchy" .chezmoi.hostname' in tmpl
+    assert "brightnessctl -d apple-panel-bl set +5%" in tmpl
+    assert "XF86MonBrightnessDown" in tmpl
