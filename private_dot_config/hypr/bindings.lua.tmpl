@@ -58,3 +58,11 @@ replace("SUPER + SHIFT + Q", "Close window (no-grab safe)", hl.dsp.window.close(
 -- Citrix VDI (omarchy-try): keep the ICA session inside the tiling layout
 -- instead of letting wfica request fullscreen/maximize takeover.
 o.window({ class = "Wfica" }, { suppress_event = "maximize fullscreen" })
+
+-- Meh (ZSA space-hold, firmware combo Ctrl+Alt+Shift) + arrows:
+-- directional window swap. Native dwindle semantics; hyper/meh + numbers
+-- ride the existing workspace chords (SUPER+CTRL+ALT+SHIFT+N / CTRL+ALT+SHIFT+N).
+for key, direction in pairs({ LEFT = "l", DOWN = "d", UP = "u", RIGHT = "r" }) do
+  replace("CTRL + ALT + SHIFT + " .. key, "Meh: move window " .. direction,
+    hl.dsp.window.swap({ direction = direction }))
+end
