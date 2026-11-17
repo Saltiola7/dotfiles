@@ -1,0 +1,32 @@
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+#!/bin/bash
+# Exclude VM-serving directories from Spotlight indexing (mac-mini only).
+# The Try Omarchy VM is the primary workspace; Spotlight on the thin host
+# wastes CPU indexing state it will never search.
+# Verified 2026-11-17: mds_stores hit 65% CPU indexing 29+ GB of synced
+# repos and state; the .metadata_never_index marker stops it cleanly.
+set -euo pipefail
+
+EXCLUSIONS=(
+    "/Volumes/ext/state/try-omarchy"
+    "/Volumes/ext/state/xdg"
+    "/Volumes/ext/state/dbsctr"
+    "/Volumes/ext/state/lima"
+)
+
+changed=0
+for dir in "${EXCLUSIONS[@]}"; do
+    if [[ -d "$dir" && ! -f "$dir/.metadata_never_index" ]]; then
+        /usr/bin/touch "$dir/.metadata_never_index"
+        echo "excluded: $dir"
+        changed=1
+    fi
+done
+
+# Erase existing index entries only when a new exclusion was added,
+# so Spotlight drops what it already indexed for those paths.
+if (( changed )); then
+    /usr/sbin/mdutil -E /Volumes/ext 2>/dev/null || true
+    echo "Spotlight index erased for /Volumes/ext (new exclusions added)"
+fi
+{{ end -}}
