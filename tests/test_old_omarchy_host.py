@@ -81,9 +81,9 @@ def test_storage_mounts_are_declared_removable_safe_and_ordered_before_ai_apply(
     script = HELPER.read_text()
     assert "d7c7ee45-ee7f-4e73-8075-958b1f488b72" in script
     assert "fe788a68-5558-452a-ab52-6ac6b71bc55b" in script
-    for target in ("/srv/storage", "/srv/storage2"):
-        assert f"{target} ext4 defaults,nofail,x-systemd.device-timeout=10s" in script
-        assert "mountpoint -q" in script
+    assert 'UUID=%s %s ext4 defaults,nofail,x-systemd.device-timeout=10s 0 0' in script
+    assert "[d7c7ee45-ee7f-4e73-8075-958b1f488b72]=/srv/storage" in script
+    assert "[fe788a68-5558-452a-ab52-6ac6b71bc55b]=/srv/storage2" in script
     assert 'grep -q "$uuid" /etc/fstab' in script
     assert script.index("declare -A storage") < script.index("dotfiles-ai/chezmoi.toml")
 
