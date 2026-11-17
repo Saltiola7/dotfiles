@@ -170,3 +170,5 @@ def test_native_share_picker_is_scoped_to_try_guest():
 # CI trigger 202611-17: path-filtered test workflow must report on branch updates.
 
 # CI trigger 202611-17b: re-run after 92 merge.
+
+# CI trigger 20261117c
