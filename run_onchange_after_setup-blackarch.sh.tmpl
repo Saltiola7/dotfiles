@@ -1,0 +1,43 @@
+{{ if and (eq .chezmoi.os "linux") .blackarch_enabled (or (eq .machine_type "omarchy-try") (hasPrefix "mbp-omarchy" .chezmoi.hostname)) -}}
+#!/bin/bash
+# BlackArch repository setup, transparent and idempotent. Unlike the
+# strap.sh pipe-to-shell flow, every step is visible here and re-runs
+# are no-ops. Requires one interactive sudo (open a terminal and run
+# chezmoi apply if invoked non-interactively).
+set -euo pipefail
+
+if [[ ! -t 0 ]]; then
+    echo "BlackArch setup needs sudo; open a terminal and run: chezmoi apply" >&2
+    exit 0
+fi
+
+MIRRORLIST=/etc/pacman.d/blackarch-mirrorlist
+KEYRING_DIR="$HOME/.cache/blackarch-setup"
+mkdir -p "$KEYRING_DIR"
+
+if [[ -f "$MIRRORLIST" ]] && pacman -Q blackarch-keyring >/dev/null 2>&1; then
+    exit 0
+fi
+
+echo "==> Installing blackarch-keyring"
+pkg="$KEYRING_DIR/blackarch-keyring.pkg.tar.zst"
+curl -fsSL -o "$pkg" https://blackarch.org/pub/keyring/blackarch-keyring.pkg.tar.zst
+sudo pacman -U --noconfirm "$pkg"
+
+echo "==> Writing $MIRRORLIST"
+sudo tee "$MIRRORLIST" >/dev/null <<'EOF'
+[blackarch]
+Server = https://eu-mirror.blackarch.org/blackarch/$repo/os/$arch
+Server = https://mirror.hetzner.com/blackarch/blackarch/$repo/os/$arch
+Server = https://blackarch.org/blackarch/$repo/os/$arch
+EOF
+
+if ! grep -q "^\[blackarch\]" /etc/pacman.conf; then
+    echo "==> Registering [blackarch] in pacman.conf"
+    sudo sed -i '/^\[omarchy\]/i [blackarch]\nInclude = /etc/pacman.d/blackarch-mirrorlist\n' /etc/pacman.conf
+fi
+
+echo "==> Refreshing databases"
+sudo pacman -Sy
+echo "BlackArch ready: pacman -Sg blackarch | head to browse tools."
+{{ end -}}
