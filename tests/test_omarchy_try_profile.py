@@ -28,6 +28,28 @@ TARGETS = {
     ".local/lib/omarchy-apps/recipes/rustdesk-bin/rustdesk-bin.install",
     ".local/state/omarchy/indicators/stay-awake", "apply-omarchy-theme.sh",
     "create-kitty-socket-dir.sh", "install-omarchy-apps",
+    "start-omarchy-deskflow.sh",
+    ".config/deskflow/deskflow.conf", ".config/deskflow/deskflow-core.conf",
+    ".config/systemd/user/omarchy-deskflow.service",
+    ".config/systemd/user/citrix-ica-watch.service",
+    ".config/systemd/user/citrix-ica-watch.path",
+    ".local/bin/ica-autolaunch", ".local/share/mime/packages/ica.xml",
+    ".local/share/applications/zen.desktop",
+    ".local/share/icons/hicolor/16x16/apps/zen-browser.png",
+    ".local/share/icons/hicolor/32x32/apps/zen-browser.png",
+    ".local/share/icons/hicolor/48x48/apps/zen-browser.png",
+    ".local/share/icons/hicolor/64x64/apps/zen-browser.png",
+    ".local/share/icons/hicolor/128x128/apps/zen-browser.png",
+    ".local/lib/omarchy-apps/recipes/icaclient/PKGBUILD",
+    ".local/lib/omarchy-apps/recipes/icaclient/citrix-client.install",
+    ".local/lib/omarchy-apps/recipes/icaclient/citrix-configmgr.desktop",
+    ".local/lib/omarchy-apps/recipes/icaclient/citrix-conncenter.desktop",
+    ".local/lib/omarchy-apps/recipes/icaclient/citrix-wfica.desktop",
+    ".local/lib/omarchy-apps/recipes/icaclient/citrix-workspace.desktop",
+    ".local/lib/omarchy-apps/recipes/icaclient/ctxcwalogd.service",
+    ".local/lib/omarchy-apps/recipes/icaclient/ctxusbd.service",
+    ".local/lib/omarchy-apps/recipes/icaclient/wfica.sh",
+    ".local/lib/omarchy-apps/recipes/icaclient/wfica_assoc.sh",
 }
 
 
@@ -73,15 +95,18 @@ def test_guest_workspace_bindings_do_not_capture_hp_at_macro():
 
 
 def test_recipes_select_native_architecture_and_essentials_only():
+    # icaclient and zen are arm64-only recipes (x86_64 sources unverified/unpinned).
+    expected_apps = {'arm64': {'pycharm', 'rustdesk-bin', 'icaclient', 'zen'},
+                     'amd64': {'pycharm', 'rustdesk-bin'}}
     for arch, native, suffix in [('arm64', 'aarch64', '-aarch64'), ('amd64', 'x86_64', '')]:
         data = {**DATA, 'chezmoi': {**DATA['chezmoi'], 'arch': arch}}
         profile = json.loads(render("private_dot_config/omarchy-apps/recipes.json.tmpl", data))
         assert profile['architecture'] == native
-        assert {r['name'] for r in profile['apps']} == {'pycharm', 'rustdesk-bin'}
+        assert {r['name'] for r in profile['apps']} == expected_apps[arch]
         pycharm = next(r for r in profile['apps'] if r['name'] == 'pycharm')
         assert f'pycharm-2026.2.3{suffix}.tar.gz' in pycharm['url']
     packages = (ROOT / 'private_dot_config/omarchy-apps/repository.txt').read_text().splitlines()
-    assert {p for p in packages if p and not p.startswith('#')} == {'python', 'curl', 'git', 'podman'}
+    assert {p for p in packages if p and not p.startswith('#')} == {'python', 'curl', 'git', 'podman', 'deskflow'}
 
 
 def test_apply_hook_renders_as_a_script_only_for_try():
