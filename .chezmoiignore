@@ -121,6 +121,7 @@ Library/LaunchAgents/dev.client.aws-sso-login.plist
 .local/bin/fedora-parallels
 {{ end }}
 {{ if or (ne .chezmoi.os "darwin") (ne .machine_type "mac-mini") }}
+exclude-vm-state-from-spotlight.sh
 .config/synergy-recovery/
 .config/synergy-screens-ensure/
 Library/Deskflow/
