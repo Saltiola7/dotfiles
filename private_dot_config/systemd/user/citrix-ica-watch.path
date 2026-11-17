@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch Downloads for new Citrix ICA sessions
+
+[Path]
+PathChanged=%h/Downloads
+Unit=citrix-ica-watch.service
+
+[Install]
+WantedBy=default.target

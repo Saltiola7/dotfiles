@@ -115,7 +115,7 @@ def test_invalid_scroll_never_writes_audio(volume, delta):
 
 def test_native_menu_is_not_covered_by_helper():
     config = (BAR / "executable_sketchybarrc").read_text()
-    assert "topmost=off" in config
+    assert "topmost=window" in config
     assert "exec-and-forget sketchybar-toggle" not in (ROOT / "dot_aerospace.toml.tmpl").read_text()
     assert "nohup sketchybar-toggle" not in (ROOT / "run_onchange_after_start-sketchybar-stack.sh.tmpl").read_text()
 

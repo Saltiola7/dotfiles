@@ -28,11 +28,17 @@ fi
 pkill -x sketchybar 2>/dev/null || true
 {{ else -}}
 # Native auto-hide owns the overlay; sketchybarrc owns the hover helper's startup.
-# macOS 27+ governs reveal via com.apple.controlcenter AutoHideMenuBarOption; the
-# legacy _HIHideMenuBar key hides the bar without enabling hover-reveal when both
-# are set. Clear the legacy key this hook previously wrote.
-defaults write com.apple.controlcenter AutoHideMenuBarOption -int 2
-defaults delete NSGlobalDomain _HIHideMenuBar 2>/dev/null || true
+# The menu bar must be auto-hidden ("Always") so SketchyBar owns the top strip;
+# sketchybar-toggle then hides it on hover so macOS can reveal the native bar.
+# macOS 26+ stores this dropdown as a two-key combo in NSGlobalDomain
+# (verified 2026-11-16 on macOS 27):
+#   Always:          _HIHideMenuBar=true   AppleMenuBarVisibleInFullscreen=false
+#   Never:           _HIHideMenuBar=false  AppleMenuBarVisibleInFullscreen=true
+#   In Full Screen Only: _HIHideMenuBar=false AppleMenuBarVisibleInFullscreen=false
+# com.apple.controlcenter AutoHideMenuBarOption is vestigial on macOS 27
+# (writing 1/2/3 has no effect); _HIHideMenuBar must NOT be deleted or the
+# combo decodes as "In Full Screen Only" and the bar stays visible.
+defaults write NSGlobalDomain _HIHideMenuBar -bool true
 defaults write NSGlobalDomain AppleMenuBarVisibleInFullscreen -bool false
 
 # ── 1. Install sketchybar-app-font (not available via Homebrew) ──

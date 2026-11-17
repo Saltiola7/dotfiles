@@ -1,0 +1,7 @@
+[Unit]
+Description=Auto-launch downloaded Citrix ICA sessions
+
+[Service]
+KillMode=process
+Type=oneshot
+ExecStart=%h/.local/bin/ica-autolaunch

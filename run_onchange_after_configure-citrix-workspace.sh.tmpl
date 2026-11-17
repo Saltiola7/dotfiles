@@ -1,0 +1,23 @@
+{{ if eq .machine_type "omarchy-try" -}}
+#!/bin/bash
+set -euo pipefail
+# Citrix Workspace user config: {{ include "dot_local/lib/omarchy-apps/recipes/icaclient/PKGBUILD" | sha256sum }}
+# ICA auto-launch watcher: {{ include "dot_local/bin/executable_ica-autolaunch" | sha256sum }}
+ICAROOT=/opt/Citrix/ICAClient
+
+if [ ! -x "$ICAROOT/wfica.sh" ]; then
+    echo "configure-citrix-workspace: icaclient not installed yet, skipping" >&2
+    exit 0
+fi
+
+mkdir -p "$HOME/.ICAClient/cache"
+for ini in All_Regions Trusted_Region Unknown_Region canonicalization regions; do
+    cp -f "$ICAROOT/config/$ini.ini" "$HOME/.ICAClient/"
+done
+
+# Portal flow: browsers hand the downloaded .ica to the wfica handler.
+xdg-mime default citrix-wfica.desktop application/x-ica
+update-mime-database "$HOME/.local/share/mime" 2>/dev/null || true
+systemctl --user daemon-reload
+systemctl --user enable --now citrix-ica-watch.path 2>/dev/null || systemctl --user restart citrix-ica-watch.path
+{{ end }}

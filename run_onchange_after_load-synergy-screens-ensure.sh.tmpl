@@ -1,0 +1,21 @@
+#!/bin/bash
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+set -eu
+# Screens guard: {{ include "dot_local/bin/executable_synergy-screens-ensure" | sha256sum }}
+# Managed layout: {{ include "private_dot_config/synergy-screens-ensure/synergy.conf.managed" | sha256sum }}
+# Managed trust: {{ include "private_dot_config/synergy-screens-ensure/trusted-clients.managed" | sha256sum }}
+# Launch agent: {{ include "private_Library/LaunchAgents/dev.dotfiles.synergy-screens-ensure.plist.tmpl" | sha256sum }}
+label="dev.dotfiles.synergy-screens-ensure"
+plist="$HOME/Library/LaunchAgents/$label.plist"
+[[ -f "$plist" ]] || { echo "Missing rendered $label.plist; run chezmoi apply." >&2; exit 1; }
+/usr/bin/plutil -lint "$plist" >/dev/null
+domain="gui/$(id -u)"
+if /bin/launchctl print "$domain/$label" >/dev/null 2>&1; then
+    /bin/launchctl bootout "$domain/$label"
+fi
+/bin/launchctl bootstrap "$domain" "$plist"
+/bin/launchctl kickstart "$domain/$label"
+echo "$label loaded and started"
+{{ else -}}
+exit 0
+{{ end -}}
