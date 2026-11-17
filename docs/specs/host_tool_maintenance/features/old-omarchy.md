@@ -59,16 +59,22 @@ can; an ordinary local KVM cannot provide network access.
 
 ## Storage
 
-Formatted 2026-11-16 after explicit erase confirmation: single ext4 partition,
-label `old-storage`, filesystem UUID
-`d7c7ee45-ee7f-4e73-8075-958b1f488b72`, mounted at `/srv/storage` via fstab
-with `nofail,x-systemd.device-timeout=10s` so an unplugged drive never blocks
-boot. Ownership set to the user only while mounted.
+Two 2 TB batch-twin drives (Seagate ST2000LM003, S/N `S382J9BH800825` and
+`S382J9BH800822`), each formatted after explicit erase confirmation: single
+ext4 partition, labels `old-storage` and `old-storage-2`, filesystem UUIDs
+`d7c7ee45-ee7f-4e73-8075-958b1f488b72` and
+`fe788a68-5558-452a-ab52-6ac6b71bc55b`, mounted at `/srv/storage` and
+`/srv/storage2` via fstab with `nofail,x-systemd.device-timeout=10s` so an
+unplugged drive never blocks boot. Ownership set to the user only while
+mounted. One drive is attached at a time until the planned enclosure/dock
+arrives; the declarations are UUID-based and survive re-homing.
 
-SMART: zero reallocated/pending/uncorrectable sectors; historical
-`UDMA_CRC_Error_Count` 13762 points at earlier cabling, not current errors.
-A full surface verification (`smartctl -t long`, ~6 h) is recommended before
-trusting the drive with important data; not yet run.
+SMART: both drives carry passing extended self-test logs (drive 1 fresh at
+4,713 h; drive 2 historically at the same hours). Drive 1's `UDMA_CRC_Error_Count`
+13762 points at the JMicron JMS579 USB bridge/cable, which also produced 131
+UAS host resets under sustained load before going quiet at idle. Before heavy
+use, move both drives to the enclosure/dock, or declare
+`usb-storage.quirks=152d:0578:u` to force BOT mode on this bridge.
 
 Kanex note: the HDD only enumerates through the direct USB-SATA cable
 (JMicron JMS579). The Kanex path remains undiagnosed.
