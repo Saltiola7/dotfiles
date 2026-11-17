@@ -166,3 +166,5 @@ def test_native_share_picker_is_scoped_to_try_guest():
     for machine, os_name in [("omarchy", "linux"), ("mac-mini", "darwin")]:
         data = {**DATA, "machine_type": machine, "chezmoi": {**DATA["chezmoi"], "os": os_name}}
         assert ".config/hypr/xdph.conf" not in chezmoi("managed", "--include", "files", data=data).splitlines()
+
+# CI trigger 202611-17: path-filtered test workflow must report on branch updates.

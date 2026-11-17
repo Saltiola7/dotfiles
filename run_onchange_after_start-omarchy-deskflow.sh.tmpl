@@ -20,6 +20,9 @@ if [[ ! -f "$HOME/.config/deskflow/tls/deskflow.pem" ]]; then
     chmod 600 "$HOME/.config/deskflow/tls/deskflow.pem"
 fi
 systemctl --user daemon-reload
-systemctl --user enable omarchy-deskflow.service
-systemctl --user restart omarchy-deskflow.service
+# Respect the parked state: the guest server is upstream-blocked (Hyprland
+# input-capture barriers ignore absolute pointers) and MUST NOT run beside
+# the macOS deskflow server. Only restart when the operator enabled it.
+systemctl --user is-enabled --quiet omarchy-deskflow.service && \
+    systemctl --user restart omarchy-deskflow.service || true
 {{ end }}
