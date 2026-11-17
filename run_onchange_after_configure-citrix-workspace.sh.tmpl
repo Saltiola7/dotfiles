@@ -2,6 +2,7 @@
 #!/bin/bash
 set -euo pipefail
 # Citrix Workspace user config: {{ include "dot_local/lib/omarchy-apps/recipes/icaclient/PKGBUILD" | sha256sum }}
+# ICA auto-launch watcher: {{ include "dot_local/bin/executable_ica-autolaunch" | sha256sum }}
 ICAROOT=/opt/Citrix/ICAClient
 
 if [ ! -x "$ICAROOT/wfica.sh" ]; then
@@ -16,4 +17,7 @@ done
 
 # Portal flow: browsers hand the downloaded .ica to the wfica handler.
 xdg-mime default citrix-wfica.desktop application/x-ica
+update-mime-database "$HOME/.local/share/mime" 2>/dev/null || true
+systemctl --user daemon-reload
+systemctl --user enable --now citrix-ica-watch.path 2>/dev/null || systemctl --user restart citrix-ica-watch.path
 {{ end }}

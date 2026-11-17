@@ -446,11 +446,14 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+!.config/systemd/user/citrix-ica-watch.service
+!.config/systemd/user/citrix-ica-watch.path
 !.local/
 .local/*
 !.local/bin/
 .local/bin/*
 !.local/bin/omarchy-apps
+!.local/bin/ica-autolaunch
 !.local/bin/omarchy-rustdesk-client-setup
 !.local/bin/try-omarchy-update
 !.local/bin/try-omarchy-efi-audit
