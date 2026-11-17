@@ -48,17 +48,25 @@ if target.exists():
     target.chmod(0o600)
 PY
 
-# 2 TB ext4 storage (Seagate ST2000LM003, S/N S382J9BH800825) on USB.
+# 2 TB ext4 storage pair (Seagate ST2000LM003 batch) on USB.
 # Removable: nofail plus a short device timeout keeps boot working when absent.
-storage_uuid=d7c7ee45-ee7f-4e73-8075-958b1f488b72
-sudo mkdir -p /srv/storage
-if ! grep -q "$storage_uuid" /etc/fstab; then
-    printf 'UUID=%s /srv/storage ext4 defaults,nofail,x-systemd.device-timeout=10s 0 0\n' \
-        "$storage_uuid" | sudo tee -a /etc/fstab >/dev/null
-fi
+declare -A storage=(
+    [d7c7ee45-ee7f-4e73-8075-958b1f488b72]=/srv/storage
+    [fe788a68-5558-452a-ab52-6ac6b71bc55b]=/srv/storage2
+)
+for uuid in "${!storage[@]}"; do
+    target="${storage[$uuid]}"
+    sudo mkdir -p "$target"
+    if ! grep -q "$uuid" /etc/fstab; then
+        printf 'UUID=%s %s ext4 defaults,nofail,x-systemd.device-timeout=10s 0 0\n' \
+            "$uuid" "$target" | sudo tee -a /etc/fstab >/dev/null
+    fi
+done
 sudo systemctl daemon-reload
-sudo mount /srv/storage 2>/dev/null || true
-mountpoint -q /srv/storage && sudo chown "$(id -un):$(id -gn)" /srv/storage
+for target in /srv/storage /srv/storage2; do
+    sudo mount "$target" 2>/dev/null || true
+    mountpoint -q "$target" && sudo chown "$(id -un):$(id -gn)" "$target"
+done
 
 # Trust this particular adapter, never all Thunderbolt peripherals.
 uuid=0005001a-5404-a700-ffff-ffffffffffff
