@@ -15,11 +15,14 @@ for agent in codex opencode herdr wt; do
 done
 unset agent
 [[ $- != *i* ]] && return
-# ble.sh early init: line editing + autocomplete, prompt untouched.
+source "$OMARCHY_PATH/default/bash/rc"
+# ble.sh after Omarchy's rc: the rc's `bind -f` loads readline-8.1
+# directives (emacs-editing-mode, menu-complete-backward, ...) that
+# ble.sh's bind emulation rejects with a warning per function. Loading
+# ble after lets those binds hit real readline silently.
 if [[ -z ${BLE_VERSION-} && -r "$HOME/.local/share/blesh/ble.sh" ]]; then
     source "$HOME/.local/share/blesh/ble.sh" --noattach
 fi
-source "$OMARCHY_PATH/default/bash/rc"
 # Mise changes PATH on each prompt; the functions above keep agent ownership stable.
 export PATH="$HOME/.local/bin:$PATH"
 
