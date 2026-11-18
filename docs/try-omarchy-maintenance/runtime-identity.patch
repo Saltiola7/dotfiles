@@ -1,0 +1,17 @@
+--- a/run-qemu-gpu.sh
++++ b/run-qemu-gpu.sh
+@@ -45 +45 @@
+-script_dir=$(cd "$(dirname "$0")" && pwd -P)
++script_dir='/Applications/Try Omarchy.app/Contents/Resources/scripts'
+@@ -551,0 +552,5 @@
++runtime_app='/Volumes/ext/state/try-omarchy/runtime-identity-stable/Try Omarchy Runtime.app'
++qemu_exec="$runtime_app/Contents/MacOS/Try Omarchy Runtime"
++[[ -L $qemu_exec && $(readlink "$qemu_exec") == "$qemu_bin" ]] || fail 'stable runtime wrapper target changed'
++[[ $(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$runtime_app/Contents/Info.plist") == dev.tryomarchy.runtime ]] || fail 'stable runtime wrapper identity changed'
++
+@@ -733 +738 @@
+-  printf ' %q' "$qemu_bin" "${qemu_args[@]}" >&2
++  printf ' %q' "$qemu_exec" "${qemu_args[@]}" >&2
+@@ -749 +754 @@
+-"$qemu_bin" "${qemu_args[@]}" &
++"$qemu_exec" "${qemu_args[@]}" &

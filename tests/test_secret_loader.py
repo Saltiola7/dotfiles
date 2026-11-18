@@ -1,6 +1,5 @@
 import os
 import shlex
-import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -14,7 +13,7 @@ def executable(path: Path, content: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
 
 
-def test_aws_settings_are_shell_config_not_secrets() -> None:
+def test_aws_and_service_account_settings_are_retired() -> None:
     secret = (ROOT / "dot_local/bin/executable_secret").read_text()
     profiles = (
         (ROOT / "dot_common_profile.tmpl").read_text(),
@@ -24,11 +23,13 @@ def test_aws_settings_are_shell_config_not_secrets() -> None:
     assert "AWS_REGION" not in secret
     assert "CLAUDE_CODE_USE_BEDROCK" not in secret
     for profile in profiles:
-        assert "ClientAccess-000000000000" in profile
-        assert "us-west-2" in profile
+        assert "ClientAccess-000000000000" not in profile
+        assert "awslogin" not in profile
+        assert "__cleanup_gcp_cache" not in profile
+        assert "sa-dev-admin" not in profile
 
 
-def test_secret_fetches_one_item_and_preserves_aws_env(tmp_path: Path) -> None:
+def test_secret_is_a_pure_env_loader_without_credential_files(tmp_path: Path) -> None:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     log = tmp_path / "op.log"
@@ -45,7 +46,6 @@ cat <<'JSON'
 {{"label":"OPENAI_API_KEY","value":"openai"}},
 {{"label":"DATABRICKS_HOST","value":"https://databricks.example"}},
 {{"label":"DATABRICKS_TOKEN","value":"db-token"}},
-{{"label":"GCP_SERVICE_ACCOUNT_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}},
 {{"label":"GOOGLE_VERTEX_PROJECT","value":"project-a"}},
 {{"label":"GOOGLE_VERTEX_LOCATION","value":"us-central1"}},
 {{"label":"CLICKHOUSE_HOST","value":"clickhouse"}},
@@ -55,14 +55,11 @@ cat <<'JSON'
 {{"label":"SEMRUSH_API","value":"semrush"}},
 {{"label":"SEMRUSH_ENTERPRISE_API","value":"enterprise"}},
 {{"label":"PAGESPEED_API_KEY","value":"pagespeed"}},
-{{"label":"GCS_HMAC_ACCESS_KEY","value":"access"}},
-{{"label":"GCS_HMAC_SECRET_KEY","value":"secret"}},
 {{"label":"CLOCKIFY_API_KEY","value":"clockify"}},
 {{"label":"GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC","value":"github"}},
 {{"label":"ATLASSIAN_API","value":"atlassian"}},
 {{"label":"EMAIL","value":"me@example.com"}},
-{{"label":"ATLASSIAN_URL","value":"https://example.atlassian.net"}},
-{{"label":"GWS_CONTENT_READER_CREDENTIAL","value":"{{\\"type\\":\\"service_account\\"}}"}}
+{{"label":"ATLASSIAN_URL","value":"https://example.atlassian.net"}}
 ]}}
 JSON
 ''',
@@ -78,23 +75,16 @@ JSON
 trap 'touch "$HOME/original-exit-trap-ran"' EXIT
 source {ROOT / "dot_local/bin/executable_secret"}
 test "$GEMINI_API_KEY" = gemini
+test "$OPENAI_API_KEY" = openai
+test "$GOOGLE_VERTEX_PROJECT" = project-a
 test "$AWS_PROFILE" = existing-profile
 test "$AWS_REGION" = existing-region
 test -z "${{CLAUDE_CODE_USE_BEDROCK:-}}"
-first_google="$GOOGLE_APPLICATION_CREDENTIALS"
-first_gws="$GWS_CONTENT_READER_CREDENTIALS"
-rm "$first_google"
+test -z "${{GOOGLE_APPLICATION_CREDENTIALS:-}}"
+test -z "${{GWS_CONTENT_READER_CREDENTIALS:-}}"
+test -z "${{CLOUDSDK_ACTIVE_CONFIG_NAME:-}}"
+test ! -d "$HOME/.cache/gcp"
 source {ROOT / "dot_local/bin/executable_secret"}
-test -s "$GOOGLE_APPLICATION_CREDENTIALS"
-test -s "$GWS_CONTENT_READER_CREDENTIALS"
-test "$first_google" != "$GOOGLE_APPLICATION_CREDENTIALS"
-test ! -e "$first_gws"
-reloaded_google="$GOOGLE_APPLICATION_CREDENTIALS"
-source {ROOT / "dot_local/bin/executable_secret"}
-test "$GOOGLE_APPLICATION_CREDENTIALS" = "$reloaded_google"
-PARENT_GOOGLE="$GOOGLE_APPLICATION_CREDENTIALS" bash -lc 'set -e; source {ROOT / "dot_local/bin/executable_secret"}; test "$GOOGLE_APPLICATION_CREDENTIALS" != "$PARENT_GOOGLE"; __cleanup_gcp_cache'
-test -s "$reloaded_google"
-printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
 '''
     result = subprocess.run(
         ["bash", "-lc", command],
@@ -103,8 +93,11 @@ printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
         capture_output=True,
     )
     assert result.returncode == 0, result.stderr
+    assert "Secrets already loaded." in result.stdout
     assert (tmp_path / "original-exit-trap-ran").is_file()
-    (tmp_path / "original-exit-trap-ran").unlink()
+    assert log.read_text().splitlines() == [
+        "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"
+    ]
     other_shell = subprocess.run(
         ["bash", "-lc", command],
         env=env,
@@ -113,23 +106,7 @@ printf 'credential_dir=%s\n' "$(dirname "$GOOGLE_APPLICATION_CREDENTIALS")"
     )
     assert other_shell.returncode == 0, other_shell.stderr
     assert (tmp_path / "original-exit-trap-ran").is_file()
-    credential_dir = next(
-        line.removeprefix("credential_dir=")
-        for line in result.stdout.splitlines()
-        if line.startswith("credential_dir=")
-    )
-    other_credential_dir = next(
-        line.removeprefix("credential_dir=")
-        for line in other_shell.stdout.splitlines()
-        if line.startswith("credential_dir=")
-    )
-    assert credential_dir != other_credential_dir
-    for directory in (Path(credential_dir), Path(other_credential_dir)):
-        assert directory.is_dir()
-        assert stat.S_IMODE(directory.stat().st_mode) == 0o700
-        for credential in directory.iterdir():
-            assert stat.S_IMODE(credential.stat().st_mode) == 0o600
-        shutil.rmtree(directory)
+    assert stat.S_IMODE((Path("/tmp/sketchybar_clockify/api_key")).stat().st_mode) == 0o600
     assert log.read_text().splitlines() == [
         "item get ojb5dyao2ahusvjgvgh7gbuxj4 --vault Automation --reveal --format json"
-    ] * 6
+    ] * 2

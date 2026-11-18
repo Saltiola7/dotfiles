@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>dev.dotfiles.mbp-borg-backup</string>
+<key>LimitLoadToSessionType</key><string>Aqua</string>
+<key>Disabled</key><false/>
+<key>RunAtLoad</key><false/>
+<key>StartCalendarInterval</key><dict>
+<key>Hour</key><integer>3</integer>
+<key>Minute</key><integer>0</integer>
+</dict>
+<key>ProgramArguments</key><array>
+<string>{{ .chezmoi.homeDir }}/.local/bin/mbp-borg-backup</string>
+</array>
+<key>StandardOutPath</key><string>{{ .chezmoi.homeDir }}/Library/Logs/mbp-borg-backup.log</string>
+<key>StandardErrorPath</key><string>{{ .chezmoi.homeDir }}/Library/Logs/mbp-borg-backup.log</string>
+</dict></plist>

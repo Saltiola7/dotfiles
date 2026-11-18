@@ -1,0 +1,39 @@
+{{ if eq .machine_type "omarchy-try" -}}
+-- Keep Try Omarchy's device model, gestures and Mac integration untouched.
+-- Every keyboard uses Finnish; ZSA firmware owns Colemak-DH.
+hl.config({ input = {
+  kb_layout = {{ default "fi" (get . "omarchy_keyboard_layout") | quote }},
+  kb_variant = "",
+  resolve_binds_by_sym = true,
+} })
+{{ else -}}
+-- Shared Finnish base: ZSA firmware owns Colemak-DH; do not remap it twice.
+-- Match shortcuts to the symbols produced by each keyboard.
+-- Natural (inverse) scrolling matches macOS.
+hl.config({ input = {
+  kb_layout = "fi",
+  kb_variant = "",
+  resolve_binds_by_sym = true,
+  touchpad = { natural_scroll = true },
+} })
+-- The laptop built-in keyboard has no ZSA firmware: software Colemak-DH
+-- Matrix, with Right-Alt held selecting the Finnish group so ä/ö type from
+-- their semicolon and apostrophe positions. Override the variant with the
+-- omarchy_builtin_keyboard_variant data key (colemak_dh_ortho keeps ZXCV).
+hl.device({
+  name = "at-translated-set-2-keyboard",
+  kb_layout = "us,fi",
+  kb_variant = "{{ default "colemak_dh_ortho" (get . "omarchy_builtin_keyboard_variant") }},",
+  kb_options = "grp:ralt_switch",
+})
+-- M1 Apple Silicon laptops expose the built-in keyboard over SPI under a
+-- different libinput name; map it identically.
+hl.device({
+  name = "apple-spi-keyboard",
+  kb_layout = "us,fi",
+  kb_variant = "{{ default "colemak_dh_ortho" (get . "omarchy_builtin_keyboard_variant") }},",
+  kb_options = "grp:ralt_switch",
+})
+-- Literal text injection must not invoke the desktop's shortcut bindings.
+hl.device({ name = "hl-virtual-keyboard-wtype", keybinds = false })
+{{ end -}}

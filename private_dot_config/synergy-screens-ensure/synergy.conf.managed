@@ -1,0 +1,53 @@
+section: screens
+	macmini-37c28f86:
+		alt = alt
+		meta = meta
+		shift = shift
+		super = super
+		ctrl = ctrl
+		halfDuplexNumLock = false
+		xtestIsXineramaUnaware = false
+		halfDuplexCapsLock = false
+		halfDuplexScrollLock = false
+		switchCorners = none 
+		altgr = alt
+	omarchy-5849dc63:
+		alt = alt
+		meta = meta
+		shift = shift
+		super = super
+		ctrl = ctrl
+		halfDuplexNumLock = false
+		xtestIsXineramaUnaware = false
+		halfDuplexCapsLock = false
+		halfDuplexScrollLock = false
+		switchCorners = none 
+		altgr = alt
+	mbp-omarchy:
+		alt = alt
+		meta = meta
+		shift = shift
+		super = super
+		ctrl = ctrl
+		halfDuplexNumLock = false
+		xtestIsXineramaUnaware = false
+end
+
+section: links
+	macmini-37c28f86:
+		left(0,100) = omarchy-5849dc63(0,100)
+		right(0,100) = mbp-omarchy(0,100)
+	omarchy-5849dc63:
+		right(0,100) = macmini-37c28f86(0,100)
+	mbp-omarchy:
+		left(0,100) = macmini-37c28f86(0,100)
+end
+
+section: options
+	heartbeat = 5000
+	relativeMouseMoves = true
+	clipboardSharing = true
+	clipboardSharingSize = 131072
+	win32KeepForeground = true
+	disableLockToScreen = false
+end

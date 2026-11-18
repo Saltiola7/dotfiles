@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# Provision and start the SketchyBar + AeroSpace + JankyBorders + sketchybar-toggle stack.
+# Provision and start the SketchyBar + AeroSpace + JankyBorders stack.
 # Re-runs when any of the key config files change.
 #
 # sketchybarrc hash: {{ include "private_dot_config/sketchybar/executable_sketchybarrc" | sha256sum }}
+# volume item hash: {{ include "private_dot_config/sketchybar/items/executable_volume.sh" | sha256sum }}
+# volume plugin hash: {{ include "private_dot_config/sketchybar/plugins/executable_volume.sh" | sha256sum }}
 # aerospace hash:    {{ include "dot_aerospace.toml.tmpl" | sha256sum }}
 
 {{ if ne .chezmoi.os "darwin" -}}
@@ -12,6 +14,32 @@ exit 0
 {{ end -}}
 
 set -eu
+
+{{ if eq .machine_type "macbook" -}}
+# macbook thin client: the native menu bar owns the strip; SketchyBar was
+# removed 2026-11-16. Restore Apple defaults this hook previously overrode and
+# make sure no resurrect agent (brew services) is left behind.
+defaults write com.apple.controlcenter AutoHideMenuBarOption -int 0
+defaults delete NSGlobalDomain _HIHideMenuBar 2>/dev/null || true
+defaults delete NSGlobalDomain AppleMenuBarVisibleInFullscreen 2>/dev/null || true
+if command -v brew &>/dev/null; then
+    brew services stop sketchybar >/dev/null 2>&1 || true
+fi
+pkill -x sketchybar 2>/dev/null || true
+{{ else -}}
+# Native auto-hide owns the overlay; sketchybarrc owns the hover helper's startup.
+# The menu bar must be auto-hidden ("Always") so SketchyBar owns the top strip;
+# sketchybar-toggle then hides it on hover so macOS can reveal the native bar.
+# macOS 26+ stores this dropdown as a two-key combo in NSGlobalDomain
+# (verified 2026-11-16 on macOS 27):
+#   Always:          _HIHideMenuBar=true   AppleMenuBarVisibleInFullscreen=false
+#   Never:           _HIHideMenuBar=false  AppleMenuBarVisibleInFullscreen=true
+#   In Full Screen Only: _HIHideMenuBar=false AppleMenuBarVisibleInFullscreen=false
+# com.apple.controlcenter AutoHideMenuBarOption is vestigial on macOS 27
+# (writing 1/2/3 has no effect); _HIHideMenuBar must NOT be deleted or the
+# combo decodes as "In Full Screen Only" and the bar stays visible.
+defaults write NSGlobalDomain _HIHideMenuBar -bool true
+defaults write NSGlobalDomain AppleMenuBarVisibleInFullscreen -bool false
 
 # ── 1. Install sketchybar-app-font (not available via Homebrew) ──
 FONT_PATH="$HOME/Library/Fonts/sketchybar-app-font.ttf"
@@ -41,25 +69,18 @@ if command -v sketchybar &>/dev/null; then
 else
     echo "[sketchybar-stack] sketchybar not found. Run 'brew bundle' first." >&2
 fi
+{{ end -}}
 
-# ── 3. Ensure AeroSpace is running (it cascades borders + sketchybar-toggle) ──
+# ── 3. Ensure AeroSpace is running (it cascades borders) ──
 if [ -d "/Applications/AeroSpace.app" ]; then
     if ! pgrep -xq "AeroSpace"; then
         echo "[sketchybar-stack] Starting AeroSpace..."
         open -a AeroSpace
-        # Give it a moment to run after-startup-command (starts borders + sketchybar-toggle)
+        # Give it a moment to run after-startup-command (starts borders)
         sleep 2
     else
         echo "[sketchybar-stack] AeroSpace already running."
-        # AeroSpace is running but sketchybar-toggle may have died — ensure it's alive
-        if ! pgrep -xq "sketchybar-toggle"; then
-            if command -v sketchybar-toggle &>/dev/null; then
-                echo "[sketchybar-stack] Restarting sketchybar-toggle..."
-                nohup sketchybar-toggle > /dev/null 2>&1 &
-                disown
-            fi
-        fi
-        # Same for borders
+        # Ensure borders are alive.
         if ! pgrep -xq "borders"; then
             if command -v borders &>/dev/null; then
                 echo "[sketchybar-stack] Restarting JankyBorders..."

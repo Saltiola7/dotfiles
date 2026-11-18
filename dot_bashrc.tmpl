@@ -1,11 +1,12 @@
-{{ if eq .machine_type "omarchy" -}}
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
 # Keep Omarchy's shell integrations, then select the chezmoi-managed agents.
 [[ -r /usr/share/omarchy/default/bash/env-bootstrap ]] && source /usr/share/omarchy/default/bash/env-bootstrap
 export PATH="$HOME/.local/bin:$PATH"
 for agent in codex opencode herdr wt; do
     if [[ -x "$HOME/.local/bin/$agent" ]]; then
         case "$agent" in
-            codex) codex() { "$HOME/.local/bin/codex" "$@"; } ;;
+            # The packaged Codex CLI has no background daemon; --no-daemon is the supported mode.
+            codex) codex() { "$HOME/.local/bin/codex" --no-daemon "$@"; } ;;
             opencode) opencode() { "$HOME/.local/bin/opencode" "$@"; } ;;
             herdr) herdr() { "$HOME/.local/bin/herdr" "$@"; } ;;
             wt) wt() { "$HOME/.local/bin/wt" "$@"; } ;;
@@ -15,8 +16,32 @@ done
 unset agent
 [[ $- != *i* ]] && return
 source "$OMARCHY_PATH/default/bash/rc"
+# Shell tooling hooks load before ble.sh: fzf's bash hook binds with
+# readline-8.1 directives (emacs/vi-editing-mode) that ble.sh's bind
+# emulation rejects with a warning each; before ble they hit real
+# readline silently. atuin/direnv register precmd hooks, no binds.
+[ -x "$(command -v direnv)" ] && eval "$(direnv hook bash)"
+[ -x "$(command -v fzf)" ] && source <(fzf --bash)
+# ble.sh after all plain-readline setup, same reason as the hooks above.
+if [[ -z ${BLE_VERSION-} && -r "$HOME/.local/share/blesh/ble.sh" ]]; then
+    source "$HOME/.local/share/blesh/ble.sh" --noattach
+fi
 # Mise changes PATH on each prompt; the functions above keep agent ownership stable.
 export PATH="$HOME/.local/bin:$PATH"
+
+# Render the starship prompt into PS1 BEFORE ble-attach: ble captures
+# PS1 at attach time, and Omarchy's minimal prompt (~ ❯) is starship
+# driven, so starship must have drawn once by then or ble adopts the
+# raw fallback prompt.
+if command -v starship >/dev/null && [[ $TERM != "dumb" ]]; then
+    eval "$(starship init bash)"
+    starship_precmd 2>/dev/null || true
+fi
+[[ ${BLE_VERSION-} ]] && ble-attach
+# atuin LAST: its ctrl-r and up-arrow binds must be the final word —
+# after fzf (which would otherwise own ctrl-r) and after ble-attach
+# (so ble adopts atuin's bindings rather than replacing them).
+[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then

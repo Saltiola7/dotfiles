@@ -1,0 +1,33 @@
+# Deskflow 1.27 general settings — mac-mini server (replaces paid Synergy).
+# Screens live here as [computer_<name>] sections since 1.27.0.
+# protocol=synergy is REQUIRED for waynergy clients (barrier is the default).
+[core]
+coreMode=2
+computerName=macmini-37c28f86
+port=24800
+
+[log]
+level=DEBUG
+
+[security]
+tlsEnabled=true
+# Same certificate as the Synergy server it replaces: clients' pinned TOFU
+# hashes and presented client certs keep matching. Zero client changes.
+# The loader copies it from Synergy (or generates one) if missing.
+certificate={{ .chezmoi.homeDir }}/Library/Deskflow/tls/deskflow.pem
+checkPeerFingerprints=false
+
+[server]
+externalConfig=true
+externalConfigFile={{ .chezmoi.homeDir }}/Library/Deskflow/deskflow-server.conf
+protocol=synergy
+enableClipboard=true
+
+[computer_macmini-37c28f86]
+name=macmini-37c28f86
+
+[computer_omarchy-5849dc63]
+name=omarchy-5849dc63
+
+[computer_mbp-omarchy]
+name=mbp-omarchy

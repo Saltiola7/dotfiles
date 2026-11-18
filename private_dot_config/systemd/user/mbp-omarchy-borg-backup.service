@@ -1,0 +1,6 @@
+[Unit]
+Description=Nightly borg backup to mac-mini
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/mbp-omarchy-borg-backup

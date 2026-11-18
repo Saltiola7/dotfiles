@@ -1,0 +1,28 @@
+{{ if and (eq .chezmoi.os "linux") (eq .machine_type "omarchy-try") -}}
+#!/bin/bash
+set -eu
+# Deskflow unit: {{ include "private_dot_config/systemd/user/omarchy-deskflow.service" | sha256sum }}
+# Deskflow settings: {{ include "private_dot_config/deskflow/deskflow-core.conf" | sha256sum }}
+# Deskflow layout: {{ include "private_dot_config/deskflow/deskflow.conf" | sha256sum }}
+if ! command -v deskflow-core >/dev/null 2>&1; then
+    echo "deskflow not installed yet; omarchy-apps --install handles repository.txt. Skipping enable." >&2
+    exit 0
+fi
+# The GUI normally generates the TLS cert; headless servers must do it
+# themselves or every client connection dies with "tls certificate doesn't
+# exist" (verified 2026-11-16).
+if [[ ! -f "$HOME/.config/deskflow/tls/deskflow.pem" ]]; then
+    mkdir -p "$HOME/.config/deskflow/tls"
+    openssl req -x509 -newkey rsa:2048 \
+        -keyout "$HOME/.config/deskflow/tls/deskflow.pem" \
+        -out "$HOME/.config/deskflow/tls/deskflow.pem" \
+        -days 3650 -nodes -subj "/CN=try-omarchy" >/dev/null 2>&1
+    chmod 600 "$HOME/.config/deskflow/tls/deskflow.pem"
+fi
+systemctl --user daemon-reload
+# Respect the parked state: the guest server is upstream-blocked (Hyprland
+# input-capture barriers ignore absolute pointers) and MUST NOT run beside
+# the macOS deskflow server. Only restart when the operator enabled it.
+systemctl --user is-enabled --quiet omarchy-deskflow.service && \
+    systemctl --user restart omarchy-deskflow.service || true
+{{ end }}

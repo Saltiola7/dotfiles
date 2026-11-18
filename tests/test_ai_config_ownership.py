@@ -7,7 +7,7 @@ ROOT = Path(__file__).parents[1]
 
 
 def test_global_graphify_has_no_competing_host_owner() -> None:
-    brewfile = (ROOT / "Brewfile").read_text()
+    brewfile = (ROOT / "Brewfile.tmpl").read_text()
     assert not re.search(r"(?mi)^\s*uv\s+[\"']graphifyy(?:[^\w-]|$)", brewfile)
     assert not list(ROOT.glob("run_*graphify*"))
     assert "graphify" not in (ROOT / "interactive_installers.sh").read_text().lower()

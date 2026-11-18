@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Reconcile this host's privileged setup without formatting any storage.
+set -euo pipefail
+[[ $(hostname -s) == old-omarchy ]] || { echo "Only for old-omarchy." >&2; exit 1; }
+[[ -t 0 ]] || { echo "Run old-omarchy-setup in a terminal for sudo prompts." >&2; exit 1; }
+config="${XDG_CONFIG_HOME:-$HOME/.config}"
+assets="$config/old-omarchy"
+mapfile -t packages < "$assets/packages.txt"
+omarchy pkg add "${packages[@]}"
+sudo systemctl enable --now sshd tailscaled
+
+# Preserve the installer's machine-specific encryption/root arguments.
+# /etc/default/limine overrides /etc/kernel/cmdline on this installation.
+parameter='video=HDMI-A-3:1920x1080@60e'
+if ! grep -qF -- "$parameter" /etc/default/limine; then
+    sudo cp -an /etc/default/limine /etc/default/limine.before-headless
+    printf 'KERNEL_CMDLINE[default]+=" %s"\n' "$parameter" | sudo tee -a /etc/default/limine >/dev/null
+    sudo limine-update
+fi
+
+# Reproduce the tested LAN rule. This permits LAN SSH on the Wi-Fi
+# interface; SSH authentication still applies. Do not disable the firewall.
+sudo ufw allow in on wlp3s0 to any port 22 proto tcp comment 'LAN SSH for try-omarchy gliff'
+
+# Seed only the selected public keys; retain keys already authorized locally.
+python3 - "$assets/authorized_keys" <<'PY'
+import pathlib
+import sys
+
+directory = pathlib.Path.home() / ".ssh"
+directory.mkdir(mode=0o700, exist_ok=True)
+directory.chmod(0o700)
+target = directory / "authorized_keys"
+if target.is_symlink():
+    sys.exit("Refusing to modify symlinked authorized_keys")
+old = target.read_text() if target.exists() else ""
+known = {tuple(line.split()[:2]) for line in old.splitlines()}
+new = [
+    line for line in pathlib.Path(sys.argv[1]).read_text().splitlines()
+    if tuple(line.split()[:2]) not in known
+]
+if new:
+    with target.open("a") as stream:
+        if old and not old.endswith("\n"):
+            stream.write("\n")
+        stream.write("\n".join(new) + "\n")
+if target.exists():
+    target.chmod(0o600)
+PY
+
+# 2 TB ext4 storage pair (Seagate ST2000LM003 batch) on USB.
+# Removable: nofail plus a short device timeout keeps boot working when absent.
+declare -A storage=(
+    [d7c7ee45-ee7f-4e73-8075-958b1f488b72]=/srv/storage
+    [fe788a68-5558-452a-ab52-6ac6b71bc55b]=/srv/storage2
+)
+for uuid in "${!storage[@]}"; do
+    target="${storage[$uuid]}"
+    sudo mkdir -p "$target"
+    if ! grep -q "$uuid" /etc/fstab; then
+        printf 'UUID=%s %s ext4 defaults,nofail,x-systemd.device-timeout=10s 0 0\n' \
+            "$uuid" "$target" | sudo tee -a /etc/fstab >/dev/null
+    fi
+done
+sudo systemctl daemon-reload
+for target in /srv/storage /srv/storage2; do
+    sudo mount "$target" 2>/dev/null || true
+    mountpoint -q "$target" && sudo chown "$(id -un):$(id -gn)" "$target"
+done
+
+# Trust this particular adapter, never all Thunderbolt peripherals.
+uuid=0005001a-5404-a700-ffff-ffffffffffff
+if info=$(LC_ALL=C boltctl info "$uuid" 2>/dev/null); then
+    if grep -q 'stored:' <<< "$info"; then
+        sudo boltctl config device.policy "$uuid" auto
+    else
+        sudo boltctl enroll --policy auto "$uuid"
+    fi
+fi
+
+# Existing Omarchy mise declarations retain OpenCode/Codex ownership.
+mise use -g chezmoi@2.74.1
+mise install node@26.13.1
+mise install opencode
+root="/var/lib/dotfiles-ai/$(id -un)"
+sudo install -d -m 0700 -o "$(id -un)" -g "$(id -gn)" "$root"
+if [[ ! -e $root/.dotfiles-ai-state ]]; then
+    (umask 077; touch "$root/.dotfiles-ai-state")
+fi
+if [[ ! -d $HOME/Projects/dotfiles-ai ]]; then
+    mkdir -p "$HOME/Projects"
+    git clone git@github.com:Saltiola7/dotfiles-ai.git "$HOME/Projects/dotfiles-ai"
+fi
+chezmoi -c "$config/dotfiles-ai/chezmoi.toml" apply
+printf '%s\n' \
+    'Host setup complete; no disks formatted, no reboot performed.' \
+    'Tailscale enrollment and RustDesk password/portal approval remain interactive.' \
+    'Disk encryption still requires unlocking after every cold boot.'

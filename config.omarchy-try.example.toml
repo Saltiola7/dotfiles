@@ -1,0 +1,10 @@
+# Replace /home/you and identity fields before use; keep the live config private.
+sourceDir = "/home/you/Projects/dotfiles"
+persistentState = "/home/you/.config/chezmoi/omarchy-try.boltdb"
+
+[data]
+machine_type = "omarchy-try"
+name = "Your Name"
+email = "you@example.com"
+omarchy_keyboard_layout = "fi"
+atuin_sync_address = "https://api.atuin.sh"

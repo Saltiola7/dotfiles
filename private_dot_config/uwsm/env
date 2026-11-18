@@ -1,0 +1,7 @@
+# mbp-omarchy: fcitx5 is disabled; its Finnish QWERTY IME rewrote remote-session
+# typing. Clear the input-method environment so apps use direct input.
+QT_IM_MODULE=
+GTK_IM_MODULE=
+SDL_IM_MODULE=
+XMODIFIERS=
+INPUT_METHOD=
