@@ -3,7 +3,7 @@ auto_sync = false
 {{ else -}}
 auto_sync = true
 {{ end -}}
-{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") (eq .machine_type "mac-mini") -}}
 # Self-hosted atuin server: container on the try-omarchy VM, reachable
 # fleet-wide over Tailscale (NAT-proof). The VM's Tailscale address is
 # the stable entrypoint for every machine.
