@@ -30,13 +30,15 @@ fi
 # Mise changes PATH on each prompt; the functions above keep agent ownership stable.
 export PATH="$HOME/.local/bin:$PATH"
 
-# ble.sh attach, then re-init starship: attach resets prompt integration
-# and the Omarchy minimal prompt (~ ❯) is starship-driven, so it comes
-# back here (ble.sh's documented ordering for prompt engines).
-[[ ${BLE_VERSION-} ]] && ble-attach
+# Render the starship prompt into PS1 BEFORE ble-attach: ble captures
+# PS1 at attach time, and Omarchy's minimal prompt (~ ❯) is starship
+# driven, so starship must have drawn once by then or ble adopts the
+# raw fallback prompt.
 if command -v starship >/dev/null && [[ $TERM != "dumb" ]]; then
     eval "$(starship init bash)"
+    starship_precmd 2>/dev/null || true
 fi
+[[ ${BLE_VERSION-} ]] && ble-attach
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then
