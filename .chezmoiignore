@@ -72,8 +72,8 @@ apply-omarchy-theme.sh
 !.config/omarchy-host/logind.conf
 !.config/omarchy-host/backup/
 !.config/omarchy-host/backup/**
-{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/{{ end }}
-{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/**{{ end }}
+{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/
+!.config/omarchy-host/waynergy-package/**{{ else }}.config/omarchy-host/waynergy-package/{{ end }}
 !.config/zen-managed/
 !.config/zen-managed/**
 !.config/systemd/
