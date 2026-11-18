@@ -35,6 +35,12 @@ TARGETS = {
     ".config/systemd/user/citrix-ica-watch.service",
     ".config/systemd/user/citrix-ica-watch.path",
     ".local/bin/ica-autolaunch", ".local/share/mime/packages/ica.xml",
+    ".config/systemd/user/herdr.service",
+    ".config/systemd/user/graphical-session.target.wants/herdr.service",
+    ".local/bin/omarchy-herdr-server", ".local/bin/omarchy-herdr-shell",
+    ".local/bin/kitty-plain", ".local/share/applications/kitty-plain.desktop",
+    ".config/autostart/chatgpt.desktop", ".config/autostart/kitty.desktop",
+    "configure-desktop-startup.sh",
     ".local/share/applications/zen.desktop",
     ".local/share/icons/hicolor/16x16/apps/zen-browser.png",
     ".local/share/icons/hicolor/32x32/apps/zen-browser.png",
@@ -187,3 +193,5 @@ def test_native_share_picker_is_scoped_to_try_guest():
 # CI trigger 20261118b: post-99 merge.
 
 # CI trigger 20261118c.
+
+# CI trigger 20261118d: omarchy-common herdr.
