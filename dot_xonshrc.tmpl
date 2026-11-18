@@ -127,23 +127,6 @@ def _ch_alias(args, stdin=None):
 
 aliases['ch'] = _ch_alias
 
-# ── GCP credential hygiene ────────────────────────────────────────────────────
-# Remove stale SA key files from previous sessions (e.g. shell killed via SIGKILL
-# where the atexit handler couldn't fire). Runs at every shell startup — before secret.
-def _cleanup_gcp_cache():
-    import os
-    for _f in ('service-account.json', 'gws-content-reader-key.json'):
-        try:
-            os.remove(os.path.expanduser(f'~/.cache/gcp/{_f}'))
-        except FileNotFoundError:
-            pass
-
-_cleanup_gcp_cache()
-
-# AWS SSO credentials are owned by the AWS CLI cache and refresh service.
-$AWS_PROFILE = 'ClientAccess-000000000000'
-$AWS_REGION = 'us-west-2'
-
 # ── Secrets (lazy-loaded via 1Password CLI) ───────────────────────────────────
 # Run 'secret' to load all secrets into the current shell session.
 # Secrets are cached in memory — only one biometric prompt per session.
@@ -162,23 +145,6 @@ def _load_secrets(args=None, stdin=None):
         $GOOGLE_GENERATIVE_AI_API_KEY = $(op read 'op://Personal/Google AI API Key/credential').strip()
         $OPENAI_API_KEY = $(op read 'op://Personal/OpenAI API Key/credential').strip()
 
-        # GCP Service Account
-        import os
-        os.makedirs(os.path.expanduser('~/.cache/gcp'), exist_ok=True)
-        _sa_path = os.path.expanduser('~/.cache/gcp/service-account.json')
-        with open(_sa_path, 'w') as f:
-            f.write($(op read 'op://Personal/GCP Service Account/credential'))
-        os.chmod(_sa_path, 0o600)
-        $GOOGLE_APPLICATION_CREDENTIALS = _sa_path
-        $GOOGLE_VERTEX_PROJECT = $(op read 'op://Personal/GCP Service Account/project').strip()
-        $GOOGLE_VERTEX_LOCATION = $(op read 'op://Personal/GCP Service Account/location').strip()
-        $GOOGLE_CLOUD_PROJECT = $GOOGLE_VERTEX_PROJECT
-        $GOOGLE_PROJECT = $GOOGLE_VERTEX_PROJECT
-
-        # gcloud CLI auth — session-scoped, no credentials persisted to gcloud's store
-        $CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE = _sa_path
-        $CLOUDSDK_ACTIVE_CONFIG_NAME = 'sa-dev-admin'
-
         # Client data services
         $CLICKHOUSE_HOST = $(op read 'op://Personal/ClickHouse Cloud/host').strip()
         $CLICKHOUSE_USER = $(op read 'op://Personal/ClickHouse Cloud/user').strip()
@@ -188,24 +154,11 @@ def _load_secrets(args=None, stdin=None):
         $SEMRUSH_ENTERPRISE_API = $(op read 'op://Personal/SEMRUSH API/enterprise').strip()
         $PAGESPEED_API_KEY = $(op read 'op://Personal/PageSpeed API/credential').strip()
         $AI_STUDIO_KEY = $GOOGLE_GENERATIVE_AI_API_KEY
-        $GCS_HMAC_ACCESS_KEY = $(op read 'op://Personal/GCS HMAC/access_key').strip()
-        $GCS_HMAC_SECRET_KEY = $(op read 'op://Personal/GCS HMAC/secret_key').strip()
         $GITHUB_PERSONAL_ACCESS_TOKEN_CLASSIC = $(op read 'op://Personal/GitHub PAT Classic/credential').strip()
         $ATLASSIAN_API = $(op read 'op://Personal/Atlassian API Token/credential').strip()
         $ROVODEV = $ATLASSIAN_API
         $EMAIL = $(op read 'op://Personal/Atlassian API Token/email').strip()
         $ATLASSIAN_URL = $(op read 'op://Personal/Atlassian API Token/url').strip()
-
-        # GWS Content Reader SA
-        _gws_path = os.path.expanduser('~/.cache/gcp/gws-content-reader-key.json')
-        with open(_gws_path, 'w') as f:
-            f.write($(op read 'op://Personal/GCP Service Account - GWS Content Reader/credential'))
-        os.chmod(_gws_path, 0o600)
-        $GWS_CONTENT_READER_CREDENTIALS = _gws_path
-
-        # Register cleanup on shell exit
-        import atexit
-        atexit.register(_cleanup_gcp_cache)
 
         _secrets_loaded = True
         print('Secrets loaded.')

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "desktop-controls-bedrock-retirement",
+  "title": "Desktop volume controls and local MGM Bedrock retirement",
+  "state": "blocked",
+  "coordinator_repository": "Saltiola7/dotfiles",
+  "statements": [
+    {"id":"INT-001","kind":"requirement","text":"Keep a speaker icon visible; click opens a volume slider, percentage and mute control; leaving the popup closes it.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/desktop-controls.md"]},
+    {"id":"INT-002","kind":"requirement","text":"Control the current macOS audio output without extra software; report unsupported volume control rather than pretending success.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/desktop-controls.md"]},
+    {"id":"INT-003","kind":"requirement","text":"Keep Apple menu-bar auto-hide enabled on desktop and fullscreen; diagnose intermittent failure and remove verified local interference without claiming to fix unreproduced OS bugs.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/desktop-controls.md"]},
+    {"id":"INT-004","kind":"decision","text":"The personal dotfiles repository owns managed desktop and local AWS retirement changes; preserve unrelated primary-checkout work.","disposition":"ready","artifacts":["docs/initiatives/desktop-controls-bedrock-retirement/README.md"]},
+    {"id":"INT-005","kind":"requirement","text":"Remove the AWS SketchyBar item and disable scheduled, reactive and manual MGM Bedrock auth automation, including future startup paths.","disposition":"ready","artifacts":["docs/specs/aws_creds/features/local-retirement.md"]},
+    {"id":"INT-006","kind":"constraint","text":"Preserve existing CLI authentication source inactive outside deployment for later Vertex reuse; do not implement Vertex now.","disposition":"ready","artifacts":["docs/specs/aws_creds/features/local-retirement.md"]},
+    {"id":"INT-007","kind":"decision","text":"Remove only attributable local MGM Bedrock profiles, sessions and cached credentials. Broad AWS deletion is superseded; do not delete cloud resources.","disposition":"ready","artifacts":["docs/specs/aws_creds/features/local-retirement.md"]},
+    {"id":"INT-008","kind":"constraint","text":"Preserve Backblaze B2 credentials and profile, shared AWS CLI, and unrelated AWS configuration and caches.","disposition":"ready","artifacts":["docs/specs/aws_creds/features/local-retirement.md"]},
+    {"id":"INT-009","kind":"risk","text":"Native auto-hide failed initial host validation and later passed operator checks; the exact recovery cause is not isolated and future OS reliability is not guaranteed.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/desktop-controls.md"]},
+    {"id":"INT-010","kind":"decision","text":"Retain the existing hover helper with below-native SketchyBar layering; SketchyBar starts it only when missing. Retiring the helper failed operator expectations.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/desktop-controls.md"]},
+    {"id":"INT-011","kind":"decision","text":"The operator selected lighter local completion, focused validation and a local commit without a push. Preserve the incomplete DBSCTR cycle and its failed evidence rather than claiming it passed.","disposition":"ready","artifacts":["docs/initiatives/desktop-controls-bedrock-retirement/README.md"]}
+  ],
+  "contexts": [
+    {"id":"host_tool_maintenance","repository":"Saltiola7/dotfiles","status":"blocked","depends_on":["aws_creds"]},
+    {"id":"aws_creds","repository":"Saltiola7/dotfiles","status":"ready","depends_on":[]}
+  ],
+  "slices": [
+    {
+      "id":"desktop-controls-local-retirement",
+      "context":"host_tool_maintenance",
+      "state":"blocked",
+      "execution_owner":"build",
+      "requirements":["INT-001","INT-002","INT-003","INT-004","INT-005","INT-006","INT-007","INT-008","INT-009","INT-010","INT-011"],
+      "depends_on":[],
+      "artifacts":[
+        "docs/initiatives/desktop-controls-bedrock-retirement/README.md",
+        "docs/specs/host_tool_maintenance/PROFILE.md",
+        "docs/specs/host_tool_maintenance/DESKTOP-CONTROLS.plan.json",
+        "docs/specs/host_tool_maintenance/features/desktop-controls.md",
+        "docs/specs/aws_creds/features/local-retirement.md"
+      ],
+      "release_group":"local-desktop"
+    }
+  ],
+  "release_groups":[{"id":"local-desktop","members":["desktop-controls-local-retirement"],"state":"blocked"}]
+}

@@ -1,8 +1,16 @@
 # AWS SSO Credentials Auto-Refresh Specification
 
-**Status:** Stable
+**Status:** Retired (2026-11-17)
 **Created:** 2026-04-28
-**Last updated:** 2026-07-13
+**Last updated:** 2026-11-17
+
+> **Retirement notice:** The automation described below was fully retired on
+> 2026-11-17 — the `aws-sso-refresh` wrapper, LaunchAgent template and load hook
+> were removed from active source (archived in `docs/_archive/aws-auth/` and Git
+> history), and the shell defaults (`AWS_PROFILE`, `AWS_REGION`, `awslogin`) were
+> dropped from Bash and Xonsh configs. This document is retained as the
+> historical design record; see `features/local-retirement.md` for the
+> retirement contract and `CHANGELOG.md` for the removal entry.
 
 ## Overview
 

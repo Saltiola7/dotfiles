@@ -2,6 +2,11 @@
 
 All notable changes to the AWS SSO credential automation.
 
+## [2026-11-17]
+
+### Removed
+- Retired the dev.client AWS SSO automation source per the local-retirement contract: the `aws-sso-refresh` wrapper, the `dev.client.aws-sso-login` LaunchAgent template, and the launchd load hook. A future `chezmoi apply` can no longer resurrect the agent; archived copies remain in `docs/_archive/aws-auth/` and Git history.
+
 ## [2026-07-13]
 
 ### Changed
