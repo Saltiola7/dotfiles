@@ -3,9 +3,11 @@ auto_sync = false
 {{ else -}}
 auto_sync = true
 {{ end -}}
-{{ if eq .machine_type "omarchy-try" -}}
-# Self-hosted atuin server (container on this machine).
-sync_address = "http://127.0.0.1:8888"
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
+# Self-hosted atuin server: container on the try-omarchy VM, reachable
+# fleet-wide over Tailscale (NAT-proof). The VM's Tailscale address is
+# the stable entrypoint for every machine.
+sync_address = "http://100.109.164.98:8888"
 {{ else -}}
 sync_address = {{ .atuin_sync_address | quote }}
 {{ end -}}
