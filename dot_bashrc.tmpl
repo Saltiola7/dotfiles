@@ -16,22 +16,27 @@ done
 unset agent
 [[ $- != *i* ]] && return
 source "$OMARCHY_PATH/default/bash/rc"
-# ble.sh after Omarchy's rc: the rc's `bind -f` loads readline-8.1
-# directives (emacs-editing-mode, menu-complete-backward, ...) that
-# ble.sh's bind emulation rejects with a warning per function. Loading
-# ble after lets those binds hit real readline silently.
+# Shell tooling hooks load before ble.sh: fzf's bash hook binds with
+# readline-8.1 directives (emacs/vi-editing-mode) that ble.sh's bind
+# emulation rejects with a warning each; before ble they hit real
+# readline silently. atuin/direnv register precmd hooks, no binds.
+[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
+[ -x "$(command -v direnv)" ] && eval "$(direnv hook bash)"
+[ -x "$(command -v fzf)" ] && source <(fzf --bash)
+# ble.sh after all plain-readline setup, same reason as the hooks above.
 if [[ -z ${BLE_VERSION-} && -r "$HOME/.local/share/blesh/ble.sh" ]]; then
     source "$HOME/.local/share/blesh/ble.sh" --noattach
 fi
 # Mise changes PATH on each prompt; the functions above keep agent ownership stable.
 export PATH="$HOME/.local/bin:$PATH"
 
-# --- Managed shell tooling hooks (minimal prompt intentionally untouched) ---
-[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
-[ -x "$(command -v direnv)" ] && eval "$(direnv hook bash)"
-[ -x "$(command -v fzf)" ] && source <(fzf --bash)
-# ble.sh attach must come last.
+# ble.sh attach, then re-init starship: attach resets prompt integration
+# and the Omarchy minimal prompt (~ ❯) is starship-driven, so it comes
+# back here (ble.sh's documented ordering for prompt engines).
 [[ ${BLE_VERSION-} ]] && ble-attach
+if command -v starship >/dev/null && [[ $TERM != "dumb" ]]; then
+    eval "$(starship init bash)"
+fi
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then
