@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-{{ if eq .machine_type "omarchy" -}}
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
 # Reload when the unit or its transport-only readiness checks change.
 # {{ include "private_dot_config/systemd/user/herdr.service" | sha256sum }}
 # {{ include "dot_local/bin/executable_omarchy-herdr-server" | sha256sum }}

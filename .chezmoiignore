@@ -1,3 +1,5 @@
+{{/* omarchy-common: every Omarchy-family machine (bare metal + try-omarchy guest) */}}
+{{- $omarchyCommon := or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
 .config/hypr/xdph.conf
 {{ if ne .machine_type "omarchy" }}
 .config/hypr/input.lua
@@ -299,7 +301,7 @@ Shared/Backup-Recovery/
 {{ end }}
 
 # Open the primary remote desk applications at Omarchy desktop login.
-{{ if eq .machine_type "omarchy" }}
+{{ if $omarchyCommon }}
 !.config/autostart/chatgpt.desktop
 !.config/autostart/kitty.desktop
 !.config/systemd/user/herdr.service
@@ -449,6 +451,14 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/omarchy-deskflow.service
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
+!.config/systemd/user/herdr.service
+!.config/systemd/user/graphical-session.target.wants/
+.config/systemd/user/graphical-session.target.wants/*
+!.config/systemd/user/graphical-session.target.wants/herdr.service
+!.config/autostart/
+.config/autostart/*
+!.config/autostart/chatgpt.desktop
+!.config/autostart/kitty.desktop
 !.local/
 .local/*
 !.local/bin/
@@ -458,6 +468,9 @@ start-omarchy-deskflow.sh
 !.local/bin/omarchy-rustdesk-client-setup
 !.local/bin/try-omarchy-update
 !.local/bin/try-omarchy-efi-audit
+!.local/bin/omarchy-herdr-server
+!.local/bin/omarchy-herdr-shell
+!.local/bin/kitty-plain
 !.local/lib/
 .local/lib/*
 !.local/lib/omarchy-apps/
@@ -476,6 +489,9 @@ start-omarchy-deskflow.sh
 !.local/share/mime/packages/
 .local/share/mime/packages/*
 !.local/share/mime/packages/ica.xml
+!.local/share/applications/
+.local/share/applications/*
+!.local/share/applications/kitty-plain.desktop
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
@@ -484,6 +500,7 @@ start-omarchy-deskflow.sh
 .local/state/omarchy/indicators/*
 !.local/state/omarchy/indicators/stay-awake
 !install-omarchy-apps
+!configure-desktop-startup.sh
 !start-omarchy-deskflow.sh
 !setup-blackarch.sh
 {{ end }}
