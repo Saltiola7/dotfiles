@@ -68,8 +68,12 @@ apply-omarchy-theme.sh
 !.config/omarchy/
 .config/omarchy/*
 !.config/omarchy-host/
-!.config/omarchy-host/**
-{{ if not $waynergyEnabled }}.config/omarchy-host/waynergy-package/{{ end }}
+!.config/omarchy-host/next-steps.md
+!.config/omarchy-host/logind.conf
+!.config/omarchy-host/backup/
+!.config/omarchy-host/backup/**
+{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/{{ end }}
+{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/**{{ end }}
 !.config/zen-managed/
 !.config/zen-managed/**
 !.config/systemd/
@@ -138,6 +142,9 @@ Library/LaunchAgents/dev.dotfiles.synergy-login.plist
 Library/LaunchAgents/dev.dotfiles.synergy-recovery.plist
 Library/LaunchAgents/dev.dotfiles.synergy-screens-ensure.plist
 Library/LaunchAgents/dev.dotfiles.deskflow-server.plist
+Library/LaunchAgents/dev.dotfiles.deskflow-watchdog.plist
+Library/LaunchAgents/dev.dotfiles.deskflow-nightly-recycle.plist
+.local/bin/deskflow-watchdog
 .local/bin/synergy-recovery
 .local/bin/synergy-screens-ensure
 .local/bin/synergy-setup
@@ -409,6 +416,37 @@ Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
 load-smb-reconnect.sh
 {{ end }}
 
+# The native shell guard is qualified for the Omarchy Linux x86_64 profile.
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") }}
+!.local/bin/quickshell
+!.local/bin/omarchy-shell-maintenance
+!.config/omarchy/plugins/
+.config/omarchy/plugins/*
+!.config/omarchy/plugins/dotfiles.context-menu-guard/
+!.config/omarchy/plugins/dotfiles.context-menu-guard/**
+!.config/omarchy-host/context-menu-guard/
+!.config/omarchy-host/context-menu-guard/**
+!.config/systemd/user/omarchy-shell-log-maintenance.service
+!.config/systemd/user/omarchy-shell-log-maintenance.timer
+!.config/systemd/user/timers.target.wants/
+.config/systemd/user/timers.target.wants/*
+!.config/systemd/user/timers.target.wants/omarchy-shell-log-maintenance.timer
+!build-omarchy-shell.sh
+!configure-omarchy-shell.sh
+{{ else }}
+.local/bin/quickshell
+.local/bin/omarchy-shell-maintenance
+.config/omarchy/plugins/dotfiles.context-menu-guard/
+.config/omarchy/plugins/dotfiles.context-menu-guard/**
+.config/omarchy-host/context-menu-guard/
+.config/omarchy-host/context-menu-guard/**
+.config/systemd/user/omarchy-shell-log-maintenance.service
+.config/systemd/user/omarchy-shell-log-maintenance.timer
+.config/systemd/user/timers.target.wants/omarchy-shell-log-maintenance.timer
+build-omarchy-shell.sh
+configure-omarchy-shell.sh
+{{ end }}
+
 {{ if ne .machine_type "omarchy-try" }}
 .local/bin/try-omarchy-update
 .local/bin/try-omarchy-efi-audit
@@ -459,6 +497,22 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/omarchy-deskflow.service
 !.local/bin/atuin-init-bash
 !.local/bin/atuin-server-update
+!.local/bin/herdr-pane-reconcile
+!.local/bin/ungrab
+!.local/bin/opencode-usage-fast.py
+!.local/bin/agents-panel-guard-loop
+!.local/bin/omarchy-agent-usage-update
+!.config/systemd/user/herdr-pane-reconcile.service
+!.config/systemd/user/omarchy-agents-guard.service
+!.config/systemd/user/omarchy-agents-fast.service
+!.config/systemd/user/omarchy-agents-fast.timer
+!.config/systemd/user/default.target.wants/
+.config/systemd/user/default.target.wants/*
+!.config/systemd/user/default.target.wants/omarchy-agents-guard.service
+!.config/systemd/user/graphical-session.target.wants/herdr-pane-reconcile.service
+!.config/environment.d/
+.config/environment.d/*
+!.config/environment.d/50-path-order.conf
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
 !.config/systemd/user/herdr.service

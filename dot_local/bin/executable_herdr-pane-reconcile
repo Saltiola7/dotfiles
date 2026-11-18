@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""herdr-pane-reconcile — restore mapped opencode sessions into herdr panes.
+
+After a VM restart, herdr's supervisor brings panes back as fresh shells
+(blank opencode sessions at best). This reconciler runs once after the
+herdr service is up and re-applies the desktop-derived pane->session
+mapping (~/.local/share/dotfiles/herdr-pane-mapping.json): creates
+missing tabs, splits to pane counts, and starts each mapped session with
+the direct binary. Boot-time tool: it restarts pane content, so it must
+not run while the operator is mid-session (systemd runs it once, after
+herdr.service).
+"""
+import json
+import os
+import subprocess
+import time
+
+ENV = {**os.environ, "XDG_RUNTIME_DIR": f"/run/user/{os.getuid()}"}
+BIN = os.path.expanduser("~/.opencode/bin/opencode")
+MAPPING_PATH = os.path.expanduser("~/.local/share/dotfiles/herdr-pane-mapping.json")
+LOG_PATH = os.path.expanduser("~/.local/state/dotfiles/herdr-pane-reconcile.log")
+
+def log(msg):
+    with open(LOG_PATH, "a") as f:
+        f.write(f"{time.strftime('%Y-%m-%dT%H:%M:%S')} {msg}\n")
+
+def herdr(*args):
+    return subprocess.run(["herdr"] + list(args), capture_output=True, text=True, env=ENV).stdout
+
+def tabs():
+    try:
+        return json.loads(herdr("tab", "list"))["result"]["tabs"]
+    except Exception:
+        return []
+
+def panes():
+    try:
+        return json.loads(herdr("pane", "list"))["result"]["panes"]
+    except Exception:
+        return []
+
+# Wait for the herdr API and non-trivial pane count (restarts race).
+for _ in range(60):
+    if len(panes()) >= 20:
+        break
+    time.sleep(5)
+else:
+    log("herdr panes never became available; aborting")
+    raise SystemExit(0)
+
+if not os.path.exists(MAPPING_PATH):
+    log(f"mapping file missing: {MAPPING_PATH}; nothing to reconcile "
+        "(extract it from the herdr desktop core state on the source machine)")
+    raise SystemExit(0)
+mapping = json.load(open(MAPPING_PATH))
+wanted = {}
+for space in ("dotfiles", "tsc-data"):
+    for tab, terminals in mapping.get(space, {}).items():
+        wanted[(space, tab)] = terminals
+
+# Resolve workspace ids by known anchor tabs (ids can change across
+# session.json rebuilds; labels are stable).
+ws_by_space = {}
+all_tabs = tabs()
+for t in all_tabs:
+    if t["label"] == "AI-ROI":
+        ws_by_space["dotfiles"] = t["workspace_id"]
+    if t["label"] in ("youtube etl", "content warehouse"):
+        ws_by_space.setdefault("tsc-data", t["workspace_id"])
+for space in ("dotfiles", "tsc-data"):
+    ws_by_space.setdefault(space, "w653baf8b775563" if space == "dotfiles" else "w4")
+
+started, shells = 0, 0
+for (space, label), terminals in sorted(wanted.items()):
+    ws = ws_by_space.get(space)
+    if not ws:
+        continue
+    target = max(len(terminals), 1)
+    t = next((x for x in tabs() if x["workspace_id"] == ws and x["label"] == label), None)
+    if not t:
+        herdr("tab", "create", "--workspace", ws, "--cwd",
+              terminals[0].get("cwd") or "/Volumes/ext/git/Personal/dotfiles-ai",
+              "--label", label)
+        time.sleep(0.5)
+        t = next((x for x in tabs() if x["workspace_id"] == ws and x["label"] == label), None)
+        log(f"created tab {space}/{label}")
+    guard = 0
+    while t and t["pane_count"] < target and guard < 30:
+        tp = [p for p in panes() if p["tab_id"] == t["tab_id"]]
+        if not tp:
+            break
+        last = sorted(tp, key=lambda p: p["pane_id"])[-1]["pane_id"]
+        herdr("pane", "split", last, "--direction", "down" if t["pane_count"] % 2 else "right")
+        time.sleep(0.4)
+        t = next((x for x in tabs() if x["tab_id"] == t["tab_id"]), t)
+        guard += 1
+    if not t:
+        continue
+    tp = sorted([p for p in panes() if p["tab_id"] == t["tab_id"]], key=lambda p: p["pane_id"])
+    for i, p in enumerate(tp):
+        entry = terminals[i] if i < len(terminals) else None
+        herdr("pane", "send-keys", p["pane_id"], "C-c")
+        time.sleep(0.15)
+        # MGM-directory sessions are company-VM material, never started
+        # here: opencode --session would create a blank clone instead.
+        sid = entry.get("sid") if entry else None
+        if sid and "/Work/MGM/" not in (entry.get("cwd") or ""):
+            herdr("pane", "send-text", p["pane_id"], f"{BIN} --session {sid}")
+            herdr("pane", "send-keys", p["pane_id"], "Enter")
+            started += 1
+        else:
+            shells += 1
+        time.sleep(0.5)
+
+n = subprocess.run(["pgrep", "-c", "opencode"], capture_output=True, text=True, env=ENV)
+log(f"reconciled: {started} sessions started, {shells} shells left, opencode procs now {n.stdout.strip()}")
+print(f"reconciled: {started} sessions, {shells} shells")

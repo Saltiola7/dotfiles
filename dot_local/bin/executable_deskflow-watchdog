@@ -1,0 +1,60 @@
+#!/bin/bash
+# deskflow-watchdog — auto-heal deskflow-core wedges on the server (mac-mini).
+#
+# RCA 2026-11-17: input-capture dies with ZERO errors in deskflow-core logs;
+# killall + launchd respawn always fixes it. Suspected cause is macOS-side
+# event-tap invalidation (TCC churn), but TCC.db is SIP-hidden from user
+# space (~/Library/Application Support/com.apple.TCC returns ENOENT), so a
+# WatchPaths guard can never fire. Instead, detect the wedge mechanically:
+# a client that is pingable but has no ESTABLISHED connection to :24800
+# while deskflow-core is running means the server stopped accepting.
+# Requires 2 consecutive strikes; recycles at most once per 10 minutes.
+set -u
+export LC_ALL=C
+
+STATE_DIR="${HOME:-/Users/tis}/Library/Application Support/dotfiles/deskflow-watchdog"
+mkdir -p "$STATE_DIR"
+STRIKES="$STATE_DIR/strikes"
+LAST="$STATE_DIR/last-recycle"
+LOG="$STATE_DIR/activity.log"
+
+CLIENTS=("192.168.100.86" "192.168.100.140")   # mbp-omarchy, hp-omarchy
+
+now=$(date +%s)
+last=$(cat "$LAST" 2>/dev/null || echo 0)
+if (( now - last < 600 )); then
+    exit 0
+fi
+
+if ! pgrep -x deskflow-core >/dev/null 2>&1; then
+    echo 0 >"$STRIKES"    # server down: launchd will respawn it; not our case
+    exit 0
+fi
+
+# Count pingable clients lacking an ESTABLISHED session to :24800
+wedged=0
+for ip in "${CLIENTS[@]}"; do
+    if ping -c1 -W1000 "$ip" >/dev/null 2>&1; then
+        if ! lsof -nP -iTCP:24800 2>/dev/null | grep -q "\->$ip:.*(ESTABLISHED)"; then
+            wedged=$((wedged+1))
+        fi
+    fi
+done
+
+if (( wedged == 0 )); then
+    echo 0 >"$STRIKES"
+    exit 0
+fi
+
+strikes=$(( $(cat "$STRIKES" 2>/dev/null || echo 0) + 1 ))
+echo "$strikes" >"$STRIKES"
+if (( strikes < 2 )); then
+    exit 0    # first strike: allow a legitimate reconnect window
+fi
+
+/usr/bin/killall deskflow-core 2>/dev/null || true
+date +%s >"$LAST"
+echo 0 >"$STRIKES"
+/usr/bin/printf '%s recycled deskflow-core (%d client(s) pingable-but-not-established)\n' \
+    "$(/bin/date -u +%Y-%m-%dT%H:%M:%SZ)" "$wedged" >>"$LOG" 2>/dev/null
+exit 0

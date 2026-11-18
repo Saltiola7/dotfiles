@@ -1,0 +1,16 @@
+[Unit]
+Description=Guard: agents panel usage scanning stays off until PATH shim lands
+# The panel re-triggers the stock orchestrator, whose collectors each parse
+# large local stores (100 GB opencode DB, local-model logs). Until a login
+# applies ~/.config/environment.d/50-path-order.conf (shim intercepts the
+# orchestrator), fast-kill every collector/orchestrator process. Anchored on
+# the absolute path prefix: shells that merely mention the names never match.
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/home/tis/.local/bin/agents-panel-guard-loop
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

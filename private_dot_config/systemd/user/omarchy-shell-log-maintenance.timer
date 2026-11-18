@@ -1,0 +1,12 @@
+[Unit]
+Description=Keep dead Omarchy diagnostics out of runtime storage
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=omarchy-shell-log-maintenance.service
+
+[Install]
+WantedBy=timers.target
