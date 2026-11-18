@@ -20,7 +20,6 @@ source "$OMARCHY_PATH/default/bash/rc"
 # readline-8.1 directives (emacs/vi-editing-mode) that ble.sh's bind
 # emulation rejects with a warning each; before ble they hit real
 # readline silently. atuin/direnv register precmd hooks, no binds.
-[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
 [ -x "$(command -v direnv)" ] && eval "$(direnv hook bash)"
 [ -x "$(command -v fzf)" ] && source <(fzf --bash)
 # ble.sh after all plain-readline setup, same reason as the hooks above.
@@ -39,6 +38,10 @@ if command -v starship >/dev/null && [[ $TERM != "dumb" ]]; then
     starship_precmd 2>/dev/null || true
 fi
 [[ ${BLE_VERSION-} ]] && ble-attach
+# atuin LAST: its ctrl-r and up-arrow binds must be the final word —
+# after fzf (which would otherwise own ctrl-r) and after ble-attach
+# (so ble adopts atuin's bindings rather than replacing them).
+[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then
