@@ -1,5 +1,8 @@
 {{/* omarchy-common: every Omarchy-family machine (bare metal + try-omarchy guest) */}}
 {{- $omarchyCommon := or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
+{{/* Waynergy client is opt-out per Omarchy host; the default keeps existing hosts unchanged. */}}
+{{- $waynergyEnabled := true -}}
+{{- if hasKey . "waynergy_enabled" }}{{- $waynergyEnabled = .waynergy_enabled }}{{- end -}}
 .config/hypr/xdph.conf
 {{ if ne .machine_type "omarchy" }}
 .config/hypr/input.lua
@@ -66,13 +69,14 @@ apply-omarchy-theme.sh
 .config/omarchy/*
 !.config/omarchy-host/
 !.config/omarchy-host/**
+{{ if not $waynergyEnabled }}.config/omarchy-host/waynergy-package/{{ end }}
 !.config/zen-managed/
 !.config/zen-managed/**
 !.config/systemd/
 .config/systemd/*
 !.config/systemd/user/
 .config/systemd/user/*
-!.config/systemd/user/omarchy-waynergy.service
+{{ if $waynergyEnabled }}!.config/systemd/user/omarchy-waynergy.service{{ end }}
 !.config/systemd/user/synergy-3.service
 !.config/autostart/
 .config/autostart/*
@@ -82,10 +86,10 @@ apply-omarchy-theme.sh
 !setup-tailscale.sh
 !.local/bin/atuin-init-bash
 !install-zen-catppuccin.sh
-!.config/waynergy/
+{{ if $waynergyEnabled }}!.config/waynergy/
 .config/waynergy/*
 !.config/waynergy/config.ini
-!.config/waynergy/xkb_keymap
+!.config/waynergy/xkb_keymap{{ end }}
 !.local/
 .local/*
 !.local/bin/
@@ -98,8 +102,8 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-zen-setup
 !.local/bin/omarchy-zen-profile
 !.local/bin/omarchy-zen-launch
-!.local/bin/omarchy-waynergy-test
-!.local/bin/omarchy-waynergy-install
+{{ if $waynergyEnabled }}!.local/bin/omarchy-waynergy-test
+!.local/bin/omarchy-waynergy-install{{ end }}
 !.local/bin/omarchy-recovery-backup
 !.local/bin/omarchy-espanso-setup
 !.local/bin/omarchy-backup-setup
@@ -108,7 +112,7 @@ apply-omarchy-theme.sh
 !.local/share/applications/
 .local/share/applications/*
 !.local/share/applications/zen.desktop
-!.local/share/applications/waynergy.desktop
+{{ if $waynergyEnabled }}!.local/share/applications/waynergy.desktop{{ end }}
 !.local/state/
 .local/state/*
 !.local/state/omarchy/
@@ -549,7 +553,7 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !.config/uwsm/
 .config/uwsm/*
 !.config/uwsm/env
-!always_install-waynergy.sh
+{{ if $waynergyEnabled }}!always_install-waynergy.sh{{ end }}
 !always_install-omarchy-remote-access.sh
 !always_mbp-asahi-hardware.sh
 !always_disable-fcitx5-mbp.sh
