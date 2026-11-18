@@ -30,6 +30,7 @@ TARGETS = {
     "create-kitty-socket-dir.sh", "install-omarchy-apps",
     "start-omarchy-deskflow.sh",
     "setup-blackarch.sh",
+    "setup-tailscale.sh",
     ".config/deskflow/deskflow.conf", ".config/deskflow/deskflow-core.conf",
     ".config/systemd/user/omarchy-deskflow.service",
     ".config/systemd/user/citrix-ica-watch.service",

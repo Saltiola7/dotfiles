@@ -1,0 +1,23 @@
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
+#!/bin/bash
+# Tailscale for every Omarchy machine: install + service. Joining the
+# tailnet is the one interactive step per device (browser auth); the
+# script prints how when a machine is not yet authenticated.
+set -euo pipefail
+if [[ ! -t 0 ]]; then
+    echo "[tailscale] Run chezmoi apply from a terminal for the sudo prompt." >&2
+    exit 0
+fi
+
+if ! command -v tailscale >/dev/null 2>&1; then
+    echo "==> Installing tailscale"
+    omarchy pkg add tailscale
+fi
+sudo systemctl enable --now tailscaled
+
+if ! tailscale status --self >/dev/null 2>&1; then
+    echo "[tailscale] Not authenticated yet. Run: sudo tailscale up"
+    echo "[tailscale] Open the printed URL in a browser and approve the device."
+fi
+echo "[tailscale] ready: $(tailscale status --self 2>/dev/null | awk '{print $1, $2}' || echo 'install complete, auth pending')"
+{{ end -}}

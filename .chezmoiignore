@@ -80,6 +80,7 @@ apply-omarchy-theme.sh
 !.config/autostart/synergy-3.desktop
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
+!setup-tailscale.sh
 !install-zen-catppuccin.sh
 !.config/waynergy/
 .config/waynergy/*
@@ -310,6 +311,7 @@ Shared/Backup-Recovery/
 !.local/bin/kitty-plain
 !.local/share/applications/kitty-plain.desktop
 !configure-desktop-startup.sh
+!setup-tailscale.sh
 {{ else }}
 .config/autostart/chatgpt.desktop
 .config/autostart/kitty.desktop
