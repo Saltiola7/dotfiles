@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "dotfiles.context-menu-guard",
+  "name": "Context menu crash guard",
+  "version": "1.0.0",
+  "description": "Protect focusless shell windows from the Qt context-menu origin crash.",
+  "kinds": [
+    "service"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

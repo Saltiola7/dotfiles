@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Select the personal Omarchy policy without changing other Quickshell clients."""
+
+import os
+from pathlib import Path
+import sys
+
+
+def prepare_launch(arguments: list[str], environment: dict[str, str]) -> tuple[list[str], dict[str, str]]:
+    result = dict(environment)
+    administrative = {"ipc", "log", "list", "kill", "--help", "-h", "--version", "-V"}
+    path = None
+    for index, argument in enumerate(arguments):
+        if argument in administrative:
+            return list(arguments), result
+        if argument in {"-p", "--path"} and index + 1 < len(arguments):
+            path = arguments[index + 1]
+        elif argument.startswith("--path="):
+            path = argument.removeprefix("--path=")
+    if path is None or str(Path(path).resolve()) not in {
+        "/usr/share/omarchy/shell", "/usr/share/omarchy/shell/shell.qml",
+    }:
+        return list(arguments), result
+    module_root = str(Path(result.get("HOME", str(Path.home()))) / ".local/lib/omarchy-qml")
+    imports = [part for part in result.get("QML_IMPORT_PATH", "").split(":")
+               if part and part != module_root]
+    result["QML_IMPORT_PATH"] = ":".join([module_root, *imports])
+    return ["--no-detailed-logs", *arguments], result
+
+
+if __name__ == "__main__":
+    arguments, environment = prepare_launch(sys.argv[1:], dict(os.environ))
+    os.execve("/usr/bin/quickshell", ["/usr/bin/quickshell", *arguments], environment)

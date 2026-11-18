@@ -1,0 +1,421 @@
+#!/usr/bin/env python3
+"""Build the user Qt module and retain only verified dead Omarchy diagnostics."""
+
+import argparse
+from contextlib import ExitStack, contextmanager
+import errno
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import stat
+import subprocess
+import sys
+import tempfile
+import time
+import uuid
+import zipfile
+
+
+OWNER = b'{"owner":"dotfiles.omarchy-shell","version":1}\n'
+LOG_NAMES = ("log.log", "log.qslog")
+INSTANCE_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+ARCHIVE_NAME = re.compile(r"instance-[A-Za-z0-9_-]{1,64}\.zip")
+SHELL_PATHS = {"/usr/share/omarchy/shell", "/usr/share/omarchy/shell/shell.qml"}
+QMLDIR = b"module Dotfiles.ContextMenuGuard\nplugin dotfilescontextguard\nclassname DotfilesContextGuardPlugin\n"
+
+
+class UnsafePath(ValueError):
+    """An unknown file or ownership boundary must remain untouched."""
+
+
+@contextmanager
+def descriptor(path, flags, mode=0o600, *, dir_fd=None):
+    # Reject FIFOs/devices via fstat without waiting for a peer during open.
+    fd = os.open(path, flags | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK,
+                 mode, dir_fd=dir_fd)
+    try:
+        yield fd
+    finally:
+        os.close(fd)
+
+
+def owned_regular(details: os.stat_result) -> bool:
+    return (stat.S_ISREG(details.st_mode) and details.st_uid == os.getuid()
+            and details.st_nlink == 1)
+
+
+def owned_directory(fd: int, private: bool = False) -> None:
+    details = os.fstat(fd)
+    forbidden = 0o077 if private else 0o022
+    if (not stat.S_ISDIR(details.st_mode) or details.st_uid != os.getuid()
+            or details.st_mode & forbidden):
+        raise UnsafePath("unsafe directory ownership or permissions")
+
+
+def identity(details: os.stat_result) -> tuple[int, int, int, int]:
+    return details.st_dev, details.st_ino, details.st_size, details.st_mtime_ns
+
+
+def digest_fd(fd: int, size: int) -> str:
+    with os.fdopen(os.dup(fd), "rb") as stream:
+        stream.seek(0)
+        digest = hashlib.sha256()
+        remaining = size
+        while remaining:
+            chunk = stream.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                raise OSError("runtime log shortened during verification")
+            digest.update(chunk)
+            remaining -= len(chunk)
+        if stream.read(1):
+            raise OSError("runtime log grew during verification")
+        return digest.hexdigest()
+
+
+def write_archive(path, files: dict, now: float, *, dir_fd=None) -> None:
+    manifest = {"version": 1, "created": now, "files": {}}
+    with descriptor(path, os.O_RDWR | os.O_CREAT | os.O_EXCL, dir_fd=dir_fd) as output:
+        with os.fdopen(os.dup(output), "wb") as stream:
+            with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_DEFLATED,
+                                 compresslevel=1) as archive:
+                for name, (fd, details) in files.items():
+                    digest = hashlib.sha256()
+                    with os.fdopen(os.dup(fd), "rb") as source, archive.open(name, "w", force_zip64=True) as target:
+                        source.seek(0)
+                        remaining = details.st_size
+                        while remaining:
+                            chunk = source.read(min(remaining, 1024 * 1024))
+                            if not chunk:
+                                raise OSError("runtime log shortened during copy")
+                            target.write(chunk)
+                            digest.update(chunk)
+                            remaining -= len(chunk)
+                        if source.read(1):
+                            raise OSError("runtime log grew during copy")
+                    manifest["files"][name] = {"size": details.st_size,
+                                                "sha256": digest.hexdigest()}
+                archive.writestr("manifest.json", json.dumps(manifest, allow_nan=False))
+        os.fsync(output)
+
+
+def verify_archive(path, files: dict, *, dir_fd=None) -> None:
+    with descriptor(path, os.O_RDONLY, dir_fd=dir_fd) as fd:
+        if not owned_regular(os.fstat(fd)):
+            raise UnsafePath("unsafe archive file")
+        with os.fdopen(os.dup(fd), "rb") as stream, zipfile.ZipFile(stream) as archive:
+            if archive.getinfo("manifest.json").file_size > 8192:
+                raise ValueError("oversized archive manifest")
+            manifest = json.loads(archive.read("manifest.json"))
+            if (not isinstance(manifest, dict) or manifest.get("version") != 1
+                    or not isinstance(manifest.get("files"), dict)):
+                raise ValueError("invalid archive manifest")
+            entries = manifest["files"]
+            # A prior reclaim may have removed one member before an unlink
+            # failure. Verify the complete archive and every remaining source.
+            if not set(files) <= set(entries) <= set(LOG_NAMES):
+                raise ValueError("archive members differ")
+            if (set(archive.namelist()) != {*entries, "manifest.json"}
+                    or len(archive.namelist()) != len(entries) + 1):
+                raise ValueError("unexpected archive members")
+            for name, entry in entries.items():
+                if (not isinstance(entry, dict) or type(entry.get("size")) is not int
+                        or entry["size"] < 0 or not isinstance(entry.get("sha256"), str)
+                        or not re.fullmatch(r"[a-f0-9]{64}", entry["sha256"])):
+                    raise ValueError("invalid archive member metadata")
+                if archive.getinfo(name).file_size != entry["size"]:
+                    raise ValueError("archive size differs")
+                with archive.open(name) as member:
+                    digest = hashlib.file_digest(member, "sha256").hexdigest()
+                if digest != entry["sha256"]:
+                    raise ValueError("archive content differs")
+                if name in files:
+                    source, details = files[name]
+                    if entry["size"] != details.st_size or digest != digest_fd(source, details.st_size):
+                        raise ValueError("archive differs from runtime log")
+
+
+def archive_instance(parent: int, identifier: str, archive_root: int, now: float) -> tuple[str, int]:
+    with ExitStack() as stack:
+        directory = stack.enter_context(descriptor(identifier, os.O_RDONLY | os.O_DIRECTORY,
+                                                   dir_fd=parent))
+        owned_directory(directory)
+        lock = stack.enter_context(descriptor("instance.lock", os.O_RDWR, dir_fd=directory))
+        if not owned_regular(os.fstat(lock)):
+            raise UnsafePath("unsafe native instance lock")
+        try:
+            fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return "live", 0
+        files = {}
+        for name in LOG_NAMES:
+            try:
+                fd = stack.enter_context(descriptor(name, os.O_RDONLY, dir_fd=directory))
+            except FileNotFoundError:
+                continue
+            details = os.fstat(fd)
+            if not owned_regular(details):
+                raise UnsafePath("unsafe runtime log")
+            files[name] = fd, details
+        if not files:
+            return "empty", 0
+        destination = f"instance-{identifier}.zip"
+        try:
+            os.stat(destination, dir_fd=archive_root, follow_symlinks=False)
+        except FileNotFoundError:
+            temporary = f".stage-{uuid.uuid4().hex}.tmp"
+            try:
+                write_archive(temporary, files, now, dir_fd=archive_root)
+                verify_archive(temporary, files, dir_fd=archive_root)
+                # An exclusive hard-link publish cannot overwrite a file that
+                # appeared after the initial existence check.
+                os.link(temporary, destination, src_dir_fd=archive_root,
+                        dst_dir_fd=archive_root, follow_symlinks=False)
+                os.unlink(temporary, dir_fd=archive_root)
+                os.utime(destination, (now, now), dir_fd=archive_root, follow_symlinks=False)
+                os.fsync(archive_root)
+            finally:
+                try:
+                    os.unlink(temporary, dir_fd=archive_root)
+                except FileNotFoundError:
+                    pass
+        else:
+            verify_archive(destination, files, dir_fd=archive_root)
+        for name, (fd, original) in files.items():
+            current = os.stat(name, dir_fd=directory, follow_symlinks=False)
+            if identity(current) != identity(original) or identity(os.fstat(fd)) != identity(original):
+                raise OSError("runtime log changed; source retained")
+        reclaimed = 0
+        for name, (_, original) in files.items():
+            if identity(os.stat(name, dir_fd=directory, follow_symlinks=False)) != identity(original):
+                raise OSError("runtime log changed before reclaim")
+            os.unlink(name, dir_fd=directory)
+            reclaimed += original.st_size
+        return "archived", reclaimed
+
+
+def retain_archives(root: int, now: float, maximum_count: int, maximum_age_days: int,
+                    maximum_bytes: int) -> int:
+    candidates = []
+    for name in os.listdir(root):
+        if not ARCHIVE_NAME.fullmatch(name):
+            continue
+        details = os.stat(name, dir_fd=root, follow_symlinks=False)
+        if not owned_regular(details):
+            raise UnsafePath("unsafe retained archive")
+        candidates.append((details.st_mtime, name, details))
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    total = sum(item[2].st_size for item in candidates)
+    removed = 0
+    while candidates and (now - candidates[0][0] > maximum_age_days * 86400
+                          or len(candidates) > maximum_count or total > maximum_bytes):
+        _, name, details = candidates.pop(0)
+        if identity(os.stat(name, dir_fd=root, follow_symlinks=False)) != identity(details):
+            raise UnsafePath("retained archive changed")
+        os.unlink(name, dir_fd=root)
+        total -= details.st_size
+        removed += 1
+    return removed
+
+
+def prune_logs(runtime_root: Path, archive_root: Path, instances: list, *, now=None,
+               max_archives=8, max_age_days=7, max_archive_bytes=64 * 1024 * 1024) -> dict:
+    if not isinstance(instances, list) or min(max_archives, max_age_days, max_archive_bytes) < 0:
+        raise ValueError("invalid maintenance input")
+    now = time.time() if now is None else now
+    result = {"archived": 0, "reclaimed_bytes": 0, "skipped_live": 0,
+              "skipped_unsafe": 0, "errors": 0, "busy": False, "expired": 0}
+    archive_root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with descriptor(archive_root, os.O_RDONLY | os.O_DIRECTORY) as archives:
+        owned_directory(archives, private=True)
+        with descriptor(".maintenance.lock", os.O_RDWR | os.O_CREAT, dir_fd=archives) as lock:
+            if not owned_regular(os.fstat(lock)):
+                raise UnsafePath("unsafe maintenance lock")
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                result["busy"] = True
+                return result
+            try:
+                os.stat(".owner", dir_fd=archives, follow_symlinks=False)
+            except FileNotFoundError:
+                if any(name != ".maintenance.lock" for name in os.listdir(archives)):
+                    raise UnsafePath("archive directory has no ownership marker")
+                with descriptor(".owner", os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                                dir_fd=archives) as owner:
+                    os.write(owner, OWNER)
+                    os.fsync(owner)
+            with descriptor(".owner", os.O_RDONLY, dir_fd=archives) as owner:
+                if not owned_regular(os.fstat(owner)) or os.read(owner, 1024) != OWNER:
+                    raise UnsafePath("archive directory ownership differs")
+            with ExitStack() as stack:
+                runtime = stack.enter_context(descriptor(runtime_root, os.O_RDONLY | os.O_DIRECTORY))
+                owned_directory(runtime, private=True)
+                quickshell = stack.enter_context(descriptor("quickshell", os.O_RDONLY | os.O_DIRECTORY,
+                                                            dir_fd=runtime))
+                owned_directory(quickshell)
+                parent = stack.enter_context(descriptor("by-id", os.O_RDONLY | os.O_DIRECTORY,
+                                                        dir_fd=quickshell))
+                owned_directory(parent)
+                for entry in instances:
+                    if not isinstance(entry, dict) or entry.get("config_path") not in SHELL_PATHS:
+                        continue
+                    identifier = entry.get("id")
+                    if not isinstance(identifier, str) or not INSTANCE_ID.fullmatch(identifier):
+                        result["skipped_unsafe"] += 1
+                        continue
+                    try:
+                        outcome, reclaimed = archive_instance(parent, identifier, archives, now)
+                        if outcome == "live":
+                            result["skipped_live"] += 1
+                        elif outcome == "archived":
+                            result["archived"] += 1
+                            result["reclaimed_bytes"] += reclaimed
+                    except (UnsafePath, FileNotFoundError):
+                        result["skipped_unsafe"] += 1
+                    except OSError as error:
+                        if error.errno in (errno.ELOOP, errno.ENOTDIR):
+                            result["skipped_unsafe"] += 1
+                        else:
+                            result["errors"] += 1
+                    except (ValueError, zipfile.BadZipFile):
+                        result["errors"] += 1
+            result["expired"] = retain_archives(archives, now, max_archives,
+                                                 max_age_days, max_archive_bytes)
+    return result
+
+
+def module_record(target: Path) -> dict:
+    """Accept only our relative link to a complete, owned immutable generation."""
+    if not target.is_symlink():
+        raise UnsafePath("existing module target is not a managed generation link")
+    name = os.readlink(target)
+    if not re.fullmatch(re.escape(f".{target.name}-") + r"[a-f0-9]{32}", name):
+        raise UnsafePath("unknown module generation link")
+    generation = target.parent / name
+    with descriptor(generation, os.O_RDONLY | os.O_DIRECTORY) as directory:
+        owned_directory(directory)
+        contents = {}
+        for name in ("build.json", "qmldir", "libdotfilescontextguard.so"):
+            with descriptor(name, os.O_RDONLY, dir_fd=directory) as fd:
+                if not owned_regular(os.fstat(fd)):
+                    raise UnsafePath("unsafe module artifact")
+                with os.fdopen(os.dup(fd), "rb") as stream:
+                    contents[name] = stream.read()
+    previous = json.loads(contents["build.json"])
+    if (not isinstance(previous, dict) or previous.get("owner") != "dotfiles.omarchy-shell"
+            or contents["qmldir"] != QMLDIR
+            or hashlib.sha256(contents["libdotfilescontextguard.so"]).hexdigest()
+            != previous.get("binary_sha256")):
+        raise UnsafePath("installed module differs from its recorded bytes")
+    return previous
+
+
+def publish_module(target: Path, library: bytes, record: dict) -> None:
+    """Publish a complete generation with a single atomic link replacement."""
+    generation = target.parent / f".{target.name}-{uuid.uuid4().hex}"
+    temporary = target.parent / f".activate-{uuid.uuid4().hex}"
+    published = False
+    generation.mkdir(mode=0o755)
+    try:
+        for name, content, mode in (
+                ("libdotfilescontextguard.so", library, 0o755), ("qmldir", QMLDIR, 0o644),
+                ("build.json", json.dumps(record, sort_keys=True).encode() + b"\n", 0o600)):
+            with descriptor(generation / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, mode) as fd:
+                with os.fdopen(os.dup(fd), "wb") as stream:
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+        with descriptor(generation, os.O_RDONLY | os.O_DIRECTORY) as fd:
+            os.fsync(fd)
+        temporary.symlink_to(generation.name, target_is_directory=True)
+        os.replace(temporary, target)
+        published = True
+        with descriptor(target.parent, os.O_RDONLY | os.O_DIRECTORY) as fd:
+            os.fsync(fd)
+    finally:
+        temporary.unlink(missing_ok=True)
+        if not published:
+            shutil.rmtree(generation)
+
+
+def build_module(source: Path, target: Path) -> bool:
+    packages = ["Qt6Core", "Qt6Gui", "Qt6Qml", "Qt6Quick"]
+    compiler = shutil.which("c++")
+    pkg_config = shutil.which("pkg-config")
+    if not compiler or not pkg_config:
+        raise RuntimeError("existing C++ and pkg-config tools are required")
+    def query(*arguments):
+        return subprocess.check_output([pkg_config, *arguments], text=True).strip()
+    version = query("--modversion", "Qt6Core")
+    if not version.startswith("6."):
+        raise RuntimeError("the guard requires the selected Qt 6 toolchain")
+    moc = Path(query("--variable=libexecdir", "Qt6Core")) / "moc"
+    if not moc.is_file():
+        moc = Path("/usr/lib/qt6/moc")
+    if not moc.is_file():
+        raise RuntimeError("the selected Qt moc tool is unavailable")
+    flags = shlex.split(query("--cflags", *packages))
+    libraries = shlex.split(query("--libs", *packages))
+    inputs = hashlib.sha256()
+    for name in ("guard.h", "plugin.cpp"):
+        inputs.update(name.encode() + b"\0" + (source / name).read_bytes())
+    inputs.update(json.dumps([version, compiler, flags, libraries]).encode())
+    fingerprint = inputs.hexdigest()
+    initial_link = os.readlink(target) if target.is_symlink() else None
+    if target.exists() or target.is_symlink():
+        previous = module_record(target)
+        if previous.get("inputs_sha256") == fingerprint:
+            return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".guard-build-", dir=target.parent) as stage_name:
+        stage = Path(stage_name)
+        moc_flags = [flag for flag in flags if flag.startswith(("-I", "-D", "-U", "-F"))]
+        subprocess.run([str(moc), *moc_flags, str(source / "guard.h"), "-o", str(stage / "moc_guard.cpp")], check=True)
+        subprocess.run([str(moc), *moc_flags, str(source / "plugin.cpp"), "-o", str(stage / "plugin.moc")], check=True)
+        subprocess.run([compiler, "-std=c++17", "-O2", "-fPIC", "-shared", *flags,
+                        "-I", str(source), "-I", str(stage), str(source / "plugin.cpp"),
+                        str(stage / "moc_guard.cpp"), "-o", str(stage / "libdotfilescontextguard.so"), *libraries], check=True)
+        content = (stage / "libdotfilescontextguard.so").read_bytes()
+        if ((target.exists() or target.is_symlink()) and
+                (not target.is_symlink() or os.readlink(target) != initial_link)):
+            raise UnsafePath("module target changed during compilation")
+        publish_module(target, content, {"owner": "dotfiles.omarchy-shell", "qt": version,
+                       "inputs_sha256": fingerprint, "binary_sha256": hashlib.sha256(content).hexdigest()})
+    return True
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    commands = parser.add_subparsers(dest="command", required=True)
+    build = commands.add_parser("build")
+    build.add_argument("--source", type=Path, required=True)
+    build.add_argument("--target", type=Path, required=True)
+    commands.add_parser("prune")
+    arguments = parser.parse_args()
+    if arguments.command == "build":
+        changed = build_module(arguments.source, arguments.target)
+        print("Qt guard built" if changed else "Qt guard unchanged")
+        return 0
+    runtime = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+    if not (runtime / "quickshell/by-id").exists():
+        return 0
+    inventory = json.loads(subprocess.check_output(
+        ["/usr/bin/quickshell", "list", "--all", "--show-dead", "--json"],
+        text=True, timeout=10,
+    ))
+    result = prune_logs(runtime, Path.home() / ".local/state/omarchy-shell/log-archives", inventory)
+    print(json.dumps(result, sort_keys=True))
+    return 1 if result["errors"] else 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f"Omarchy shell maintenance failed: {error}", file=sys.stderr)
+        raise SystemExit(1)
