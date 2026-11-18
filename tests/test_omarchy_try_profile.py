@@ -31,6 +31,7 @@ TARGETS = {
     "start-omarchy-deskflow.sh",
     "setup-blackarch.sh",
     "setup-tailscale.sh",
+    ".local/bin/atuin-init-bash", ".local/bin/atuin-server-update",
     ".config/atuin/config.toml",
     "setup-shell-tooling.sh",
     ".config/deskflow/deskflow.conf", ".config/deskflow/deskflow-core.conf",
@@ -213,4 +214,4 @@ def test_native_share_picker_is_scoped_to_try_guest():
 
 # CI trigger 20261118m.
 
-# CI trigger 20261118o.
+# CI trigger 20261118r.

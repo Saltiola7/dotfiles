@@ -41,7 +41,7 @@ fi
 # atuin LAST: its ctrl-r and up-arrow binds must be the final word —
 # after fzf (which would otherwise own ctrl-r) and after ble-attach
 # (so ble adopts atuin's bindings rather than replacing them).
-[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
+[ -x "$(command -v atuin)" ] && eval "$(atuin-init-bash)"
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then

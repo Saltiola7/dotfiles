@@ -1,0 +1,11 @@
+#!/bin/bash
+# atuin-init-bash — atuin's bash hook with a local base-10 patch.
+#
+# atuin (18.24.x) computes command duration with bare (( )) arithmetic on
+# digit strings that can carry leading zeros ("0128" + "000" = "012800");
+# bash parses leading-zero literals as octal and errors on 8/9. Force
+# base 10 at the arithmetic sites until fixed upstream
+# (atuinsh/atuin — issue filed 2026-11-18).
+atuin init bash | sed \
+  -e 's|\$((\${__atuin_precmd_time//\[!0-9\]} - \${__atuin_preexec_time//\[!0-9\]}))|$((10#${__atuin_precmd_time//[!0-9]} - 10#${__atuin_preexec_time//[!0-9]}))|' \
+  -e 's|((duration >= 0))|((10#${duration:-0} >= 0))|'

@@ -64,7 +64,6 @@ apply-omarchy-theme.sh
 !.config/rustdesk-client/**
 !.config/omarchy/
 .config/omarchy/*
-!.config/omarchy/shell.json
 !.config/omarchy-host/
 !.config/omarchy-host/next-steps.md
 !.config/omarchy-host/logind.conf
@@ -86,6 +85,7 @@ apply-omarchy-theme.sh
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
 !setup-tailscale.sh
+!.local/bin/atuin-init-bash
 !install-zen-catppuccin.sh
 !.config/waynergy/
 .config/waynergy/*
@@ -410,7 +410,6 @@ Library/LaunchAgents/dev.dotfiles.smb-reconnect.plist
 load-smb-reconnect.sh
 {{ end }}
 
-<<<<<<< HEAD
 # The native shell guard is qualified for the Omarchy Linux x86_64 profile.
 {{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") }}
 !.local/bin/quickshell
@@ -440,7 +439,8 @@ load-smb-reconnect.sh
 .config/systemd/user/timers.target.wants/omarchy-shell-log-maintenance.timer
 build-omarchy-shell.sh
 configure-omarchy-shell.sh
-=======
+{{ end }}
+
 {{ if ne .machine_type "omarchy-try" }}
 .local/bin/try-omarchy-update
 .local/bin/try-omarchy-efi-audit
@@ -489,6 +489,8 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+!.local/bin/atuin-init-bash
+!.local/bin/atuin-server-update
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
 !.config/systemd/user/herdr.service
@@ -609,5 +611,4 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 .config/old-omarchy/**
 .local/bin/old-omarchy-setup
 always_configure-old-omarchy.sh
->>>>>>> origin/main
 {{ end }}
