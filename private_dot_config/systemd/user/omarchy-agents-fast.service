@@ -1,0 +1,6 @@
+[Unit]
+Description=Fast incremental opencode usage record
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /home/tis/.local/bin/opencode-usage-fast.py
