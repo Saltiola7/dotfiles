@@ -30,6 +30,9 @@ TARGETS = {
     "create-kitty-socket-dir.sh", "install-omarchy-apps",
     "start-omarchy-deskflow.sh",
     "setup-blackarch.sh",
+    "setup-tailscale.sh",
+    ".config/atuin/config.toml",
+    "setup-shell-tooling.sh",
     ".config/deskflow/deskflow.conf", ".config/deskflow/deskflow-core.conf",
     ".config/systemd/user/omarchy-deskflow.service",
     ".config/systemd/user/citrix-ica-watch.service",
@@ -40,8 +43,7 @@ TARGETS = {
     ".local/bin/omarchy-herdr-server", ".local/bin/omarchy-herdr-shell",
     ".local/bin/kitty-plain", ".local/share/applications/kitty-plain.desktop",
     ".config/autostart/chatgpt.desktop", ".config/autostart/kitty.desktop",
-    "configure-desktop-startup.sh", ".config/atuin/config.toml",
-    "setup-shell-tooling.sh",
+    "configure-desktop-startup.sh",
     ".local/share/applications/zen.desktop",
     ".local/share/icons/hicolor/16x16/apps/zen-browser.png",
     ".local/share/icons/hicolor/32x32/apps/zen-browser.png",
@@ -197,4 +199,4 @@ def test_native_share_picker_is_scoped_to_try_guest():
 
 # CI trigger 20261118d: omarchy-common herdr.
 
-# CI trigger 20261118e.
+# CI trigger 20261118f.

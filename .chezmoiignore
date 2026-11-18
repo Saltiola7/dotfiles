@@ -47,9 +47,6 @@ apply-omarchy-theme.sh
 !.config/hypr/bindings.lua
 !.config/hypr/hyprland.lua
 !.config/xdg-terminals.list
-!.config/atuin/
-.config/atuin/*
-!.config/atuin/config.toml
 !.config/kitty/
 .config/kitty/*
 !.config/kitty/kitty.conf
@@ -63,9 +60,6 @@ apply-omarchy-theme.sh
 !.config/samba/smb.conf
 !.config/rustdesk-server/
 !.config/rustdesk-server/**
-!.config/atuin/
-.config/atuin/*
-!.config/atuin/config.toml
 !.config/rustdesk-client/
 !.config/rustdesk-client/**
 !.config/omarchy/
@@ -86,7 +80,7 @@ apply-omarchy-theme.sh
 !.config/autostart/synergy-3.desktop
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
-!setup-shell-tooling.sh
+!setup-tailscale.sh
 !install-zen-catppuccin.sh
 !.config/waynergy/
 .config/waynergy/*
@@ -122,11 +116,13 @@ apply-omarchy-theme.sh
 !.local/state/omarchy/indicators/
 .local/state/omarchy/indicators/*
 !.local/state/omarchy/indicators/stay-awake
+!setup-shell-tooling.sh
+!.config/atuin/config.toml
+.config/atuin/*
+!.config/atuin/
 {{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
-Library/LaunchAgents/dev.client.aws-sso-login.plist
-.local/bin/aws-sso-refresh
 .local/bin/fedora-parallels
 {{ end }}
 {{ if or (ne .chezmoi.os "darwin") (ne .machine_type "mac-mini") }}
@@ -319,7 +315,7 @@ Shared/Backup-Recovery/
 !.local/bin/kitty-plain
 !.local/share/applications/kitty-plain.desktop
 !configure-desktop-startup.sh
-!setup-shell-tooling.sh
+!setup-tailscale.sh
 {{ else }}
 .config/autostart/chatgpt.desktop
 .config/autostart/kitty.desktop
@@ -457,9 +453,6 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
-!.config/atuin/
-.config/atuin/*
-!.config/atuin/config.toml
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
 !.config/systemd/user/herdr.service
@@ -514,6 +507,10 @@ start-omarchy-deskflow.sh
 !configure-desktop-startup.sh
 !start-omarchy-deskflow.sh
 !setup-blackarch.sh
+!setup-shell-tooling.sh
+!.config/atuin/config.toml
+.config/atuin/*
+!.config/atuin/
 {{ end }}
 
 # Public example input, never a home-directory target.
