@@ -116,6 +116,10 @@ apply-omarchy-theme.sh
 !.local/state/omarchy/indicators/
 .local/state/omarchy/indicators/*
 !.local/state/omarchy/indicators/stay-awake
+!setup-shell-tooling.sh
+!.config/atuin/config.toml
+.config/atuin/*
+!.config/atuin/
 {{ end }}
 {{ if ne .chezmoi.os "darwin" }}
 .aerospace.toml
@@ -503,6 +507,10 @@ start-omarchy-deskflow.sh
 !configure-desktop-startup.sh
 !start-omarchy-deskflow.sh
 !setup-blackarch.sh
+!setup-shell-tooling.sh
+!.config/atuin/config.toml
+.config/atuin/*
+!.config/atuin/
 {{ end }}
 
 # Public example input, never a home-directory target.
