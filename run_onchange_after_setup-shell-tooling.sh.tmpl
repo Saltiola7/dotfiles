@@ -1,0 +1,31 @@
+{{ if or (eq .machine_type "omarchy") (eq .machine_type "omarchy-try") -}}
+#!/bin/bash
+# Shell tooling: atuin, direnv, fzf (distro packages; one sudo) and ble.sh
+# (pinned release tarball to ~/.local/share/blesh, no sudo). ble.sh provides
+# line editing and autocomplete only; the minimal prompt is untouched.
+set -euo pipefail
+if [[ ! -t 0 ]]; then
+    echo "[shell-tooling] Run chezmoi apply from a terminal for the sudo prompt." >&2
+    exit 0
+fi
+
+if ! pacman -Q atuin >/dev/null 2>&1 || ! pacman -Q direnv >/dev/null 2>&1 \
+   || ! pacman -Q fzf >/dev/null 2>&1; then
+    echo "==> Installing atuin direnv fzf"
+    sudo pacman -S --needed --noconfirm atuin direnv fzf
+fi
+
+BLESH_TAG="${BLESH_TAG:-v0.3.4}"
+BLESH_VER="${BLESH_TAG#v}"
+BLESH_DIR="$HOME/.local/share/blesh"
+if [[ ! -f "$BLESH_DIR/ble.sh" ]]; then
+    echo "==> Installing ble.sh $BLESH_TAG"
+    tmp=$(mktemp -d)
+    curl -fsSL -o "$tmp/ble.tar.xz" \
+        "https://github.com/akinomyoga/ble.sh/releases/download/$BLESH_TAG/ble-$BLESH_VER.tar.xz"
+    mkdir -p "$BLESH_DIR"
+    tar xJf "$tmp/ble.tar.xz" -C "$BLESH_DIR" --strip-components=1
+    rm -rf "$tmp"
+fi
+echo "[shell-tooling] ready (atuin/direnv/fzf + ble.sh). New shells pick it up."
+{{ end -}}

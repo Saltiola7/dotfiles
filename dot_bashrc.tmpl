@@ -5,7 +5,8 @@ export PATH="$HOME/.local/bin:$PATH"
 for agent in codex opencode herdr wt; do
     if [[ -x "$HOME/.local/bin/$agent" ]]; then
         case "$agent" in
-            codex) codex() { "$HOME/.local/bin/codex" "$@"; } ;;
+            # The packaged Codex CLI has no background daemon; --no-daemon is the supported mode.
+            codex) codex() { "$HOME/.local/bin/codex" --no-daemon "$@"; } ;;
             opencode) opencode() { "$HOME/.local/bin/opencode" "$@"; } ;;
             herdr) herdr() { "$HOME/.local/bin/herdr" "$@"; } ;;
             wt) wt() { "$HOME/.local/bin/wt" "$@"; } ;;
@@ -14,9 +15,20 @@ for agent in codex opencode herdr wt; do
 done
 unset agent
 [[ $- != *i* ]] && return
+# ble.sh early init: line editing + autocomplete, prompt untouched.
+if [[ -z ${BLE_VERSION-} && -r "$HOME/.local/share/blesh/ble.sh" ]]; then
+    source "$HOME/.local/share/blesh/ble.sh" --noattach
+fi
 source "$OMARCHY_PATH/default/bash/rc"
 # Mise changes PATH on each prompt; the functions above keep agent ownership stable.
 export PATH="$HOME/.local/bin:$PATH"
+
+# --- Managed shell tooling hooks (minimal prompt intentionally untouched) ---
+[ -x "$(command -v atuin)" ] && eval "$(atuin init bash)"
+[ -x "$(command -v direnv)" ] && eval "$(direnv hook bash)"
+[ -x "$(command -v fzf)" ] && source <(fzf --bash)
+# ble.sh attach must come last.
+[[ ${BLE_VERSION-} ]] && ble-attach
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then

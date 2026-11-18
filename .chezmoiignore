@@ -47,6 +47,9 @@ apply-omarchy-theme.sh
 !.config/hypr/bindings.lua
 !.config/hypr/hyprland.lua
 !.config/xdg-terminals.list
+!.config/atuin/
+.config/atuin/*
+!.config/atuin/config.toml
 !.config/kitty/
 .config/kitty/*
 !.config/kitty/kitty.conf
@@ -60,6 +63,9 @@ apply-omarchy-theme.sh
 !.config/samba/smb.conf
 !.config/rustdesk-server/
 !.config/rustdesk-server/**
+!.config/atuin/
+.config/atuin/*
+!.config/atuin/config.toml
 !.config/rustdesk-client/
 !.config/rustdesk-client/**
 !.config/omarchy/
@@ -80,6 +86,7 @@ apply-omarchy-theme.sh
 !.config/autostart/synergy-3.desktop
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
+!setup-shell-tooling.sh
 !install-zen-catppuccin.sh
 !.config/waynergy/
 .config/waynergy/*
@@ -312,6 +319,7 @@ Shared/Backup-Recovery/
 !.local/bin/kitty-plain
 !.local/share/applications/kitty-plain.desktop
 !configure-desktop-startup.sh
+!setup-shell-tooling.sh
 {{ else }}
 .config/autostart/chatgpt.desktop
 .config/autostart/kitty.desktop
