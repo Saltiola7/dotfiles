@@ -106,7 +106,8 @@ def test_waynergy_targets_opt_out_per_omarchy_host():
     ignore = (ROOT / ".chezmoiignore").read_text()
     assert '$waynergyEnabled = .waynergy_enabled' in ignore
     assert "{{ if $waynergyEnabled }}!.config/systemd/user/omarchy-waynergy.service{{ end }}" in ignore
-    assert "{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/**{{ end }}" in ignore
+    assert "{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/" in ignore
+    assert "{{ else }}.config/omarchy-host/waynergy-package/{{ end }}" in ignore
     assert "{{ if $waynergyEnabled }}!always_install-waynergy.sh{{ end }}" in ignore
     config_tmpl = (ROOT / ".chezmoi.toml.tmpl").read_text()
     assert "waynergy_enabled" in config_tmpl
