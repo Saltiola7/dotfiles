@@ -1,0 +1,9 @@
+[Unit]
+Description=Refresh the opencode usage record (incremental, indexed)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

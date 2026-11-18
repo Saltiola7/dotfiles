@@ -1,0 +1,9 @@
+#!/bin/bash
+# Fast-kill agents-panel usage collectors until the PATH shim lands.
+# Anchored patterns: only the real processes match, never shells that
+# merely mention the names.
+while true; do
+    pkill -9 -f '^/bin/bash /usr/share/omarchy/bin/omarchy-agent-usage' 2>/dev/null
+    pkill -9 -f '^/usr/bin/python3 /usr/share/omarchy/bin/omarchy-agent-usage' 2>/dev/null
+    sleep 2
+done

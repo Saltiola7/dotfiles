@@ -1,0 +1,26 @@
+#!/bin/bash
+# ungrab — break a stuck Try Omarchy (QEMU) full-grab from INSIDE the guest.
+#
+# Stuck-grab signature (verified 2026-11-17/18): mouse dead everywhere,
+# keyboard still reaches the last-focused pane, deskflow edges dead on both
+# sides, recovery only via external input injection (RustDesk). Cause: the
+# app hardcodes full-grab=on; when the release event is lost the grab holds
+# until something else steals macOS focus.
+#
+# This works because typed keys still reach the terminal during a grab:
+# it switches macOS focus away from QEMU over SSH, which breaks the grab.
+set -u
+SSH_OPTS=(-o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new)
+
+if ! ssh "${SSH_OPTS[@]}" tis@192.168.100.95 '
+    # Synthetic Cmd+Opt chord (QEMU grab-release) first, then a hard
+    # focus switch away from QEMU — the reliable breaker.
+    osascript -e "tell application \"System Events\" to key down command" \
+              -e "key down option" -e "key up option" -e "key up command" >/dev/null 2>&1
+    osascript -e "tell application \"Finder\" to activate" >/dev/null 2>&1
+    echo ok
+' 2>/dev/null | grep -q ok; then
+    echo "ungrab: could not reach the host — try RustDesk from another computer." >&2
+    exit 1
+fi
+echo "ungrab: host focus switched — grab should be released. Move the mouse now."
