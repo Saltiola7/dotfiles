@@ -409,7 +409,6 @@ load-smb-reconnect.sh
 .local/lib/omarchy-apps/
 install-omarchy-apps
 start-omarchy-deskflow.sh
-setup-blackarch.sh
 {{ end }}
 {{ if eq .machine_type "omarchy-try" }}
 # A separate VM role: never inherit HP hardware/services or host/private state.
