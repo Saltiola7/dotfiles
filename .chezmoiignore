@@ -64,7 +64,6 @@ apply-omarchy-theme.sh
 !.config/rustdesk-client/**
 !.config/omarchy/
 .config/omarchy/*
-!.config/omarchy/shell.json
 !.config/omarchy-host/
 !.config/omarchy-host/**
 !.config/zen-managed/
@@ -81,6 +80,7 @@ apply-omarchy-theme.sh
 !.config/systemd/user/espanso.service
 !apply-omarchy-theme.sh
 !setup-tailscale.sh
+!.local/bin/atuin-init-bash
 !install-zen-catppuccin.sh
 !.config/waynergy/
 .config/waynergy/*
@@ -453,6 +453,8 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+!.local/bin/atuin-init-bash
+!.local/bin/atuin-server-update
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
 !.config/systemd/user/herdr.service

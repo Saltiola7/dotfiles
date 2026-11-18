@@ -1,0 +1,31 @@
+#!/bin/bash
+# atuin-server-update — rebuild the self-hosted atuin server container at a
+# given release tag (default: latest) and switch the quadlet to it.
+#
+# GHCR returns 403 from this network, so the image is built locally from
+# the atuin source. History lives in the atuin-data volume, which survives
+# the image swap. No-op on machines without the quadlet.
+set -euo pipefail
+
+QUADLET="$HOME/.config/containers/systemd/atuin.container"
+if [[ ! -f "$QUADLET" ]]; then
+    echo "[atuin-server-update] no atuin.container quadlet here; nothing to do." >&2
+    exit 0
+fi
+
+TAG="${1:-$(git ls-remote --tags https://github.com/atuinsh/atuin.git | grep -oE 'v18\.[0-9]+\.[0-9]+$' | sort -V | tail -1)}"
+WORK=$(mktemp -d /tmp/atuin-build-XXXX)
+
+echo "==> Building atuin server $TAG"
+git clone -q --depth 1 --branch "$TAG" https://github.com/atuinsh/atuin.git "$WORK/atuin"
+podman build -q -t "localhost/atuin-server:${TAG#v}" "$WORK/atuin"
+
+echo "==> Switching quadlet to ${TAG#v}"
+sed -i "s|^Image=.*|Image=localhost/atuin-server:${TAG#v}|" "$QUADLET"
+systemctl --user daemon-reload
+systemctl --user restart atuin.service
+sleep 4
+systemctl --user is-active atuin.service
+curl -s --max-time 3 -o /dev/null -w "server: HTTP %{http_code}\n" http://127.0.0.1:8888/
+rm -rf "$WORK"
+echo "==> done: atuin server ${TAG#v}"
