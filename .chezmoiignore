@@ -526,6 +526,7 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !always_install-omarchy-remote-access.sh
 !always_mbp-asahi-hardware.sh
 !always_disable-fcitx5-mbp.sh
+!setup-blackarch.sh
 !.local/bin/mbp-omarchy-borg-backup
 !.config/systemd/user/mbp-omarchy-borg-backup.service
 !.config/systemd/user/mbp-omarchy-borg-backup.timer
