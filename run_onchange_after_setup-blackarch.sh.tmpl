@@ -15,11 +15,8 @@ MIRRORLIST=/etc/pacman.d/blackarch-mirrorlist
 KEYRING_DIR="$HOME/.cache/blackarch-setup"
 mkdir -p "$KEYRING_DIR"
 
-if [[ -f "$MIRRORLIST" ]] && pacman -Q blackarch-keyring >/dev/null 2>&1; then
-    exit 0
-fi
-
-echo "==> Installing blackarch-keyring"
+if ! pacman -Q blackarch-keyring >/dev/null 2>&1; then
+    echo "==> Installing blackarch-keyring"
 # Discover the current keyring package filename from the repo database
 # (same method as strap.sh; static URLs 404 behind a 200 HTML page).
 repo="https://blackarch.org/blackarch/blackarch/os/$(uname -m)"
@@ -28,12 +25,13 @@ keyring_pkg=$(bsdtar -xOf "$KEYRING_DIR/blackarch.db" 'blackarch-keyring-*/desc'
 [ -n "$keyring_pkg" ] || { echo "Could not find blackarch-keyring in the repository database" >&2; exit 1; }
 curl -fsSL -o "$KEYRING_DIR/$keyring_pkg" "$repo/$keyring_pkg"
 sudo pacman -U --noconfirm "$KEYRING_DIR/$keyring_pkg"
+fi
 
 echo "==> Writing $MIRRORLIST"
 sudo tee "$MIRRORLIST" >/dev/null <<'EOF'
+Server = https://blackarch.org/blackarch/$repo/os/$arch
 Server = https://eu-mirror.blackarch.org/blackarch/$repo/os/$arch
 Server = https://mirror.hetzner.com/blackarch/blackarch/$repo/os/$arch
-Server = https://blackarch.org/blackarch/$repo/os/$arch
 EOF
 
 if ! grep -q "^\[blackarch\]" /etc/pacman.conf; then
