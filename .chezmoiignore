@@ -457,6 +457,9 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+!.config/atuin/
+.config/atuin/*
+!.config/atuin/config.toml
 !.config/systemd/user/citrix-ica-watch.service
 !.config/systemd/user/citrix-ica-watch.path
 !.config/systemd/user/herdr.service
