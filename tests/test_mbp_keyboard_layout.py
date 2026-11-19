@@ -77,8 +77,8 @@ def test_keymap_inherits_colemak_dh_ortho_and_binds_altgr():
         "AD11": ["adiaeresis", "Adiaeresis", "bracketleft"],
         "AC11": ["odiaeresis", "Odiaeresis", "apostrophe"],
         "BKSL": ["quotedbl", "apostrophe", "bar"],
-        "TLDE": ["bar", "asciitilde", "backslash"],
-        "LSGT": ["grave", "less"],
+        "TLDE": ["bar", "asciitilde"],
+        "LSGT": ["grave", "backslash"],
         "AE07": ["7", "ampersand", "braceleft"],
         "AE08": ["8", "asterisk", "bracketleft"],
         "AE09": ["9", "parenleft", "bracketright"],
@@ -132,10 +132,12 @@ def test_run_script_installs_keyd_and_persists_fn_policy():
     assert "systemctl enable --now keyd" in script
     assert "options hid_apple fnmode=3" in script
     # keyd re-emits KEY_FN (464) as its internal keycode 254 on the virtual
-    # keyboard; a udev rule pins KEYBOARD_KEY_fe=fn for libinput consumers.
-    assert 'ATTRS{name}=="keyd virtual keyboard"' in script
-    assert 'KEYBOARD_KEY_fe}="fn"' in script
-    assert 'udevadm trigger' in script
+    # keyboard; a tiny bridge daemon re-emits it as real KEY_FN for tiny-dfr.
+    assert "keyd-fn-bridge" in script
+    assert "KEYD_FN = 254" in script
+    assert "UI_DEV_SETUP = 0x405C5503" in script
+    assert "keyd-fn-bridge.service" in script
+    assert 'rm -f /etc/udev/rules.d/90-keyd-virtual-fn.rules' in script
     # tiny-dfr owns the rendered strip; MediaLayerDefault=true = media keys
     # by default, F1-F12 while fn is held (fnmode only picks keycodes).
     assert 'MediaLayerDefault = true' in script

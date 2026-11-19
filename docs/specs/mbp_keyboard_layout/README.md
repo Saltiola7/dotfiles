@@ -130,16 +130,19 @@ Oryx firmware layout (external authority, see OD-1).
 
 **Scenario: grave key — pipe on tap, tilde on hold**
 - Given keyd layers are active
-- When the grave key is tapped, then `|`; with AltGr, `\`
+- When the grave key is tapped, then `|`
 - When the grave key is held past 200 ms, then `~`
 - And `|` also stays on AltGr+`\` in the keymap
 
 ### Feature: Markdown key on the ISO `<>` key
 
-**Scenario: backtick tap, code fence hold**
+**Scenario: backtick tap, code fence hold, backslash on shift**
 - Given keyd layers are active
 - When the `<>` key (LSGT) is tapped, then `` ` ``
 - When it is held past 200 ms, then ``` ``` ``` is typed for a code fence
+- When Shift+`<>` is tapped, then `\` (a plain shift level — AltGr+grave
+  woke Atuin in terminals via its escape sequence, so backslash avoids
+  AltGr entirely)
 - And the letter `z` is untouched (one physical z key only)
 
 ### Feature: Displaced angle brackets on comma and dot
@@ -194,8 +197,8 @@ Oryx firmware layout (external authority, see OD-1).
 | `[` (AD11) | ä | Ä | `[` |
 | `'` (AC11) | ö | Ö | `'` |
 | `\` (BKSL) | `"` | `'` | `\|` |
-| `` ` `` (TLDE) | `\|` | `~` | `\` |
-| LSGT (`<>` key) | `` ` `` | `<` | reserved (OD-1) |
+| `` ` `` (TLDE) | `\|` | `~` | reserved |
+| LSGT (`<>` key) | `` ` `` | `\` | reserved (hold: ``` ``` ``` via keyd) |
 | `7`/`8`/`9`/`0` | unchanged | unchanged | `{` `[` `]` `}` |
 | all other keys | inherit `us(colemak_dh_ortho)` | | |
 
@@ -300,11 +303,12 @@ mbp still types its firmware layout.
   chords are the only multi-press primitives.
 - keyd's u8 keycode table cannot carry `KEY_FN` (464): the virtual keyboard
   re-emits fn as internal keycode 254 (live-captured), so tiny-dfr — which
-  matches `KEY_FN` through libinput — never sees it. Bridge: a udev rule
-  pins `KEYBOARD_KEY_fe=fn` onto keyd's virtual keyboard (hwdb cannot match
-  it — the uinput node carries no MODALIAS); libinput applies the remap
-  exactly where tiny-dfr reads. Raw evdev still shows 254; verification is
-  the bar itself.
+  matches `KEY_FN` through libinput — never sees it. No udev-level bridge
+  exists: keyd's virtual keyboard has no MSC capability, so libinput never
+  applies `KEYBOARD_KEY_*` remaps (and the node carries no MODALIAS for
+  hwdb). Fix: the `keyd-fn-bridge` daemon re-emits keycode 254 as real
+  `KEY_FN` on a private uinput device; tiny-dfr reads it like any keyboard.
+  Raw evdev still shows 254 by design; verification is the bar itself.
 - Omarchy's Lua config tree parses at Hyprland start; `hyprctl reload`
   does not re-execute `input.lua`. Live preview without restarting the
   session: `hyprctl eval 'hl.device({...})'`; a fresh session picks the

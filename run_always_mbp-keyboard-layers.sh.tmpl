@@ -51,23 +51,117 @@ sudo systemctl enable --now keyd
 sudo systemctl restart keyd
 
 # keyd's u8 keycode table cannot carry KEY_FN (464): it re-emits fn as its
-# internal keycode 254 on the virtual keyboard, so tiny-dfr (which matches
-# KEY_FN) never switches Touch Bar layers. Restore fn at the libinput layer:
-# a udev rule pins the remap property onto keyd's virtual keyboard (hwdb
-# cannot match it — the uinput node carries no MODALIAS).
-sudo mkdir -p /etc/udev/rules.d
-sudo rm -f /etc/udev/hwdb.d/90-keyd-virtual-fn.hwdb
-printf '%s\n' 'ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event*", \' \
-    '  ATTRS{name}=="keyd virtual keyboard", ENV{KEYBOARD_KEY_fe}="fn"' \
-    | sudo tee /etc/udev/rules.d/90-keyd-virtual-fn.rules > /dev/null
-for d in /sys/class/input/input*/; do
-    grep -q "keyd virtual keyboard" "$d/name" 2>/dev/null && sudo udevadm trigger "$d"event* 2>/dev/null || true
-done
-# A keyd restart also replays add uevents, so the rule applies even when the
-# trigger races the device; restarting keyd after the rule exists is the
-# self-healing path.
-sudo systemctl restart keyd
-sudo systemctl restart tiny-dfr
+# internal keycode 254 on the virtual keyboard, and tiny-dfr — which matches
+# KEY_FN through libinput — never switches Touch Bar layers. Neither hwdb nor
+# a udev KEYBOARD_KEY_* remap can bridge it (keyd's virtual keyboard has no
+# MSC capability, so libinput never applies udev remaps). A tiny bridge
+# daemon watches keyd's virtual keyboard and re-emits only that keycode as
+# real KEY_FN on a private uinput device.
+sudo tee /usr/local/bin/keyd-fn-bridge > /dev/null << 'BRIDGE'
+#!/usr/bin/env python3
+"""keyd-fn-bridge: re-emit keyd's mangled fn keycode (254) as KEY_FN (464).
+
+keyd's u8 keycode table cannot represent KEY_FN, so its virtual keyboard
+re-emits fn as internal keycode 254 and tiny-dfr (which matches KEY_FN
+through libinput) never switches Touch Bar layers. This bridge watches
+keyd's virtual keyboard and re-emits only that keycode on a private
+uinput device; every seat0 consumer, including tiny-dfr, then sees a
+real KEY_FN. No other events are forwarded.
+"""
+import glob
+import fcntl
+import os
+import struct
+import time
+
+KEY_FN = 464
+KEYD_FN = 254
+EV_SYN, EV_KEY = 0x00, 0x01
+SYNC_REPORT = 0
+FMT = "llHHi"
+SIZE = struct.calcsize(FMT)
+
+UI_SET_EVBIT = 0x40045564
+UI_SET_KEYBIT = 0x40045565
+UI_DEV_CREATE = 0x5501
+UI_DEV_SETUP = 0x405C5503  # _IOW('U', 3, struct uinput_setup)
+
+
+def find_keyd_node():
+    for name in glob.glob("/sys/class/input/input*/name"):
+        try:
+            with open(name) as fh:
+                if fh.read().strip() != "keyd virtual keyboard":
+                    continue
+            for entry in sorted(os.listdir(os.path.dirname(name))):
+                if entry.startswith("event"):
+                    return "/dev/input/" + entry
+        except OSError:
+            continue
+    return None
+
+
+def make_uinput():
+    ui = os.open("/dev/uinput", os.O_WRONLY)
+    fcntl.ioctl(ui, UI_SET_EVBIT, EV_KEY)
+    fcntl.ioctl(ui, UI_SET_KEYBIT, KEY_FN)
+    # struct uinput_setup: input_id (4 x u16) + name[80] + ff_effects_max
+    setup = struct.pack("HHHH80sI", 0x03, 0xFEED, 0xF00D, 1, b"keyd-fn-bridge", 0)
+    fcntl.ioctl(ui, UI_DEV_SETUP, setup)
+    fcntl.ioctl(ui, UI_DEV_CREATE)
+    return ui
+
+
+def emit(ui, code, value):
+    os.write(ui, struct.pack(FMT, 0, 0, EV_KEY, code, value))
+    os.write(ui, struct.pack(FMT, 0, 0, EV_SYN, SYNC_REPORT, 0))
+
+
+def main():
+    ui = make_uinput()
+    while True:
+        node = find_keyd_node()
+        if not node:
+            time.sleep(2)
+            continue
+        try:
+            fh = os.open(node, os.O_RDONLY)
+        except OSError:
+            time.sleep(2)
+            continue
+        while True:
+            try:
+                data = os.read(fh, SIZE)
+            except OSError:
+                break  # keyd restarted: rescan for the new node
+            if len(data) < SIZE:
+                break
+            _, _, typ, code, value = struct.unpack(FMT, data)
+            if typ == EV_KEY and code == KEYD_FN:
+                emit(ui, KEY_FN, 1 if value else 0)
+
+
+if __name__ == "__main__":
+    main()
+BRIDGE
+sudo chmod 755 /usr/local/bin/keyd-fn-bridge
+sudo tee /etc/systemd/system/keyd-fn-bridge.service > /dev/null << 'UNIT'
+[Unit]
+Description=keyd fn bridge (KEY_FN from keyd keycode 254)
+After=keyd.service
+
+[Service]
+ExecStart=/usr/local/bin/keyd-fn-bridge
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+# The udev remap route is dead on keyd's MSC-less virtual keyboard; drop the
+# stale rule from earlier attempts.
+sudo rm -f /etc/udev/rules.d/90-keyd-virtual-fn.rules /etc/udev/hwdb.d/90-keyd-virtual-fn.hwdb
+sudo systemctl enable --now keyd-fn-bridge
+sudo systemctl restart keyd-fn-bridge
 sudo systemctl restart tiny-dfr
 
 # Touch Bar policy: tiny-dfr owns the rendered strip — media keys by

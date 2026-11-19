@@ -19,12 +19,14 @@ xkb_keymap {
         key <BKSL> { [ quotedbl, apostrophe, bar ] };
 
         // ZSA-free parity: pipe on tap, tilde on hold (keyd timeout,
-        // Shift+grave); the displaced backslash parks at AltGr.
-        key <TLDE> { [ bar, asciitilde, backslash ] };
+        // Shift+grave); level 3 stays free for future tailoring.
+        key <TLDE> { [ bar, asciitilde ] };
 
         // The ISO <> key becomes the markdown key: backtick on tap, a triple
-        // backtick code fence on hold (keyd macro). It must not double z.
-        key <LSGT> { [ grave, less ] };
+        // backtick code fence on hold (keyd macro), backslash on Shift — a
+        // plain shift level avoids terminal AltGr escape sequences (one of
+        // those wakes Atuin). It must not double z.
+        key <LSGT> { [ grave, backslash ] };
 
         // Brackets displaced by ä/ö live on the AltGr number cluster.
         key <AE07> { [ 7, ampersand, braceleft ] };

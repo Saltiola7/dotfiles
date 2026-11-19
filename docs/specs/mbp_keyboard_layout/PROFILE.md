@@ -9,7 +9,7 @@
 | Compatibility | Global Finnish base for external keyboards, the `omarchy-try` template branch, and every existing Hyprland MEH/HYPER chord remain unchanged; ZSA firmware untouched |
 | Trust/data | Public configuration only; no credentials, secrets, or private endpoints in this context |
 | Delivery | `chezmoi apply` on mbp-omarchy; sudo-gated `run_always` script for system files; no release artifact |
-| Operations | keyd and tiny-dfr run as distro-packaged system services; no bespoke service ownership |
+| Operations | keyd and tiny-dfr run as distro-packaged system services; the `keyd-fn-bridge` uinput shim is the one bespoke system service, deployed and enabled by the run script |
 | Maintenance | Edit the include-based keymap source directly (no compiled artifact); ZSA-parity pass when Oryx exports arrive; retire by applying the rollback contract |
 | Authorities | `pytest tests/`, chezmoi render diff (`omarchy-try` branch byte-identical), `hyprctl configerrors`, `sudo keyd monitor` live walk, Touch Bar visual check |
 
