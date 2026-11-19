@@ -563,6 +563,11 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 .config/sketchybar
 {{ end }}
 
+{{ if not (and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname)) }}
+.config/xkb/
+always_mbp-keyboard-layers.sh
+{{ end }}
+
 {{ if not (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
 .local/bin/mbp-omarchy-borg-backup
 .config/systemd/user/mbp-omarchy-borg-backup.service
@@ -587,7 +592,13 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 !.config/uwsm/env
 !always_install-waynergy.sh
 !always_install-omarchy-remote-access.sh
+!.config/xkb/
+.config/xkb/*
+!.config/xkb/keymap/
+.config/xkb/keymap/*
+!.config/xkb/keymap/tis.xkb
 !always_mbp-asahi-hardware.sh
+!always_mbp-keyboard-layers.sh
 !always_disable-fcitx5-mbp.sh
 !setup-blackarch.sh
 !.local/bin/mbp-omarchy-borg-backup

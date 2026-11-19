@@ -16,7 +16,26 @@ hl.config({ input = {
   resolve_binds_by_sym = true,
   touchpad = { natural_scroll = true },
 } })
--- The laptop built-in keyboard has no ZSA firmware: software Colemak-DH
+{{ if hasPrefix "mbp-omarchy" .chezmoi.hostname -}}
+-- mbp built-in keyboard has no ZSA firmware: the tis keymap supplies
+-- Colemak-DH with direct ä/ö and an AltGr punctuation cluster. keyd owns
+-- the tap/hold layers (Caps=HYPER, space=MEH, right-Cmd=arrows, hold-/)
+-- below this layout and re-emits events through its own virtual keyboard,
+-- which needs the same keymap. The physical entries cover keyd-disabled use.
+hl.device({
+  name = "at-translated-set-2-keyboard",
+  kb_file = "{{ .chezmoi.homeDir }}/.config/xkb/keymap/tis.xkb",
+})
+hl.device({
+  name = "apple-spi-keyboard",
+  kb_file = "{{ .chezmoi.homeDir }}/.config/xkb/keymap/tis.xkb",
+})
+hl.device({
+  name = "keyd virtual keyboard",
+  kb_file = "{{ .chezmoi.homeDir }}/.config/xkb/keymap/tis.xkb",
+})
+{{ else -}}
+-- Other Omarchy laptops without ZSA firmware use the software Colemak-DH
 -- Matrix, with Right-Alt held selecting the Finnish group so ä/ö type from
 -- their semicolon and apostrophe positions. Override the variant with the
 -- omarchy_builtin_keyboard_variant data key (colemak_dh_ortho keeps ZXCV).
@@ -34,6 +53,7 @@ hl.device({
   kb_variant = "{{ default "colemak_dh_ortho" (get . "omarchy_builtin_keyboard_variant") }},",
   kb_options = "grp:ralt_switch",
 })
+{{ end -}}
 -- Literal text injection must not invoke the desktop's shortcut bindings.
 hl.device({ name = "hl-virtual-keyboard-wtype", keybinds = false })
 {{ end -}}

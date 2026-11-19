@@ -1,0 +1,30 @@
+// mbp-omarchy built-in keyboard: Colemak-DH matrix with direct Finnish ä/ö
+// and an AltGr punctuation cluster (MKL-001, docs/specs/mbp_keyboard_layout).
+// Loaded through Hyprland kb_file; include directives resolve against
+// /usr/share/X11/xkb so distro layout updates keep flowing through.
+xkb_keymap {
+    xkb_keycodes { include "evdev+aliases(qwerty)" };
+    xkb_types { include "complete" };
+    xkb_compat { include "complete" };
+    xkb_symbols {
+        include "pc+us(colemak_dh_ortho)+inet(evdev)+level3(ralt_switch)"
+
+        // Finnish letters on their macOS muscle-memory keys (äiti, yö);
+        // AltGr keeps the original bracket and apostrophe reachable.
+        key <AD11> { [ adiaeresis, Adiaeresis, bracketleft ] };
+        key <AC11> { [ odiaeresis, Odiaeresis, apostrophe ] };
+
+        // Double quote moves to the backslash key; pipe stays at AltGr.
+        key <BKSL> { [ backslash, quotedbl, bar ] };
+        key <TLDE> { [ grave, asciitilde, bar ] };
+
+        // The ISO <> key must not double z (colemak_dh maps LSGT to z).
+        key <LSGT> { [ less, greater ] };
+
+        // Brackets displaced by ä/ö live on the AltGr number cluster.
+        key <AE07> { [ 7, ampersand, braceleft ] };
+        key <AE08> { [ 8, asterisk, bracketleft ] };
+        key <AE09> { [ 9, parenleft, bracketright ] };
+        key <AE10> { [ 0, parenright, braceright ] };
+    };
+};

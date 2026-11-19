@@ -1,13 +1,14 @@
 # MBP Built-in Keyboard Layout
 
-**Status:** Draft
+**Status:** Implemented (pending live deploy)
 **Created:** 2026-11-18
-**Last updated:** 2026-11-18
+**Last updated:** 2026-11-19
 
 ## Engineering Profile
 
-Stable defaults live in [PROFILE.md](PROFILE.md). Current-cycle overrides:
-risk `routine`, delivery intent `local` (chezmoi apply on mbp-omarchy), affected
+Stable defaults live in [PROFILE.md](PROFILE.md). Current-cycle overrides: risk
+`routine`, delivery intent `draft_pr` (feature branch + draft PR into `main`;
+durable delivery is `chezmoi apply` on mbp-omarchy after merge), affected
 scope limited to the mbp built-in keyboards and Touch Bar policy.
 
 ## Overview
@@ -33,9 +34,8 @@ Problem being solved:
 
 | Path | Purpose |
 |------|---------|
-| `private_dot_config/hypr/input.lua.tmpl` | mbp branch: built-in devices move from `us,fi` group switching to the custom keymap (`kb_file` or `~/.config/xkb` overlay, see OD-2) |
-| `private_dot_config/xkb/tis.xkb` | Compiled custom keymap loaded by Hyprland (committed; regenerated from source) |
-| `private_dot_config/xkb/src/tis.keymap` | Keymap source (`xkb_keymap` directives over `us(colemak_dh_ortho)`) |
+| `private_dot_config/hypr/input.lua.tmpl` | mbp branch: built-in devices and keyd's virtual keyboard load the custom keymap via `kb_file` |
+| `private_dot_config/xkb/keymap/tis.xkb` | Self-contained keymap source (`xkb_keymap` directives with `include` over system `us(colemak_dh_ortho)`); loaded directly by Hyprland, no compiled artifact or regen script |
 | `run_always_mbp-keyboard-layers.sh.tmpl` | Installs keyd, writes `/etc/keyd/mbp.conf`, persists Touch Bar fn policy; gated like `run_always_mbp-asahi-hardware.sh.tmpl` |
 | `tests/test_mbp_keyboard_layout.py` | Render and content contract tests (pytest, same authority as `test_omarchy_try_profile.py`) |
 
@@ -189,19 +189,26 @@ Oryx firmware layout (external authority, see OD-1).
 
 | Binding | Action |
 |---|---|
+| `[ids]` | `05ac:0341*` — built-in SPI keyboard only; external keyboards never match |
 | `capslock` | `layer(hyper)`; `[hyper:C-M-A-S]` |
 | `space` | `overloadt(meh, space, 200)`; `[meh:C-A-S]` |
 | `rightmeta` | `layer(arrows)`; arrows layer maps `j k l ;` → left/down/up/right |
-| `slash` | tap `/`; hold → backslash (see OD-3 for Shift variant) |
-| `[ids]` | built-in keyboards only; external keyboards never match |
+| `slash` | `timeout(slash, 200, backslash)`: tap `/`, hold alone past 200 ms emits `\` |
+| `[shift] slash` | `timeout(slash, 200, S-backslash)`: Shift+hold-/ emits `"` (OD-3 resolved; `|` stays on AltGr+`` ` `` and AltGr+`\` in the keymap) |
+
+keyd re-emits all built-in keyboard events through its own `keyd virtual
+keyboard` uinput device, so Hyprland's custom keymap must also bind that
+device (see the template contract below).
 
 ### Template contract
 
 - **Pre:** `input.lua.tmpl` `omarchy-try` branch and the global Finnish base
-  are byte-identical before and after this work.
-- **Post:** the mbp branch references the custom keymap for exactly the two
-  built-in device entries; `run_always` scripts are idempotent and no-op on
-  other machines.
+  are byte-identical before and after this work; non-mbp Omarchy machines keep
+  today's `us,fi` device entries.
+- **Post:** the mbp branch references the custom keymap via `kb_file` for
+  exactly three device entries — `apple-spi-keyboard`,
+  `at-translated-set-2-keyboard`, and `keyd virtual keyboard`; `run_always`
+  scripts are idempotent and no-op on other machines.
 
 ### Rollback
 
@@ -231,15 +238,15 @@ Removing the keyd conf, keymap reference, and fn policy restores today's
 
 ```bash
 # Static (repo root)
-pytest tests/ -k mbp_keyboard_layout
-chezmoi apply --dry-run --source . # mbp data renders; omarchy-try diff empty
+uv run --group test pytest tests/            # full suite, incl. other machines
+chezmoi apply --dry-run --source .           # mbp data renders; omarchy-try diff empty
 
 # Live (mbp-omarchy, after apply)
-sudo keyd monitor            # walk every tap/hold mapping incl. Shift+hold-/
-hyprctl devices              # built-ins on the custom keymap
-hyprctl configerrors         # clean
-xkbcli compile-keymap        # regenerates committed tis.xkb byte-identically
+sudo keyd monitor                # walk every tap/hold mapping incl. Shift+hold-/
+hyprctl devices                 # built-ins + keyd virtual keyboard on the tis map
+hyprctl configerrors            # clean
 cat /sys/module/hid_apple/parameters/fnmode   # 1
+systemctl is-active keyd tiny-dfr
 ```
 
 Manual matrix: ä Ä ö Ö on `[`/`'`; `{ [ ] }` and `'` on AltGr; `\` `" `` ` `` `~`
@@ -261,13 +268,22 @@ mbp still types its firmware layout.
 
 ## Facts, Assumptions, Risks, Open Decisions
 
-**Facts (verified 2026-11-18)**
+**Facts (verified 2026-11-18/19)**
 
 - Current mbp template state: `us,fi` + `colemak_dh_ortho` + `grp:ralt_switch`.
 - `colemak_dh` maps LSGT→z and the ortho override re-adds z on the z key
   (upstream comment: LSGT absent on ANSI boards) → duplicate on ISO.
 - keyd 2.6.0-5 is in `extra` for aarch64; `xkbcli` present on the mbp.
-- Touch Bar runs tiny-dfr 0.3.7 (active, stock config); `hid_apple fnmode=3`.
+- Touch Bar runs tiny-dfr 0.3.7 (active, stock config); `hid_apple fnmode=3`
+  is the loadable module's default (nothing in `/etc` persists it), so
+  `/etc/modprobe.d/hid-apple.conf` is the persistence point.
+- Built-in keyboard input ids: bus 001c, vendor 05ac, product 0341
+  (`Apple SPI Keyboard`); no separate `at-translated` device exists on the mbp.
+- Omarchy's Hyprland build forwards `kb_file` in `hl.device` (binary device
+  field whitelist, alongside `keybinds`/`share_states` already used here).
+- keyd re-emits events through its `keyd virtual keyboard` uinput device;
+  `timeout(action1, T, action2)` is the hold-emits-keycode primitive (v2.6.0
+  man page), and `[shift]` modifier-layer routing is supported.
 
 **Assumptions**
 
@@ -278,15 +294,20 @@ mbp still types its firmware layout.
 **Risks**
 
 - Typing-roll misfires on space-hold (mitigated by timeout variant; tunable).
-- Omarchy's Lua bridge may not forward `kb_file` (OD-2 fallback exists).
-- keyd hold-self-emission semantics for hold-/ need live confirmation (OD-3
-  fallback exists).
+- Hold-to-emit on `/` can misfire on slow deliberate `/` presses (isolated
+  hold past 200 ms emits `\`); tunable, and rolls are protected because an
+  intervening key resolves the tap.
+- keyd char macros assume a US symbol table; all keyd emissions use raw
+  keycodes (`backslash`, `S-backslash`) so the custom XKB levels stay authoritative.
 
 **Open decisions**
 
-- **OD-1** Final `~`/`|` placement and LSGT AltGr slot, from Moonlander Oryx
-  screenshots (ZSA parity pass).
-- **OD-2** Keymap delivery: `kb_file` via `hl.device` if the Omarchy Lua bridge
-  forwards it; else `~/.config/xkb` rules overlay maintained by a run script.
-- **OD-3** Shift+hold-/ → `|`: verify keyd `[shift]` modifier-layer routing;
-  fallback is Shift+hold-/ → `"` with `|` on AltGr+`` ` `` and AltGr+`\`.
+- **OD-1 (open)** Final `~`/`|` placement and LSGT AltGr slot, from Moonlander
+  Oryx screenshots (ZSA parity pass).
+- **OD-2 (resolved 2026-11-19)** Keymap delivery: `kb_file` via `hl.device` —
+  the Omarchy Hyprland build forwards it (device field whitelist); fallback
+  `~/.config/xkb` rules overlay not needed. Verified live at Deploy.
+- **OD-3 (resolved 2026-11-19)** Shift+hold-/ emits `"` via
+  `[shift] slash = timeout(slash, 200, S-backslash)`; `|` remains on
+  AltGr+`` ` `` and AltGr+`\` in the keymap. Live `keyd monitor` walk at Deploy
+  confirms timing feel.
