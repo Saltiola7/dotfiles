@@ -11,7 +11,7 @@ Cross-cutting work tracker for the dotfiles project. Per-spec backlogs live in t
 | 1 | Add Behavior Scenarios to astrovim.md | astrovim | low | backlog | Stable, two files customized, minimal benefit |
 | 2 | Periodic auto-snapshot for kitty workspaces | kitty_pycharm | low | pending | launchd plist calling save-workspace.py |
 | 3 | Aerospace auto-route for kitty workspace windows | kitty_pycharm | low | pending | `on-window-detected` rules |
-| 4 | Implement mbp built-in keyboard layout (XKB `tis`, keyd layers, Touch Bar policy) | mbp_keyboard_layout | high | pending | Discovery 2026-11-18; spec README is normative |
+| 4 | Implement mbp built-in keyboard layout (XKB `tis`, keyd layers, Touch Bar policy) | mbp_keyboard_layout | high | in review | MKL-001 implemented 2026-11-19; draft PR into `main`; OD-1 parity pass open |
 
 ## Spec Index
 
