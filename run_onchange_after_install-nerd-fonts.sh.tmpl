@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Refresh the fontconfig cache whenever a managed Nerd Font file changes.
+set -euo pipefail
+{{ if eq .machine_type "omarchy-try" -}}
+# fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Regular.ttf" | sha256sum }}
+# fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Bold.ttf" | sha256sum }}
+# fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Italic.ttf" | sha256sum }}
+fc-cache -f "$HOME/.local/share/fonts" >/dev/null
+{{ end -}}
