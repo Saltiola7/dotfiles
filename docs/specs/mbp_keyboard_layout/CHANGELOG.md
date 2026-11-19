@@ -11,8 +11,10 @@ cluster, duplicate-z fix) loaded via `kb_file`; keyd tap/hold layers
 to media-default (`hid_apple fnmode`).
 
 Round 2 (operator matrix revisions, same day): `fnmode=1` proved to be
-F-keys-first (the inverse of the goal), so the policy flips to
-`fnmode=3` (media default, F1-F12 on fn). Hold-/ moved to `?` (tap `/`);
+F-keys-first, but the rendered strip turned out to be tiny-dfr's
+`MediaLayerDefault` (packaged default `false` = F-keys, the "stuck"
+symptom); the fix is `/etc/tiny-dfr/config.toml` with
+`MediaLayerDefault = true` plus `fnmode=3` for the keycode side. Hold-/ moved to `?` (tap `/`);
 the grave key became ZSA style (tap `|`, hold `~`); the ISO `<>` key
 became the markdown key (tap `` ` ``, hold ``` ``` fence); `,`/`.` holds
 produce `<`/`>`. The `[shift]` slash binding was dropped — Shift+`/` tap

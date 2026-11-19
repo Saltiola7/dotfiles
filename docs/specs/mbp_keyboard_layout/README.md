@@ -265,6 +265,7 @@ sudo keyd monitor                # walk every tap/hold mapping incl. Shift+hold-
 hyprctl devices                 # built-ins + keyd virtual keyboard on the tis map
 hyprctl configerrors            # clean
 cat /sys/module/hid_apple/parameters/fnmode   # 3 (media first; 1 is F-keys first)
+grep MediaLayerDefault /etc/tiny-dfr/config.toml   # true — tiny-dfr owns the strip
 systemctl is-active keyd tiny-dfr
 ```
 
@@ -310,11 +311,14 @@ mbp still types its firmware layout.
 - `colemak_dh` maps LSGT→z and the ortho override re-adds z on the z key
   (upstream comment: LSGT absent on ANSI boards) → duplicate on ISO.
 - keyd 2.6.0-5 is in `extra` for aarch64; `xkbcli` present on the mbp.
-- Touch Bar runs tiny-dfr 0.3.7 (active, stock config); `hid_apple fnmode=3`
-  is the loadable module's default (nothing in `/etc` persists it), so
-  `/etc/modprobe.d/hid-apple.conf` is the persistence point. Live-verified
-  semantics: `fnmode=1` is F-keys-first (the inverse of the goal); `3` gives
-  media controls by default with F1-F12 on fn.
+- Touch Bar runs tiny-dfr 0.3.7 (active). Two independent layers, both
+  live-verified: tiny-dfr's `MediaLayerDefault` decides the rendered strip
+  (packaged default `false` = F-keys shown — the "stuck" symptom); fnmode
+  only decides keycodes (`fnmode=1` is F-keys-first, `3` is media-first).
+  Policy: `/etc/tiny-dfr/config.toml` with `MediaLayerDefault = true`
+  (merged over the packaged template) plus `fnmode=3`, both persisted by
+  the run script. tiny-dfr tracks fn through the DFR virtual input device,
+  which keyd ignores, so fn-layer switching survives the keyboard grab.
 - Built-in keyboard input ids: bus 001c, vendor 05ac, product 0341
   (`Apple SPI Keyboard`); no separate `at-translated` device exists on the mbp.
 - Omarchy's Hyprland build forwards `kb_file` in `hl.device` (binary device

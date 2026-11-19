@@ -128,6 +128,10 @@ def test_run_script_installs_keyd_and_persists_fn_policy():
     assert "/etc/keyd/mbp.conf" in script
     assert "systemctl enable --now keyd" in script
     assert "options hid_apple fnmode=3" in script
+    # tiny-dfr owns the rendered strip; MediaLayerDefault=true = media keys
+    # by default, F1-F12 while fn is held (fnmode only picks keycodes).
+    assert 'MediaLayerDefault = true' in script
+    assert 'systemctl restart tiny-dfr' in script
     assert "/sys/module/hid_apple/parameters/fnmode" in script
 
 
