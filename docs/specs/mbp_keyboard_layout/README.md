@@ -298,6 +298,12 @@ mbp still types its firmware layout.
   why LSGT's fence macro fires `102nd` three times).
 - keyd has no tap-dance/double-tap detection; hold timeouts and two-key
   chords are the only multi-press primitives.
+- keyd's u8 keycode table cannot carry `KEY_FN` (464): the virtual keyboard
+  re-emits fn as internal keycode 254 (live-captured), so tiny-dfr — which
+  matches `KEY_FN` through libinput — never sees it. Bridge: udev hwdb remap
+  `evdev:input:b0003v0facp0ade*` / `KEYBOARD_KEY_fe=fn` applies at the
+  libinput layer, exactly where tiny-dfr reads. Raw evdev still shows 254;
+  verification is the bar itself.
 - Omarchy's Lua config tree parses at Hyprland start; `hyprctl reload`
   does not re-execute `input.lua`. Live preview without restarting the
   session: `hyprctl eval 'hl.device({...})'`; a fresh session picks the

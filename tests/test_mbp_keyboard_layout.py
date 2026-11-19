@@ -131,6 +131,11 @@ def test_run_script_installs_keyd_and_persists_fn_policy():
     assert "/etc/keyd/mbp.conf" in script
     assert "systemctl enable --now keyd" in script
     assert "options hid_apple fnmode=3" in script
+    # keyd re-emits KEY_FN (464) as its internal keycode 254 on the virtual
+    # keyboard; libinput-level hwdb remap restores fn for tiny-dfr.
+    assert "evdev:input:b0003v0facp0ade*" in script
+    assert "KEYBOARD_KEY_fe=fn" in script
+    assert "systemd-hwdb update" in script
     # tiny-dfr owns the rendered strip; MediaLayerDefault=true = media keys
     # by default, F1-F12 while fn is held (fnmode only picks keycodes).
     assert 'MediaLayerDefault = true' in script
