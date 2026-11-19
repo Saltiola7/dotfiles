@@ -1,0 +1,39 @@
+# Managed by chezmoi; manual edits will show as drift.
+# Aliases for herdr --remote attach over the tailnet; identical on every
+# controller. Linux targets authenticate via Tailscale SSH; mac-mini via
+# sshd keys.
+{{ if eq .chezmoi.os "darwin" -}}
+# Added by Colima
+{{ if stat (joinPath .chezmoi.homeDir ".colima/ssh_config") -}}
+Include {{ .chezmoi.homeDir }}/.colima/ssh_config
+{{ end }}
+# Added by OrbStack: 'orb' SSH host for Linux machines
+# This only works if it's at the top of ssh_config (before any Host blocks).
+# This won't be added again if you remove it.
+Include {{ .chezmoi.homeDir }}/.orbstack/ssh/config
+{{ end -}}
+Host try-omarchy
+    HostName omarchy-1
+    User tis
+
+Host hp-omarchy
+    HostName omarchy
+    User tis
+
+Host old-omarchy
+    User tis
+
+Host mbp-omarchy
+    User tis
+
+Host mac-mini
+    User tis
+{{ if eq .chezmoi.os "darwin" -}}
+# macOS-scoped connection defaults (retained from prior managed config).
+Host *
+    IdentityAgent "~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    StrictHostKeyChecking ask
+    HashKnownHosts yes
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+{{ end -}}

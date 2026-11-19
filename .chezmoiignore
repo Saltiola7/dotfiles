@@ -40,6 +40,9 @@ apply-omarchy-theme.sh
 {{ if eq .machine_type "omarchy" }}
 *
 !.bashrc
+!.ssh/
+.ssh/*
+!.ssh/config
 !.config/
 .config/*
 !.config/homelab/
@@ -462,6 +465,9 @@ start-omarchy-deskflow.sh
 # A separate VM role: never inherit HP hardware/services or host/private state.
 *
 !.bashrc
+!.ssh/
+.ssh/*
+!.ssh/config
 !.config/
 .config/*
 !.config/hypr/
