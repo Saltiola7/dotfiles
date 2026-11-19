@@ -15,7 +15,7 @@ The stable Engineering Profile is [`PROFILE.md`](PROFILE.md).
 | Cycle | `HERDR-REMOTE-001` |
 | Risk | Elevated: changes SSH reachability configuration across five personal hosts and publishes connection topology names to the public repository; no credentials are published |
 | Delivery intent | `merge` — feature-branch draft PR into `main` |
-| Affected scope | New chezmoi source file `private_dot_ssh/private_config` rendering `~/.ssh/config`; this spec set |
+| Affected scope | Rewrite of existing `private_dot_ssh/config.tmpl` as `private_dot_ssh/private_config.tmpl` rendering `~/.ssh/config` mode 600; `.chezmoiignore` whitelist re-includes for the two Linux controller roles; this spec set |
 | Changed profile values | None; new context |
 
 ## Overview
@@ -35,18 +35,22 @@ Controllers: `mbp-omarchy` (Omarchy laptop), `try-omarchy` (Omarchy VM),
 
 | Path | Purpose |
 |------|---------|
-| `private_dot_ssh/private_config` | chezmoi source rendering `~/.ssh/config`, mode 600 |
+| `private_dot_ssh/private_config.tmpl` | chezmoi template rendering `~/.ssh/config`, mode 600; unconditional alias stanzas plus darwin-scoped legacy globals |
+| `private_dot_ssh/encrypted_private_id_rsa.age` | Pre-existing darwin-scoped encrypted key for mac-mini outbound auth; unchanged by this cycle |
+| `.chezmoiignore` | Whitelist re-includes (`!.ssh/`, `.ssh/*`, `!.ssh/config`) for `omarchy` and `omarchy-try` roles |
 | `~/.ssh/config` (rendered) | Alias stanzas consumed by OpenSSH and therefore by `herdr --remote` |
 | `docs/specs/herdr_remote_access/` | This spec set, plan, backlog, changelog |
 
 ## Architecture
 
-Identical `~/.ssh/config` on every controller. Each alias stanza maps an
-operator-facing alias to a tailnet host and user. `herdr --remote <alias>`
-delegates connection to OpenSSH, so alias resolution, not Herdr, owns the
-targeting. Two authentication paths: Tailscale SSH for Linux targets, plain
-sshd with operator-authorized public keys for the macOS target, where
-Tailscale's SSH server is unavailable.
+Identical alias stanzas on every controller, from one template. Each alias
+stanza maps an operator-facing alias to a tailnet host and user. macOS-scoped
+legacy globals (1Password agent routing, Colima/OrbStack includes, hardening
+defaults) render only on darwin behind a template condition; Linux controllers
+get the pure alias set. `herdr --remote <alias>` delegates connection to
+OpenSSH, so alias resolution, not Herdr, owns the targeting. Two authentication
+paths: Tailscale SSH for Linux targets, plain sshd with operator-authorized
+public keys for the macOS target, where Tailscale's SSH server is unavailable.
 
 ## Domain
 
@@ -164,11 +168,15 @@ administration — each externally owned and unchanged here.
 
 ### Alias stanza set
 - **Invariant:** every stanza sets `User`; every alias whose name differs
-  from its tailnet name declares `HostName`; no wildcard stanza exists;
-  no credential-bearing directive (`IdentityFile`, `ProxyCommand` with
-  secrets, `PasswordAuthentication`) exists in source.
-- **Invariant:** the stanza set is byte-identical across controllers —
-  per-host divergence is a defect.
+  from its tailnet name declares `HostName`; no wildcard stanza renders on
+  Linux controllers — a darwin-scoped `Host *` block may exist solely to
+  preserve mac-mini's legacy connection defaults; no credential-bearing
+  directive (`IdentityFile`, `ProxyCommand` with secrets,
+  `PasswordAuthentication`) exists in source, and no tailnet address or
+  domain appears in source — MagicDNS names only.
+- **Invariant:** the alias stanza set is byte-identical across controllers
+  in source and in every render; only the darwin-scoped globals may differ
+  by OS. Per-host divergence of alias stanzas is a defect.
 
 ### Remote attach
 - **Pre:** target online on the tailnet and its Herdr server running.
@@ -253,8 +261,13 @@ server has been started once): `herdr --remote <alias>` attaches.
 **Facts (observed 2026-11-18).** All target tailnet identities are online.
 `try-omarchy` runs Tailscale SSH already. `mbp-omarchy` runs sshd with
 Tailscale SSH disabled. `mac-mini` runs Remote Login. Herdr 0.9.5 on
-`mbp-omarchy` supports `--remote` and machine profiles. No `~/.ssh/config`
-exists on `mbp-omarchy`; other hosts unverified.
+`mbp-omarchy` supports `--remote` and machine profiles. Main already owned a
+mac-mini-only managed config (`private_dot_ssh/config.tmpl`, commits
+`79a8b40`, `55d397e`) with a published raw tailnet address, a `Host *`
+1Password block, and a darwin-scoped encrypted `id_rsa`; the `omarchy` and
+`omarchy-try` whitelist blocks ignored `.ssh` entirely, so Linux controllers
+rendered no managed config. No `~/.ssh/config` exists on `mbp-omarchy`;
+other hosts unverified.
 
 **Assumptions.** Herdr is installed on `old-omarchy`, `hp-omarchy`, and
 `mac-mini` (operator-confirmed for `mac-mini`). macOS username on
@@ -286,3 +299,7 @@ host provisioning.
   edits on any host will show as drift.
 - Tailscale's SSH server cannot run on macOS; that target keeps plain
   sshd and per-controller authorized keys.
+- `omarchy` and `omarchy-try` are whitelist roles: a new `.ssh` target must
+  be re-included in both blocks or it silently never renders.
+- `encrypted_private_id_rsa.age` stays darwin-scoped through those same
+  whitelists; Linux controllers render config only, never the key.
