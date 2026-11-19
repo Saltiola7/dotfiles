@@ -100,7 +100,7 @@ def test_keymap_inherits_colemak_dh_ortho_and_binds_altgr():
 
 def test_keyd_layers_match_spec_table():
     conf = keyd_conf()
-    assert re.search(r"\[ids\]\n05ac:0341\*\n", conf)  # built-in SPI keyboard only
+    assert re.search(r"\[ids\]\n05ac:0341:89b7fedc\n", conf)  # keyboard node uid only
     assert "capslock = layer(hyper)" in conf
     assert "space = overloadt(meh, space, 200)" in conf
     assert "rightmeta = layer(arrows)" in conf

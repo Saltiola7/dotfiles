@@ -189,7 +189,7 @@ Oryx firmware layout (external authority, see OD-1).
 
 | Binding | Action |
 |---|---|
-| `[ids]` | `05ac:0341*` — built-in SPI keyboard only; external keyboards never match |
+| `[ids]` | `05ac:0341:89b7fedc` — the built-in SPI keyboard node only (keyd ids are prefix matches with no glob syntax; the uid suffix excludes the same-id SPI trackpad) |
 | `capslock` | `layer(hyper)`; `[hyper:C-M-A-S]` |
 | `space` | `overloadt(meh, space, 200)`; `[meh:C-A-S]` |
 | `rightmeta` | `layer(arrows)`; arrows layer maps `j k l ;` → left/down/up/right |
@@ -219,13 +219,13 @@ Removing the keyd conf, keymap reference, and fn policy restores today's
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
 |---|---|---|---|---|---|---|
-| Development Kernel | required | required | pending | pytest + render diff + live smoke | — | operator |
-| Review | required | required | pending | PR review | — | operator |
-| Integrate | required | required | pending | merge to `main` | — | operator |
+| Development Kernel | required | required | passed | pytest (891 passed) + render contracts; gate commit `1c55820` | — | operator |
+| Review | required | required | pending | diff coherence + draft PR review | — | operator |
+| Integrate | required | required | pending | PR 3-way merge into `main` (auto-merge verified against current `main`) | — | operator |
 | Release | not_applicable | not_applicable | — | no versioned artifact; chezmoi apply delivers | — | — |
-| Deploy | required | required | pending | `chezmoi apply` on mbp-omarchy + live verification | — | operator |
+| Deploy | required | required | pending | preview live on mbp (keymap loaded, configerrors clean); system layer + manual matrix operator-pending | — | operator |
 | Operate | not_applicable | not_applicable | — | keyd/tiny-dfr are distro-packaged services | — | — |
-| Maintain | required | required | pending | keymap regen script + OD-1 parity pass | — | operator |
+| Maintain | required | required | pending | edit keymap source directly; OD-1 parity pass when Oryx exports arrive | — | operator |
 | Retire | not_applicable | not_applicable | — | rollback contract above | — | — |
 
 ## Artifact Review
@@ -265,6 +265,17 @@ mbp still types its firmware layout.
   left Cmd and Caps Lock remain Super/HYPER sources.
 - keyd runs as a system daemon: its conf is deployed via the sudo-gated
   `run_always` script pattern, not plain chezmoi files.
+- keyd `[ids]` are literal prefix matches (`strstr(id, pattern) == id`), not
+  globs: `05ac:0341*` matches nothing. Use the full `vendor:product:uid`
+  (journal prints it); a bare `vendor:product` would also match the SPI
+  trackpad, which keyd grabbing would break.
+- Omarchy's Lua config tree parses at Hyprland start; `hyprctl reload`
+  does not re-execute `input.lua`. Live preview without restarting the
+  session: `hyprctl eval 'hl.device({...})'`; a fresh session picks the
+  file up natively.
+- `git hash-object` dereferences symlinks, so `dbsctrctl gate-commit`
+  cannot carry symlink paths; base reconciliation therefore rides the
+  PR 3-way merge (verified auto-mergeable) instead of a branch merge.
 
 ## Facts, Assumptions, Risks, Open Decisions
 

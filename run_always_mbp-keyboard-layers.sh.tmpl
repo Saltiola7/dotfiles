@@ -14,8 +14,11 @@ sudo tee /etc/keyd/mbp.conf > /dev/null << 'KEYD'
 # mbp built-in keyboard tap/hold layers; deployed by chezmoi (MKL-001).
 # External keyboards (ZSA over USB) never match [ids] and stay untouched.
 # keyd resolves below XKB: j k l ; are raw keycodes = Colemak n e i o.
+# ids are PREFIX matches (no globs): the :89b7fedc uid pins the keyboard
+# node only -- bare 05ac:0341 would also grab the SPI trackpad. If keyd
+# upgrades change the uid, find the new one in: journalctl -u keyd
 [ids]
-05ac:0341*
+05ac:0341:89b7fedc
 
 [main]
 capslock = layer(hyper)
