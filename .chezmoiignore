@@ -116,6 +116,10 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-backup-setup
 !.local/share/
 .local/share/*
+!.local/share/fonts/
+.local/share/fonts/*
+!.local/share/fonts/**
+!install-nerd-fonts.sh
 !.local/share/applications/
 .local/share/applications/*
 !.local/share/applications/zen.desktop
@@ -460,6 +464,8 @@ configure-omarchy-shell.sh
 .local/lib/omarchy-apps/
 install-omarchy-apps
 start-omarchy-deskflow.sh
+.config/foot/foot.ini
+install-nerd-fonts.sh
 {{ end }}
 {{ if eq .machine_type "omarchy-try" }}
 # A separate VM role: never inherit HP hardware/services or host/private state.
@@ -501,6 +507,13 @@ start-omarchy-deskflow.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+!.config/foot/
+.config/foot/*
+!.config/foot/foot.ini
+!.local/share/fonts/
+.local/share/fonts/*
+!.local/share/fonts/**
+!install-nerd-fonts.sh
 !.local/bin/atuin-init-bash
 !.local/bin/atuin-server-update
 !.local/bin/herdr-pane-reconcile
