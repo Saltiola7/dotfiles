@@ -40,4 +40,7 @@ sudo-gated keyd/fnmode script. Rollback: `git switch main && chezmoi
 apply` restores `us,fi` + `grp:ralt_switch`.
 
 Final Push target: draft PR `dbsctr/mbp_keyboard_layout/MKL-001` →
-`main` (Saltiola7/dotfiles).
+`main` (Saltiola7/dotfiles), operator-approved to merge when CI is green.
+Gate ledger closed at the reconciliation merge with `origin/main`; the
+OD-1 ZSA-parity residue (LSGT AltGr slot) stays deferred in the backlog
+pending the operator's Oryx export.

@@ -238,13 +238,13 @@ Removing the keyd conf, keymap reference, and fn policy restores today's
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
 |---|---|---|---|---|---|---|
-| Development Kernel | required | required | passed | pytest (891 passed) + render contracts; gate commit `1c55820` | — | operator |
-| Review | required | required | pending | diff coherence + draft PR review | — | operator |
-| Integrate | required | required | pending | PR 3-way merge into `main` (auto-merge verified against current `main`) | — | operator |
+| Development Kernel | required | required | passed | pytest (890-891 passed across rounds) + render contracts; gate commits `1c55820`, `85e93c8`, `2c5c8ff`, `4413434` | — | operator |
+| Review | required | required | passed | diff coherence across rounds + full-suite evidence at final head; operator matrix acceptance | — | operator |
+| Integrate | required | required | passed | base reconciliation merge with `origin/main` (clean auto-merge, union validation green); PR 3-way merge into `main` | — | operator |
 | Release | not_applicable | not_applicable | — | no versioned artifact; chezmoi apply delivers | — | — |
-| Deploy | required | required | pending | preview live on mbp (keymap loaded, configerrors clean); system layer + manual matrix operator-pending | — | operator |
+| Deploy | required | required | passed | live on mbp: keyd matched the SPI keyboard, tis keymap active on keyd virtual keyboard, `configerrors` clean, `fnmode=3`, tiny-dfr `MediaLayerDefault=true`; operator matrix (ä/ö, brackets, HYPER/MEH, arrows, ```` ``` ````, `?`, Touch Bar) | — | operator |
 | Operate | not_applicable | not_applicable | — | keyd/tiny-dfr are distro-packaged services | — | — |
-| Maintain | required | required | pending | edit keymap source directly; OD-1 parity pass when Oryx exports arrive | — | operator |
+| Maintain | required | required | passed | edit keymap source directly (no compiled artifact); OD-1 residue tracked in backlog for the Oryx parity pass | OD-1 deferred: LSGT AltGr slot + final ZSA sweep pending operator Oryx export | operator |
 | Retire | not_applicable | not_applicable | — | rollback contract above | — | — |
 
 ## Artifact Review
