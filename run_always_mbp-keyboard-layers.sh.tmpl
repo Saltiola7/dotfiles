@@ -52,15 +52,18 @@ sudo systemctl restart keyd
 
 # keyd's u8 keycode table cannot carry KEY_FN (464): it re-emits fn as its
 # internal keycode 254 on the virtual keyboard, so tiny-dfr (which matches
-# KEY_FN) never switches Touch Bar layers. Bridge it at the libinput layer
-# with a udev hwdb remap on keyd's virtual keyboard (bus 0003, 0fac:0ade).
-sudo mkdir -p /etc/udev/hwdb.d
-printf '%s\n' "evdev:input:b0003v0facp0ade*" \
-    " KEYBOARD_KEY_fe=fn" | sudo tee /etc/udev/hwdb.d/90-keyd-virtual-fn.hwdb > /dev/null
-sudo systemd-hwdb update
+# KEY_FN) never switches Touch Bar layers. Restore fn at the libinput layer:
+# a udev rule pins the remap property onto keyd's virtual keyboard (hwdb
+# cannot match it — the uinput node carries no MODALIAS).
+sudo mkdir -p /etc/udev/rules.d
+sudo rm -f /etc/udev/hwdb.d/90-keyd-virtual-fn.hwdb
+printf '%s\n' 'ACTION=="add|change", SUBSYSTEM=="input", KERNEL=="event*", \' \
+    '  ATTRS{name}=="keyd virtual keyboard", ENV{KEYBOARD_KEY_fe}="fn"' \
+    | sudo tee /etc/udev/rules.d/90-keyd-virtual-fn.rules > /dev/null
 for d in /sys/class/input/input*/; do
     grep -q "keyd virtual keyboard" "$d/name" 2>/dev/null && sudo udevadm trigger "$d"
 done
+sudo systemctl restart tiny-dfr
 
 # Touch Bar policy: tiny-dfr owns the rendered strip — media keys by
 # default, F1-F12 while fn is held. /etc/tiny-dfr/config.toml merges over

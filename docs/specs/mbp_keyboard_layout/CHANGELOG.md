@@ -24,10 +24,10 @@ to media-default (`hid_apple fnmode`).
 Round 3 (fn fix, same day): live capture on keyd's virtual keyboard
 proved keyd re-emits `KEY_FN` (464) as its internal keycode 254 —
 tiny-dfr matches 464, so Touch Bar layer switching died with the grab.
-A udev hwdb remap on the keyd virtual keyboard
-(`KEYBOARD_KEY_fe=fn`) restores fn at the libinput layer where
-tiny-dfr reads; the script deploys it with `systemd-hwdb update` and
-a device trigger. Raw evdev keeps showing 254 by design.
+A udev rule pins `KEYBOARD_KEY_fe=fn` onto the keyd virtual keyboard
+(hwdb cannot match the uinput node — no MODALIAS), restoring fn at the
+libinput layer where tiny-dfr reads; the script triggers the device
+and restarts tiny-dfr. Raw evdev keeps showing 254 by design.
 
 Round 2 (operator matrix revisions, same day): `fnmode=1` proved to be
 F-keys-first, but the rendered strip turned out to be tiny-dfr's
