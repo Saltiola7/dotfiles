@@ -28,6 +28,10 @@ Host mbp-omarchy
 
 Host mac-mini
     User tis
+{{ if stat (joinPath .chezmoi.homeDir ".ssh/config.d") -}}
+# Operator-managed per-host fragments.
+Include config.d/*
+{{ end -}}
 {{ if eq .chezmoi.os "darwin" -}}
 # macOS-scoped connection defaults (retained from prior managed config).
 Host *
