@@ -10,6 +10,7 @@ uv.lock
 .aider*
 .opencode/package.json
 .opencode/package-lock.json
+.dbsctr/
 graphify-out/
 # Operator-local identity routing and other private machine configuration.
 /local/
