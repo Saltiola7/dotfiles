@@ -123,13 +123,14 @@ Oryx firmware layout (external authority, see OD-1).
 
 ### Feature: Quote and pipe relocation
 
-**Scenario: double quote moves to backslash key**
-- Given the custom keymap is active
-- When `\` is tapped, then `\`; with Shift, `"`
-
-**Scenario: ZSA-style grave key — pipe on tap, tilde on hold**
+**Scenario: the backslash key becomes the quote key**
 - Given keyd layers are active
-- When the grave key is tapped, then `|`; with AltGr, `` ` ``
+- When the backslash key is tapped, then `"`; held past 200 ms, `'`
+- And `|` stays at AltGr on the same key
+
+**Scenario: grave key — pipe on tap, tilde on hold**
+- Given keyd layers are active
+- When the grave key is tapped, then `|`; with AltGr, `\`
 - When the grave key is held past 200 ms, then `~`
 - And `|` also stays on AltGr+`\` in the keymap
 
@@ -192,8 +193,8 @@ Oryx firmware layout (external authority, see OD-1).
 |---|---|---|---|
 | `[` (AD11) | ä | Ä | `[` |
 | `'` (AC11) | ö | Ö | `'` |
-| `\` (BKSL) | `\` | `"` | `\|` |
-| `` ` `` (TLDE) | `\|` | `~` | `` ` `` |
+| `\` (BKSL) | `"` | `'` | `\|` |
+| `` ` `` (TLDE) | `\|` | `~` | `\` |
 | LSGT (`<>` key) | `` ` `` | `<` | reserved (OD-1) |
 | `7`/`8`/`9`/`0` | unchanged | unchanged | `{` `[` `]` `}` |
 | all other keys | inherit `us(colemak_dh_ortho)` | | |
@@ -212,6 +213,8 @@ Oryx firmware layout (external authority, see OD-1).
 | `rightmeta` | `layer(arrows)`; arrows layer maps `j k l ;` → left/down/up/right |
 | `slash` | `timeout(slash, 200, S-slash)`: tap `/`, hold `?` |
 | `grave` | `timeout(grave, 200, S-grave)`: tap `\|`, hold `~` |
+| `backslash` | `timeout(backslash, 200, S-backslash)`: tap `"`, hold `'` |
+| `fn` | `fn = fn`: explicit KEY_FN passthrough so tiny-dfr keeps receiving it through the virtual keyboard |
 | `102nd` (LSGT) | `timeout(102nd, 200, macro(102nd 102nd 102nd))`: tap `` ` ``, hold types ``` ``` ``` |
 | `comma` / `dot` | `timeout(..., 200, S-...)`: tap `,`/`.`, hold `<`/`>` |
 
@@ -244,7 +247,7 @@ Removing the keyd conf, keymap reference, and fn policy restores today's
 | Release | not_applicable | not_applicable | — | no versioned artifact; chezmoi apply delivers | — | — |
 | Deploy | required | required | passed | live on mbp: keyd matched the SPI keyboard, tis keymap active on keyd virtual keyboard, `configerrors` clean, `fnmode=3`, tiny-dfr `MediaLayerDefault=true`; operator matrix (ä/ö, brackets, HYPER/MEH, arrows, ```` ``` ````, `?`, Touch Bar) | — | operator |
 | Operate | not_applicable | not_applicable | — | keyd/tiny-dfr are distro-packaged services | — | — |
-| Maintain | required | required | passed | edit keymap source directly (no compiled artifact); OD-1 residue tracked in backlog for the Oryx parity pass | OD-1 deferred: LSGT AltGr slot + final ZSA sweep pending operator Oryx export | operator |
+| Maintain | required | required | passed | edit keymap source directly (no compiled artifact); OD-1 closed as superseded — layout tailored on its own merits | — | operator |
 | Retire | not_applicable | not_applicable | — | rollback contract above | — | — |
 
 ## Artifact Review
@@ -344,11 +347,11 @@ mbp still types its firmware layout.
 
 **Open decisions**
 
-- **OD-1 (partially applied 2026-11-19)** Final `~`/`|` placement and LSGT
-  AltGr slot, from Moonlander Oryx screenshots (ZSA parity pass). Operator
-  memory already applied: grave tap `|` / hold `~`, LSGT `` ` ``/``` fence,
-  `,`/`.` holds for `<`/`>`. Screenshots still welcome to settle the LSGT
-  AltGr slot and anything else.
+- **OD-1 (closed 2026-11-19, superseded)** ZSA parity is dropped as a goal;
+  the layout is tailored on its own merits. Partial parity already applied
+  (grave tap `|` / hold `~`, LSGT `` ` ``/``` fence, `,`/`.` holds for
+  `<`/`>`) stays because it tested well; no Oryx export is awaited and the
+  LSGT AltGr slot stays free for future tailoring.
 - **OD-2 (resolved 2026-11-19)** Keymap delivery: `kb_file` via `hl.device` —
   the Omarchy Hyprland build forwards it (device field whitelist); fallback
   `~/.config/xkb` rules overlay not needed. Verified live at Deploy.

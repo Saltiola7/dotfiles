@@ -2,6 +2,17 @@
 
 All notable changes to this bounded context.
 
+## 2026-11-19 — MKL-002: quote key, fn passthrough, kitty font, OD-1 closed
+
+Operator tailoring: the backslash key becomes the quote key (tap `"`,
+hold `'` via `timeout` + Shift level); the displaced `\` parks at
+AltGr+grave. `fn = fn` makes KEY_FN flow explicitly through keyd's
+virtual keyboard so tiny-dfr can switch Touch Bar layers (the physical
+node is hidden by the grab). ZSA parity is formally dropped — the
+layout is tailored on its own merits from here (OD-1 closed). Scope
+addition: kitty `font_size` becomes host-aware (9.0 on mbp-omarchy,
+14.0 elsewhere) to clear the mbp's only chezmoi drift.
+
 ## 2026-11-19 — MKL-001: tis keymap + keyd layers + fn policy
 
 Outcome: mbp built-in keyboard moved from `us,fi` group switching to a

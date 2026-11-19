@@ -24,10 +24,15 @@ sudo tee /etc/keyd/mbp.conf > /dev/null << 'KEYD'
 capslock = layer(hyper)
 space = overloadt(meh, space, 200)
 rightmeta = layer(arrows)
+# Explicit KEY_FN passthrough: tiny-dfr switches Touch Bar layers from any
+# seat0 keyboard; the grab hides the physical node, so the virtual one must
+# carry it.
+fn = fn
 # Tap/hold symbol keys (hold emits shift+key through the tis keymap):
 slash = timeout(slash, 200, S-slash)                          # / tap, ? hold
 grave = timeout(grave, 200, S-grave)                          # | tap, ~ hold
 102nd = timeout(102nd, 200, macro(102nd 102nd 102nd))         # ` tap, ``` hold
+backslash = timeout(backslash, 200, S-backslash)              # " tap, ' hold
 comma = timeout(comma, 200, S-comma)                          # , tap, < hold
 dot = timeout(dot, 200, S-dot)                                # . tap, > hold
 

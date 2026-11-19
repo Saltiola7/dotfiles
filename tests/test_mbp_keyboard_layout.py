@@ -76,8 +76,8 @@ def test_keymap_inherits_colemak_dh_ortho_and_binds_altgr():
     overrides = {
         "AD11": ["adiaeresis", "Adiaeresis", "bracketleft"],
         "AC11": ["odiaeresis", "Odiaeresis", "apostrophe"],
-        "BKSL": ["backslash", "quotedbl", "bar"],
-        "TLDE": ["bar", "asciitilde", "grave"],
+        "BKSL": ["quotedbl", "apostrophe", "bar"],
+        "TLDE": ["bar", "asciitilde", "backslash"],
         "LSGT": ["grave", "less"],
         "AE07": ["7", "ampersand", "braceleft"],
         "AE08": ["8", "asterisk", "bracketleft"],
@@ -105,9 +105,12 @@ def test_keyd_layers_match_spec_table():
     assert "space = overloadt(meh, space, 200)" in conf
     assert "rightmeta = layer(arrows)" in conf
     # Tap/hold symbol keys: hold emits shift+key resolved through the keymap.
+    # fn = fn keeps KEY_FN flowing to tiny-dfr through the virtual keyboard.
+    assert "fn = fn" in conf
     assert "slash = timeout(slash, 200, S-slash)" in conf        # / tap, ? hold
     assert "grave = timeout(grave, 200, S-grave)" in conf        # | tap, ~ hold
     assert "102nd = timeout(102nd, 200, macro(102nd 102nd 102nd))" in conf  # ` tap, ``` hold
+    assert "backslash = timeout(backslash, 200, S-backslash)" in conf  # " tap, ' hold
     assert "comma = timeout(comma, 200, S-comma)" in conf        # , tap, < hold
     assert "dot = timeout(dot, 200, S-dot)" in conf              # . tap, > hold
     assert "[shift]" not in conf  # Shift+/ tap already gives ? via the keymap
@@ -142,6 +145,13 @@ def test_run_script_noops_off_mbp():
         assert "pacman" not in script
         assert "/etc/keyd" not in script
         assert "fnmode" not in script
+
+
+def test_kitty_font_size_follows_host_preference():
+    kitty = render("private_dot_config/kitty/kitty.conf.tmpl", MBP)
+    assert "font_size 9.0" in kitty
+    desk = render("private_dot_config/kitty/kitty.conf.tmpl", DESK)
+    assert "font_size 14.0" in desk
 
 
 # --- chezmoi managed-set contract -------------------------------------------

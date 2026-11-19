@@ -14,12 +14,13 @@ xkb_keymap {
         key <AD11> { [ adiaeresis, Adiaeresis, bracketleft ] };
         key <AC11> { [ odiaeresis, Odiaeresis, apostrophe ] };
 
-        // Double quote moves to the backslash key; pipe stays at AltGr.
-        key <BKSL> { [ backslash, quotedbl, bar ] };
+        // The quote key: double quote on tap, single quote on hold (keyd
+        // timeout, Shift+backslash); pipe stays at AltGr.
+        key <BKSL> { [ quotedbl, apostrophe, bar ] };
 
-        // ZSA parity: pipe on tap, tilde on hold (keyd timeout, Shift+grave);
-        // the bare backtick lives on the ISO <> key.
-        key <TLDE> { [ bar, asciitilde, grave ] };
+        // ZSA-free parity: pipe on tap, tilde on hold (keyd timeout,
+        // Shift+grave); the displaced backslash parks at AltGr.
+        key <TLDE> { [ bar, asciitilde, backslash ] };
 
         // The ISO <> key becomes the markdown key: backtick on tap, a triple
         // backtick code fence on hold (keyd macro). It must not double z.
