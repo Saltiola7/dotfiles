@@ -16,7 +16,7 @@ DATA = {
     "chezmoi": {"os": "linux", "arch": "arm64", "homeDir": "/home/test"},
 }
 TARGETS = {
-    ".bashrc", ".config/hypr/bindings.lua", ".config/hypr/input.lua", ".config/hypr/xdph.conf",
+    ".bashrc", ".ssh/config", ".config/hypr/bindings.lua", ".config/hypr/input.lua", ".config/hypr/xdph.conf",
     ".config/kitty/kitty-query.py", ".config/kitty/kitty.conf",
     ".config/kitty/load-snapshot.py", ".config/kitty/mocha.conf",
     ".config/kitty/save-workspace.py", ".config/xdg-terminals.list",
