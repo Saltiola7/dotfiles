@@ -8,7 +8,17 @@ Outcome: mbp built-in keyboard moved from `us,fi` group switching to a
 single-group custom keymap (Colemak-DH ortho, direct ä/ö, AltGr bracket
 cluster, duplicate-z fix) loaded via `kb_file`; keyd tap/hold layers
 (HYPER/MEH/arrows/hold-/) scoped to the SPI keyboard; Touch Bar flipped
-to media-default (`hid_apple fnmode=1`).
+to media-default (`hid_apple fnmode`).
+
+Round 2 (operator matrix revisions, same day): `fnmode=1` proved to be
+F-keys-first (the inverse of the goal), so the policy flips to
+`fnmode=3` (media default, F1-F12 on fn). Hold-/ moved to `?` (tap `/`);
+the grave key became ZSA style (tap `|`, hold `~`); the ISO `<>` key
+became the markdown key (tap `` ` ``, hold ``` ``` fence); `,`/`.` holds
+produce `<`/`>`. The `[shift]` slash binding was dropped — Shift+`/` tap
+already gives `?`. Tap-dance is out of scope: keyd has no double-tap
+detection. ä/ö, AltGr brackets, HYPER/MEH chords and arrows passed the
+matrix unchanged.
 
 Validation: full pytest suite (891 passed) incl. render contracts for
 every machine profile; live mbp preview — keymap loaded on

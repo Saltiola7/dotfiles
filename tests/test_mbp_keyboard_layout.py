@@ -77,8 +77,8 @@ def test_keymap_inherits_colemak_dh_ortho_and_binds_altgr():
         "AD11": ["adiaeresis", "Adiaeresis", "bracketleft"],
         "AC11": ["odiaeresis", "Odiaeresis", "apostrophe"],
         "BKSL": ["backslash", "quotedbl", "bar"],
-        "TLDE": ["grave", "asciitilde", "bar"],
-        "LSGT": ["less", "greater"],
+        "TLDE": ["bar", "asciitilde", "grave"],
+        "LSGT": ["grave", "less"],
         "AE07": ["7", "ampersand", "braceleft"],
         "AE08": ["8", "asterisk", "bracketleft"],
         "AE09": ["9", "parenleft", "bracketright"],
@@ -104,16 +104,18 @@ def test_keyd_layers_match_spec_table():
     assert "capslock = layer(hyper)" in conf
     assert "space = overloadt(meh, space, 200)" in conf
     assert "rightmeta = layer(arrows)" in conf
-    assert "slash = timeout(slash, 200, backslash)" in conf
+    # Tap/hold symbol keys: hold emits shift+key resolved through the keymap.
+    assert "slash = timeout(slash, 200, S-slash)" in conf        # / tap, ? hold
+    assert "grave = timeout(grave, 200, S-grave)" in conf        # | tap, ~ hold
+    assert "102nd = timeout(102nd, 200, macro(102nd 102nd 102nd))" in conf  # ` tap, ``` hold
+    assert "comma = timeout(comma, 200, S-comma)" in conf        # , tap, < hold
+    assert "dot = timeout(dot, 200, S-dot)" in conf              # . tap, > hold
+    assert "[shift]" not in conf  # Shift+/ tap already gives ? via the keymap
     assert "[hyper:C-M-A-S]" in conf  # Ctrl+Super+Alt+Shift
     assert "[meh:C-A-S]" in conf      # Ctrl+Alt+Shift
     arrows = re.search(r"\[arrows\]\n((?:[^\[]\n?)*)(?:\n|$)", conf).group(1)
     for binding in ("j = left", "k = down", "l = up", "; = right"):
         assert binding in arrows
-    # OD-3 fallback: Shift+hold-/ emits the double quote (S+backslash key
-    # under the custom map); pipe stays on AltGr+` and AltGr+\ in the keymap.
-    shift = re.search(r"\[shift\]\n((?:[^\[]\n?)*)(?:\n|$)", conf).group(1)
-    assert "slash = timeout(slash, 200, S-backslash)" in shift
     # External keyboards (ZSA over USB) never match these ids.
     assert len(re.findall(r"^[0-9a-f]{4}:", conf, re.M)) == 1
 
@@ -125,7 +127,7 @@ def test_run_script_installs_keyd_and_persists_fn_policy():
     assert "pacman -S --needed --noconfirm keyd" in script
     assert "/etc/keyd/mbp.conf" in script
     assert "systemctl enable --now keyd" in script
-    assert "options hid_apple fnmode=1" in script
+    assert "options hid_apple fnmode=3" in script
     assert "/sys/module/hid_apple/parameters/fnmode" in script
 
 

@@ -24,10 +24,12 @@ sudo tee /etc/keyd/mbp.conf > /dev/null << 'KEYD'
 capslock = layer(hyper)
 space = overloadt(meh, space, 200)
 rightmeta = layer(arrows)
-slash = timeout(slash, 200, backslash)
-
-[shift]
-slash = timeout(slash, 200, S-backslash)
+# Tap/hold symbol keys (hold emits shift+key through the tis keymap):
+slash = timeout(slash, 200, S-slash)                          # / tap, ? hold
+grave = timeout(grave, 200, S-grave)                          # | tap, ~ hold
+102nd = timeout(102nd, 200, macro(102nd 102nd 102nd))         # ` tap, ``` hold
+comma = timeout(comma, 200, S-comma)                          # , tap, < hold
+dot = timeout(dot, 200, S-dot)                                # . tap, > hold
 
 [hyper:C-M-A-S]
 
@@ -44,8 +46,9 @@ sudo systemctl enable --now keyd
 sudo systemctl restart keyd
 
 # Touch Bar: device/media controls by default, F1-F12 while fn is held.
-printf '%s\n' "options hid_apple fnmode=1" | sudo tee /etc/modprobe.d/hid-apple.conf > /dev/null
-echo 1 | sudo tee /sys/module/hid_apple/parameters/fnmode > /dev/null
+# fnmode 3 = media first (live-verified: 1 is F-keys-first, the inverse).
+printf '%s\n' "options hid_apple fnmode=3" | sudo tee /etc/modprobe.d/hid-apple.conf > /dev/null
+echo 3 | sudo tee /sys/module/hid_apple/parameters/fnmode > /dev/null
 
 echo "[mbp-keyboard] applied; keyd owns tap/hold from the next keystroke."
 {{ else -}}

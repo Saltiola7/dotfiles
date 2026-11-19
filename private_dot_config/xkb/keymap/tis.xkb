@@ -16,10 +16,14 @@ xkb_keymap {
 
         // Double quote moves to the backslash key; pipe stays at AltGr.
         key <BKSL> { [ backslash, quotedbl, bar ] };
-        key <TLDE> { [ grave, asciitilde, bar ] };
 
-        // The ISO <> key must not double z (colemak_dh maps LSGT to z).
-        key <LSGT> { [ less, greater ] };
+        // ZSA parity: pipe on tap, tilde on hold (keyd timeout, Shift+grave);
+        // the bare backtick lives on the ISO <> key.
+        key <TLDE> { [ bar, asciitilde, grave ] };
+
+        // The ISO <> key becomes the markdown key: backtick on tap, a triple
+        // backtick code fence on hold (keyd macro). It must not double z.
+        key <LSGT> { [ grave, less ] };
 
         // Brackets displaced by ä/ö live on the AltGr number cluster.
         key <AE07> { [ 7, ampersand, braceleft ] };

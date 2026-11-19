@@ -126,14 +126,31 @@ Oryx firmware layout (external authority, see OD-1).
 **Scenario: double quote moves to backslash key**
 - Given the custom keymap is active
 - When `\` is tapped, then `\`; with Shift, `"`
-- When `` ` `` is tapped, then `` ` ``; with Shift, `~`
 
-**Scenario: pipe from tap/hold slash**
+**Scenario: ZSA-style grave key — pipe on tap, tilde on hold**
 - Given keyd layers are active
+- When the grave key is tapped, then `|`; with AltGr, `` ` ``
+- When the grave key is held past 200 ms, then `~`
+- And `|` also stays on AltGr+`\` in the keymap
+
+### Feature: Markdown key on the ISO `<>` key
+
+**Scenario: backtick tap, code fence hold**
+- Given keyd layers are active
+- When the `<>` key (LSGT) is tapped, then `` ` ``
+- When it is held past 200 ms, then ``` ``` ``` is typed for a code fence
+- And the letter `z` is untouched (one physical z key only)
+
+### Feature: Displaced angle brackets on comma and dot
+
+**Scenario: comma and dot hold**
+- Given keyd layers are active
+- When `,` is tapped, then `,`; held, `<`
+- When `.` is tapped, then `.`; held, `>`
+
+**Scenario: question mark from holding slash**
 - When `/` is tapped, then `/`
-- When `/` is held, then `\` is produced
-- When Shift+`/` is held, then `|` is produced (see OD-3)
-- When AltGr+`` ` `` is tapped, then `|` (ZSA-style fallback always present)
+- When `/` is held past 200 ms, then `?` (Shift+`/` tap also gives `?`)
 
 ### Feature: Modifier layers
 
@@ -176,8 +193,8 @@ Oryx firmware layout (external authority, see OD-1).
 | `[` (AD11) | ä | Ä | `[` |
 | `'` (AC11) | ö | Ö | `'` |
 | `\` (BKSL) | `\` | `"` | `\|` |
-| `` ` `` (TLDE) | `` ` `` | `~` | `\|` |
-| LSGT | `<` | `>` | reserved (OD-1) |
+| `` ` `` (TLDE) | `\|` | `~` | `` ` `` |
+| LSGT (`<>` key) | `` ` `` | `<` | reserved (OD-1) |
 | `7`/`8`/`9`/`0` | unchanged | unchanged | `{` `[` `]` `}` |
 | all other keys | inherit `us(colemak_dh_ortho)` | | |
 
@@ -193,8 +210,10 @@ Oryx firmware layout (external authority, see OD-1).
 | `capslock` | `layer(hyper)`; `[hyper:C-M-A-S]` |
 | `space` | `overloadt(meh, space, 200)`; `[meh:C-A-S]` |
 | `rightmeta` | `layer(arrows)`; arrows layer maps `j k l ;` → left/down/up/right |
-| `slash` | `timeout(slash, 200, backslash)`: tap `/`, hold alone past 200 ms emits `\` |
-| `[shift] slash` | `timeout(slash, 200, S-backslash)`: Shift+hold-/ emits `"` (OD-3 resolved; `|` stays on AltGr+`` ` `` and AltGr+`\` in the keymap) |
+| `slash` | `timeout(slash, 200, S-slash)`: tap `/`, hold `?` |
+| `grave` | `timeout(grave, 200, S-grave)`: tap `\|`, hold `~` |
+| `102nd` (LSGT) | `timeout(102nd, 200, macro(102nd 102nd 102nd))`: tap `` ` ``, hold types ``` ``` ``` |
+| `comma` / `dot` | `timeout(..., 200, S-...)`: tap `,`/`.`, hold `<`/`>` |
 
 keyd re-emits all built-in keyboard events through its own `keyd virtual
 keyboard` uinput device, so Hyprland's custom keymap must also bind that
@@ -245,7 +264,7 @@ chezmoi apply --dry-run --source .           # mbp data renders; omarchy-try dif
 sudo keyd monitor                # walk every tap/hold mapping incl. Shift+hold-/
 hyprctl devices                 # built-ins + keyd virtual keyboard on the tis map
 hyprctl configerrors            # clean
-cat /sys/module/hid_apple/parameters/fnmode   # 1
+cat /sys/module/hid_apple/parameters/fnmode   # 3 (media first; 1 is F-keys first)
 systemctl is-active keyd tiny-dfr
 ```
 
@@ -269,6 +288,12 @@ mbp still types its firmware layout.
   globs: `05ac:0341*` matches nothing. Use the full `vendor:product:uid`
   (journal prints it); a bare `vendor:product` would also match the SPI
   trackpad, which keyd grabbing would break.
+- keyd actions emit KEYCODES, not glyphs: bind to the key whose XKB level
+  carries the wanted symbol (`S-grave` → `~` because TLDE shift is `~`;
+  the `grave` keycode no longer types a backtick after the remap — that is
+  why LSGT's fence macro fires `102nd` three times).
+- keyd has no tap-dance/double-tap detection; hold timeouts and two-key
+  chords are the only multi-press primitives.
 - Omarchy's Lua config tree parses at Hyprland start; `hyprctl reload`
   does not re-execute `input.lua`. Live preview without restarting the
   session: `hyprctl eval 'hl.device({...})'`; a fresh session picks the
@@ -287,7 +312,9 @@ mbp still types its firmware layout.
 - keyd 2.6.0-5 is in `extra` for aarch64; `xkbcli` present on the mbp.
 - Touch Bar runs tiny-dfr 0.3.7 (active, stock config); `hid_apple fnmode=3`
   is the loadable module's default (nothing in `/etc` persists it), so
-  `/etc/modprobe.d/hid-apple.conf` is the persistence point.
+  `/etc/modprobe.d/hid-apple.conf` is the persistence point. Live-verified
+  semantics: `fnmode=1` is F-keys-first (the inverse of the goal); `3` gives
+  media controls by default with F1-F12 on fn.
 - Built-in keyboard input ids: bus 001c, vendor 05ac, product 0341
   (`Apple SPI Keyboard`); no separate `at-translated` device exists on the mbp.
 - Omarchy's Hyprland build forwards `kb_file` in `hl.device` (binary device
@@ -313,8 +340,11 @@ mbp still types its firmware layout.
 
 **Open decisions**
 
-- **OD-1 (open)** Final `~`/`|` placement and LSGT AltGr slot, from Moonlander
-  Oryx screenshots (ZSA parity pass).
+- **OD-1 (partially applied 2026-11-19)** Final `~`/`|` placement and LSGT
+  AltGr slot, from Moonlander Oryx screenshots (ZSA parity pass). Operator
+  memory already applied: grave tap `|` / hold `~`, LSGT `` ` ``/``` fence,
+  `,`/`.` holds for `<`/`>`. Screenshots still welcome to settle the LSGT
+  AltGr slot and anything else.
 - **OD-2 (resolved 2026-11-19)** Keymap delivery: `kb_file` via `hl.device` —
   the Omarchy Hyprland build forwards it (device field whitelist); fallback
   `~/.config/xkb` rules overlay not needed. Verified live at Deploy.
