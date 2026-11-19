@@ -1,0 +1,14 @@
+#!/bin/bash
+# PERMANENT OFF (operator decision 2026-11-18): the agents panel usage
+# scanning is disabled. The stock orchestrator re-runs every collector on
+# each panel refresh and the collectors re-parse entire agent data stores
+# (the opencode one walks a 100 GB database) — minutes of CPU per refresh,
+# stacking runs, machine-wide latency.
+#
+# This shim wins via the PATH order in ~/.config/environment.d/
+# 50-path-order.conf. The panel keeps its last-rendered data.
+#
+# To restore stock behavior: delete this file.
+# To restore cheap incremental stats instead: see
+# ~/.local/bin/opencode-usage-fast.py and re-enable omarchy-agents-fast.timer.
+exit 0

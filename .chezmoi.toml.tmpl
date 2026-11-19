@@ -26,6 +26,7 @@ encryption = "age"
 {{ end }}
 {{ if eq $machineType "omarchy" }}
     waynergy_client_name = {{ default "omarchy" (get . "waynergy_client_name") | quote }}
+    waynergy_enabled = {{ if hasKey . "waynergy_enabled" }}{{ .waynergy_enabled }}{{ else }}true{{ end }}
 {{ end }}
 {{ if eq $machineType "mac-mini" }}
     synergy_recovery_enabled = {{ if hasKey . "synergy_recovery_enabled" }}{{ .synergy_recovery_enabled }}{{ else }}true{{ end }}

@@ -94,9 +94,23 @@ def test_fcitx5_disable_enforced_on_every_apply():
 def test_waynergy_install_converges_via_apply():
     script = (ROOT / "run_always_install-waynergy.sh.tmpl").read_text()
     assert 'eq .machine_type "omarchy"' in script
+    assert 'waynergy_enabled' in script  # per-host opt-out; default keeps existing hosts
     assert "[[ -t 0 ]]" in script
     assert "omarchy-waynergy-install" in script
     assert "enable --now omarchy-waynergy.service" in script
+
+
+def test_waynergy_targets_opt_out_per_omarchy_host():
+    # Default-on keeps mbp-omarchy and hp-omarchy unchanged; a host sets
+    # waynergy_enabled = false (old-omarchy) to stop deploying the client.
+    ignore = (ROOT / ".chezmoiignore").read_text()
+    assert '$waynergyEnabled = .waynergy_enabled' in ignore
+    assert "{{ if $waynergyEnabled }}!.config/systemd/user/omarchy-waynergy.service{{ end }}" in ignore
+    assert "{{ if $waynergyEnabled }}!.config/omarchy-host/waynergy-package/" in ignore
+    assert "{{ else }}.config/omarchy-host/waynergy-package/{{ end }}" in ignore
+    assert "{{ if $waynergyEnabled }}!always_install-waynergy.sh{{ end }}" in ignore
+    config_tmpl = (ROOT / ".chezmoi.toml.tmpl").read_text()
+    assert "waynergy_enabled" in config_tmpl
 
 
 def test_omarchy_allowlist_actually_reincludes_mbp_targets():

@@ -1,9 +1,10 @@
+{{- $waynergyEnabled := true -}}{{- if hasKey . "waynergy_enabled" }}{{- $waynergyEnabled = .waynergy_enabled }}{{- end -}}
 #!/bin/bash
 # Build and install the managed waynergy package on omarchy hosts, then
 # enable the client service. Package installation needs a terminal for
 # the sudo prompt; silently skipped otherwise.
 # PKGBUILD hash: {{ include "private_dot_config/omarchy-host/waynergy-package/PKGBUILD" | sha256sum }}
-{{ if eq .machine_type "omarchy" -}}
+{{ if and (eq .machine_type "omarchy") $waynergyEnabled -}}
 [[ -t 0 ]] || { echo "[waynergy] Run chezmoi apply from a terminal for the sudo prompt." >&2; exit 0; }
 set -euo pipefail
 if ! command -v waynergy >/dev/null; then

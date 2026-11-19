@@ -16,7 +16,7 @@ DATA = {
     "chezmoi": {"os": "linux", "arch": "arm64", "homeDir": "/home/test"},
 }
 TARGETS = {
-    ".bashrc", ".config/hypr/bindings.lua", ".config/hypr/input.lua", ".config/hypr/xdph.conf",
+    ".bashrc", ".ssh/config", ".config/hypr/bindings.lua", ".config/hypr/input.lua", ".config/hypr/xdph.conf",
     ".config/kitty/kitty-query.py", ".config/kitty/kitty.conf",
     ".config/kitty/load-snapshot.py", ".config/kitty/mocha.conf",
     ".config/kitty/save-workspace.py", ".config/xdg-terminals.list",
@@ -32,6 +32,16 @@ TARGETS = {
     "setup-blackarch.sh",
     "setup-tailscale.sh",
     ".local/bin/atuin-init-bash", ".local/bin/atuin-server-update",
+    ".local/bin/herdr-pane-reconcile", ".local/bin/ungrab",
+    ".local/bin/opencode-usage-fast.py", ".local/bin/agents-panel-guard-loop",
+    ".local/bin/omarchy-agent-usage-update",
+    ".config/systemd/user/herdr-pane-reconcile.service",
+    ".config/systemd/user/omarchy-agents-guard.service",
+    ".config/systemd/user/omarchy-agents-fast.service",
+    ".config/systemd/user/omarchy-agents-fast.timer",
+    ".config/systemd/user/default.target.wants/omarchy-agents-guard.service",
+    ".config/systemd/user/graphical-session.target.wants/herdr-pane-reconcile.service",
+    ".config/environment.d/50-path-order.conf",
     ".config/atuin/config.toml",
     "setup-shell-tooling.sh",
     ".config/deskflow/deskflow.conf", ".config/deskflow/deskflow-core.conf",
@@ -215,3 +225,5 @@ def test_native_share_picker_is_scoped_to_try_guest():
 # CI trigger 20261118m.
 
 # CI trigger 20261118r.
+
+# CI trigger 20261118s.
