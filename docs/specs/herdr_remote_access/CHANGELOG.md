@@ -4,6 +4,13 @@ All notable changes to this bounded context.
 
 ## [2026-11-19]
 
+### SSH-INCLUDE-SCOPE-001 — Load local SSH fragments for all aliases
+
+- Reset the preceding host scope with `Match all` before the optional
+  `config.d/*` include. Keep fragment contents operator-owned.
+- Verify rendered configuration with OpenSSH and deliver through a PR to
+  `main`. Host applies and live attach checks remain operator-owned.
+
 ### HERDR-REMOTE-001 — Outcome
 
 - Uniform `herdr --remote <alias>` attach: one `private_dot_ssh/private_config.tmpl`
