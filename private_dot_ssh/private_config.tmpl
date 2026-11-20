@@ -30,6 +30,7 @@ Host mac-mini
     User tis
 {{ if stat (joinPath .chezmoi.homeDir ".ssh/config.d") -}}
 # Operator-managed per-host fragments.
+Match all
 Include config.d/*
 {{ end -}}
 {{ if eq .chezmoi.os "darwin" -}}
