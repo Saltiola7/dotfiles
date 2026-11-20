@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Refresh the fontconfig cache whenever a managed Nerd Font file changes.
+# Refresh the fontconfig cache and apply the fleet font whenever a managed
+# Nerd Font file changes. `omarchy font set` is idempotent: it re-asserts
+# alacritty, kitty, ghostty, foot, and the fontconfig monospace preference
+# (which herdr, the omarchy shell, and Qt apps resolve).
 set -euo pipefail
 {{ if eq .machine_type "omarchy-try" -}}
 # fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Regular.ttf" | sha256sum }}
 # fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Bold.ttf" | sha256sum }}
 # fonts: {{ include "dot_local/share/fonts/MonofurNerdFont-Italic.ttf" | sha256sum }}
 fc-cache -f "$HOME/.local/share/fonts" >/dev/null
+omarchy font set "Monofur Nerd Font"
 {{ end -}}

@@ -8,7 +8,9 @@ allow_remote_control socket-only
 listen_on unix:~/.local/share/kitty/control-socket
 
 # BEGIN_KITTY_FONTS
-font_family      family="Monofur Nerd Font"
+# Plain form matches what `omarchy font set` writes, so re-running the
+# fleet font command is a byte-for-byte no-op on this managed file.
+font_family Monofur Nerd Font
 bold_font        auto
 italic_font      auto
 bold_italic_font auto
