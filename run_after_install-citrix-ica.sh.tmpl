@@ -1,0 +1,64 @@
+{{ if and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") (get . "citrix_ica") -}}
+#!/bin/bash
+set -euo pipefail
+
+export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_CLEANUP=1
+
+workspace='/Applications/Citrix Workspace.app'
+bcr_directory='/Library/Application Support/Citrix Receiver'
+bcr_overlay="$bcr_directory/CitrixBcrOverlay.app"
+bcr_uninstaller="$bcr_directory/Uninstall Citrix BCR Overlay.app"
+teams_bundle='/Applications/Utilities/MsTeamsVdi.Plugin.app'
+teams_uninstaller="$teams_bundle/Contents/Resources/uninstall.sh"
+teams_receipt='com.microsoft.vdi2.teams.citrix'
+teams_link='/Library/Application Support/Citrix/PlugIns/MsTeamsVdi.Plugin'
+
+bcr_installed() {
+    [[ -e "$bcr_overlay" ]] ||
+        /usr/sbin/pkgutil --pkg-info com.citrix.receiver.bcr >/dev/null 2>&1
+}
+
+teams_installed() {
+    /usr/sbin/pkgutil --pkg-info "$teams_receipt" >/dev/null 2>&1
+}
+
+/usr/bin/defaults write com.citrix.receiver.nomas BCRInstallationEnabled -bool false
+
+if [[ ! -d "$workspace" ]]; then
+    brew install --cask citrix-workspace
+fi
+if [[ ! -d "$workspace" ]] || ! brew list --cask --versions citrix-workspace; then
+    echo "Expected a Homebrew-managed Citrix Workspace installation at $workspace." >&2
+    exit 1
+fi
+/usr/bin/codesign --verify --strict \
+    --test-requirement='=anchor apple generic and certificate leaf[subject.OU] = "S272Y5R93J"' "$workspace"
+
+if bcr_installed || teams_installed; then
+    if /usr/bin/pgrep -x 'Citrix Viewer' >/dev/null; then
+        echo 'Close the Citrix Viewer session and reapply to remove optional add-ons.' >&2
+        exit 1
+    fi
+fi
+
+if bcr_installed; then
+    /usr/bin/codesign --verify --strict \
+        --test-requirement='=anchor apple generic and certificate leaf[subject.OU] = "S272Y5R93J"' "$bcr_uninstaller"
+    /usr/bin/open -W "$bcr_uninstaller"
+    if bcr_installed; then
+        echo 'Citrix Browser Content Redirection is still installed.' >&2
+        exit 1
+    fi
+fi
+
+if teams_installed; then
+    /usr/bin/codesign --verify --strict \
+        --test-requirement='=anchor apple generic and certificate leaf[subject.OU] = "UBF8T346G9"' "$teams_bundle"
+    /usr/bin/sudo /bin/bash "$teams_uninstaller"
+    if teams_installed || [[ -e "$teams_bundle" || -L "$teams_link" ]]; then
+        echo 'The Citrix Teams VDI plug-in is still installed.' >&2
+        exit 1
+    fi
+fi
+{{ end -}}
