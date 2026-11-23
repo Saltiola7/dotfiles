@@ -29,6 +29,7 @@ encryption = "age"
     waynergy_enabled = {{ if hasKey . "waynergy_enabled" }}{{ .waynergy_enabled }}{{ else }}true{{ end }}
 {{ end }}
 {{ if eq $machineType "mac-mini" }}
+    citrix_ica = {{ if hasKey . "citrix_ica" }}{{ .citrix_ica }}{{ else }}false{{ end }}
     synergy_recovery_enabled = {{ if hasKey . "synergy_recovery_enabled" }}{{ .synergy_recovery_enabled }}{{ else }}true{{ end }}
     synergy_app_path = {{ default "/Applications/Synergy.app" (get . "synergy_app_path") | quote }}
     synergy_handoff_enabled = {{ if hasKey . "synergy_handoff_enabled" }}{{ .synergy_handoff_enabled }}{{ else }}true{{ end }}
