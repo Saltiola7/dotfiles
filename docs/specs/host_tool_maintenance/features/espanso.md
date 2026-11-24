@@ -235,13 +235,13 @@ install path is selected and qualified at the MBP rollout step.
 | Refactor | required | passed | Full pytest suite, `git diff --check` |
 | Review/Integrate | required | passed | Scoped QA, independent review and diff coherence |
 | Release | not applicable: no published artifact | not_run | Engineering Profile |
-| Deploy | required | failed; deferred by operator-approved exception | Guest apply with operator sudo step |
-| Operate | required | failed; deferred by operator-approved exception | Service health and typed guest expansion |
+| Deploy | required | passed | Guest install with operator sudo, config, unit and enablement |
+| Operate | required | passed | Service health, loaded matches, clean log; typed expansion is operator acceptance |
 | Maintain/Retire | required | passed | Disable, removal, preimage and recovery tests |
 
-Deploy and Operate carry an operator-approved deferral: on 2026-11-24 the operator
-directed merge-then-deploy because the guest install needs interactive sudo. Their
-evidence is due in the Cycle Record right after that install.
+No gate exception remains. The guest was deployed on 2026-11-24 before delivery.
+The typed guest-only expansion, and the shared-match and offline checks once the
+guest is enrolled, are operator acceptance steps for the next rollout stage.
 
 ## Visual Evidence
 

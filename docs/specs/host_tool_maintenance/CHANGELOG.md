@@ -19,12 +19,13 @@
   isolated real-apply rehearsal with faked system commands. The archive checksum
   passed `makepkg --verifysource`. An independent review's findings were closed with
   tests. No local lint or Semgrep run was available; Semgrep runs in CI.
-- Gate exceptions: Deploy and Operate deferred by operator direction so the change
-  merges before the guest install, which needs interactive sudo and a system-upgrade
-  review. Maintain/Retire passed on the retirement and recovery tests. Deployment
-  evidence is due in the Cycle Record right after the guest install.
+- Deployment: delivered to the Try Omarchy guest first. The pinned package built
+  natively and installed with its capability, the public config, unit and enablement
+  applied, and the service runs with the Finnish layout and a clean log. Two findings
+  from that deployment were fixed: Omarchy's pacman guard rejected the installer's
+  `-Syu`, and current libcap prints the capability as `=p`. No gate exception remains.
 - Implementation checkpoints: `0a2d8a5`, `5e634e6`, `f15a027`, `f21e686`, `ac80092`,
-  `32d891c`, `a410f40`, `dc6db8d`, `0fabcae` and the installer fix commit that follows.
+  `32d891c`, `a410f40`, `dc6db8d`, `0fabcae`, `f84a408`, `7a37296` and this entry.
   Intended Final Push: feature branch and draft PR into main; actual delivery is
   recorded in Cycle Record.
 
