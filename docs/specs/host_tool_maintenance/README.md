@@ -1,5 +1,7 @@
 # Host tool maintenance
 
+The [Espanso machine contract](features/espanso.md) defines desktop installation, settings and optional private shortcut synchronization.
+
 The [Omarchy shell reliability contract](features/omarchy-shell-reliability.md)
 explicitly extends this context to the Linux x86_64 Omarchy profile for a native
 context-menu guard, sparse diagnostic capture and safe dead-log retention.

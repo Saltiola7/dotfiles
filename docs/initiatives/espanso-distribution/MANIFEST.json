@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "id": "espanso-distribution",
+  "title": "Shared Espanso shortcuts on personal desktops",
+  "state": "ready",
+  "coordinator_repository": "Saltiola7/dotfiles",
+  "statements": [
+    {"id":"INT-001","kind":"requirement","text":"Public machine settings, installation and service have one owner; personal matches have a different private owner.","disposition":"ready","artifacts":["docs/initiatives/espanso-distribution/README.md"]},
+    {"id":"INT-002","kind":"requirement","text":"Use a pinned native ARM64 Wayland build and verify exactly one expansion from direct guest-window input.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/espanso.md"]},
+    {"id":"INT-003","kind":"decision","text":"An enrolled full apply fast-forwards the private source; previews and unenrolled hosts do not contact it.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/espanso.md"]},
+    {"id":"INT-004","kind":"constraint","text":"Preserve the last working matches on network loss, invalid input, ownership conflict or local divergence; never auto-push.","disposition":"ready","artifacts":["docs/specs/host_tool_maintenance/features/espanso.md"]},
+    {"id":"INT-005","kind":"decision","text":"Adopt reviewed noncredential shortcuts from the Mac as private YAML; every enrolled machine may explicitly publish changes.","disposition":"ready","artifacts":["docs/initiatives/espanso-distribution/README.md"]},
+    {"id":"INT-006","kind":"requirement","text":"Deploy first to the guest, then Mac mini, MBP Omarchy and HP Omarchy, preserving host layouts.","disposition":"ready","artifacts":["docs/initiatives/espanso-distribution/README.md"]},
+    {"id":"INT-007","kind":"non-goal","text":"No changes to Git hosting, AI distribution or remote-control keyboard integration.","disposition":"ready","artifacts":["docs/initiatives/espanso-distribution/README.md"]},
+    {"id":"INT-008","kind":"risk","text":"Input-device access and executable replacements require scoped permissions, private review and recoverable adoption.","disposition":"ready","artifacts":["docs/initiatives/espanso-distribution/README.md"]}
+  ],
+  "contexts": [
+    {"id":"host_tool_maintenance","repository":"Saltiola7/dotfiles","status":"ready","depends_on":[]}
+  ],
+  "slices": [
+    {"id":"espanso-host","context":"host_tool_maintenance","state":"ready","requirements":["INT-001","INT-002","INT-003","INT-004","INT-005","INT-006","INT-007","INT-008"],"depends_on":[],"artifacts":["docs/initiatives/espanso-distribution/README.md","docs/specs/host_tool_maintenance/README.md","docs/specs/host_tool_maintenance/features/espanso.md","docs/initiatives/espanso-distribution/HOST.plan.json"],"release_group":"desktop-expansion","execution_owner":"build"}
+  ],
+  "release_groups":[{"id":"desktop-expansion","members":["espanso-host"],"state":"planning"}]
+}
