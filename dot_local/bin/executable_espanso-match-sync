@@ -209,9 +209,10 @@ def assert_public_leaves_stay_out(executable: str, match_dir: Path) -> None:
     if managed.returncode != 0:
         raise Refused('chezmoi-unavailable')
     destination = os.environ.get('CHEZMOI_DEST_DIR') or str(Path.home())
+    live = os.path.normpath(os.path.abspath(match_dir))
     for entry in managed.stdout.splitlines():
         leaf = os.path.normpath(os.path.join(destination, entry))
-        if leaf == str(match_dir) or leaf.startswith(str(match_dir) + os.sep):
+        if leaf == live or leaf.startswith(live + os.sep):
             raise Refused('public-overlap')
 
 
@@ -308,18 +309,15 @@ def sync(checkout: Path, origin: str, config_root: Path, state_dir: Path) -> str
         writes, removes, adopted = build_plan(match_dir, incoming, deployed_leaves(checkout, state_dir))
     else:
         writes, removes, adopted = dict(incoming), [], []
-    if not writes and not removes:
-        record(state_dir, revision, list(incoming))
-        return f'espanso matches: added=0 updated=0 removed=0 unchanged={len(incoming)}'
-
-    # Parse changed and newly adopted leaves before anything live is replaced.
-    for name, content in [(n, writes[n]) for n in writes] + [(n, (match_dir / n).read_bytes())
-                                                            for n in adopted]:
-        if not parses_as_mapping(executable, state_dir, content):
-            raise Refused('invalid-yaml', name)
     added = [name for name in writes if not regular_file(match_dir / name)]
-    match_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    apply_plan(match_dir, writes, removes, state_dir)
+    if writes or removes:
+        # Parse changed and newly adopted leaves before anything live is replaced.
+        candidates = {**writes, **{name: (match_dir / name).read_bytes() for name in adopted}}
+        for name, content in candidates.items():
+            if not parses_as_mapping(executable, state_dir, content):
+                raise Refused('invalid-yaml', name)
+        match_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        apply_plan(match_dir, writes, removes, state_dir)
     record(state_dir, revision, list(incoming))
     return (f'espanso matches: added={len(added)} updated={len(writes) - len(added)} '
             f'removed={len(removes)} unchanged={len(incoming) - len(writes)}')

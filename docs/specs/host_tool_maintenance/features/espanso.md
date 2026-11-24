@@ -55,7 +55,9 @@ or product UI is introduced.
   `config.omarchy-try.example.toml`, `private_dot_config/espanso/`,
   `private_Library/Application Support/espanso/`, the Espanso systemd unit and
   enablement, `dot_local/lib/omarchy-apps/recipes/espanso-wayland/`, the guest
-  recipe manifest and its install hook, `run_onchange_after_start-espanso.sh.tmpl`,
+  recipe manifest and its install hook, `dot_local/bin/executable_omarchy-apps`
+  (build-scratch removal after a successful package install),
+  `run_onchange_after_start-espanso.sh.tmpl`,
   `run_after_load-espanso-matches.sh.tmpl`, `dot_local/bin/executable_espanso-match-sync`,
   `dot_local/bin/executable_omarchy-espanso-setup`, their tests, README,
   `docs/OMARCHY_TRY.md` and the HP next-steps document.
@@ -124,7 +126,9 @@ to v2.4.1, `arch=(aarch64)`, source archive pinned by SHA-256
 hook sets `cap_dac_override+p` on `/usr/bin/espanso`. It installs no unit: chezmoi's
 graphical-session unit is the only service definition. v2.4.1 follows the HP's
 `espanso-wayland-bin` 2.4.1 package line; upstream publishes no ARM64 Linux build.
-The build is qualified on the guest during Deploy.
+`omarchy-apps` removes its build scratch only after a successful `pacman -U`, so a
+failed build keeps its tree for diagnosis. The build is qualified on the guest
+during Deploy.
 
 Script ordering. chezmoi runs same-phase scripts by target name, so
 `install-omarchy-apps` < `load-espanso-matches` < `start-espanso`: the first daemon
@@ -178,7 +182,10 @@ install path is selected and qualified at the MBP rollout step.
 - **Failure semantics.** Any reason code leaves live matches as they were. A write
   error after the first replacement restores all preimages before reporting
   `write-failed`. An unreachable origin therefore fails the outer apply visibly.
-- **Compatibility and rollback.** The HP keeps its `espanso-wayland-bin` package,
+- **Compatibility and rollback.** On an enrolled host `chezmoi status` and `diff`
+  always list the run-on-every-apply script `load-espanso-matches.sh`; that single
+  marker is expected and any other status line remains drift. The HP keeps its
+  `espanso-wayland-bin` package,
   unit and live files until `espanso_enabled` is set; a preview with `chezmoi diff`
   follows enablement and precedes apply. Turning enablement off removes the public
   config, unit and enablement on the next apply but not the package or matches.
@@ -197,12 +204,12 @@ install path is selected and qualified at the MBP rollout step.
 
 | Gate | Applicability | Result | Authority |
 |---|---|---|---|
-| Domain | required | pending | Spec tests on this document |
-| Behavior | required | pending | Spec tests on this document |
-| Spec | required | pending | Spec tests on this document |
-| Contract | required | pending | Rendered-profile and fake-command tests |
-| Test-driven implementation | required | pending | Failing-first pytest fixtures |
-| Refactor | required | pending | Full pytest suite, `git diff --check` |
+| Domain | required | passed | Spec tests on this document |
+| Behavior | required | passed | Spec tests on this document |
+| Spec | required | passed | Spec tests on this document |
+| Contract | required | passed | Rendered-profile and fake-command tests |
+| Test-driven implementation | required | passed | Failing-first pytest fixtures |
+| Refactor | required | passed | Full pytest suite, `git diff --check` |
 | Review/Integrate | required | pending | Scoped QA and diff coherence |
 | Release | not applicable: no published artifact | not_run | Engineering Profile |
 | Deploy | required | pending | Guest apply with operator sudo step |

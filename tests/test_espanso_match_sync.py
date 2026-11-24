@@ -179,12 +179,13 @@ def test_unknown_origin_is_refused_before_any_change(world):
 
 
 def test_origin_identity_ignores_scheme_user_and_git_suffix(world):
-    git(world.checkout, "remote", "set-url", "origin", "ssh://git@forge.example/tis/dotfiles-private.git")
+    git(world.checkout, "remote", "set-url", "origin", "ssh://git:Hunter2-Pass@forge.example/tis/dotfiles-private.git")
     result = world.sync(
         origin="https://forge.example/tis/dotfiles-private",
         extra_env={"GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=5"},
     )
     assert_refused(result, "unreachable")
+    assert "Hunter2-Pass" not in result.stdout + result.stderr
 
 
 def test_dirty_tracked_checkout_is_refused(world):

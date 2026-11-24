@@ -533,8 +533,10 @@ a configuration archive here. To enroll a machine, set `espanso_private_checkout
 chezmoi data. A normal full `chezmoi apply` then runs `espanso-match-sync`, which
 validates the checkout and its origin, fast-forwards it, accepts only top-level
 YAML files, parses them and replaces changed match files once. Targeted applies,
-`diff`, `status` and dry runs execute none of it. The sync never pushes: publish
-an edit by committing and pushing from the private checkout. A modified live match
+`diff`, `status` and dry runs execute none of it; on an enrolled host `diff` and
+`status` list the always-run `load-espanso-matches.sh`, and any other status line
+remains drift. The sync never pushes: publish an edit by committing and pushing
+from the private checkout. A modified live match
 file, a local file whose name arrives from private Git, a divergent checkout, an
 offline origin or invalid YAML stops the whole sync with a reason code and leaves
 live matches untouched. Replaced and removed files stay as owner-only preimages
