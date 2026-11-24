@@ -1,5 +1,22 @@
 # Remote Workspace Profile Changelog
 
+## 2026-11-24 — Controlled first-run recovery Discovery (RRW-007I)
+
+- Define controlled recovery for a failed first AstroNvim preparation
+  (`rhel-remote-workspace` / `rrw-007i-overlay-editor-recovery`, INT-085): later
+  attempts prepare isolated private plugin generations and seal failed ones,
+  promotion is journaled and retains the previous root, and readiness is
+  published last after a normal-path startup. Ambiguous or unreceipted state is
+  retained for review, never repaired by shape.
+- Record the cycle's critical risk in the profile. The paired qualification uses
+  the merged foundation revision recorded at cycle registration rather than a
+  revision fixed in the contract.
+- Discovery only: no implementation, gate result, live apply or repair. The
+  implementation, receipt, preflight, exact approval and paired qualification
+  remain with the cycle. No Gate Exception is claimed.
+- Local Python 3.14 checks passed: the contract test and the full local suite
+  (978 passed, 14 skipped) on the current default branch.
+
 ## 2026-11-07 — Owner overlay expansion (RRW-007B / F02)
 
 - Add explicit work/personal Git routing through private includes without taking

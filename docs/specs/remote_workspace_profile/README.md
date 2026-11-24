@@ -5,6 +5,12 @@
 > tools, a private parser-build CLI, locked first-open AstroNvim, portable Bash
 > snippets and a separate prompt config. The overlay remains optional and
 > disjoint; source approval does not authorize live rollout or apply.
+>
+> [RRW-007I controlled editor preparation recovery](EDITOR_RECOVERY.md)
+> supersedes the first-run retry boundary of that expansion for a failed first
+> AstroNvim preparation: later attempts use isolated private generations and
+> durable seals instead of adopting leftover state. It is approved Discovery;
+> source approval does not authorize live rollout or apply.
 
 ## Outcome
 
@@ -206,3 +212,7 @@ and applicability plan. The full public merged runtime SHA is required for final
 paired qualification and live owner apply, not independent source preparation.
 No source implementation, gate pass, actual owner qualification, or deployment is
 claimed by this Discovery. Owner apply remains explicit after shared readiness.
+
+RRW-007I adds its contract to this record; its cycle still needs a fresh
+receipt, a Begin preflight and exact approval on the current foundation
+revision.
