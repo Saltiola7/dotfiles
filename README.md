@@ -542,7 +542,9 @@ offline origin or invalid YAML stops the whole sync with a reason code and leave
 live matches untouched. Replaced and removed files stay as owner-only preimages
 under `~/.local/state/espanso-match-sync/preimages`; restore one only after
 checking for newer edits. Removing the enrollment keys stops the sync and leaves
-every match in place.
+every match in place. Chezmoi does not delete a target that leaves the source:
+after turning `espanso_enabled` off, remove `config/default.yml`, the unit, its
+wants symlink and `~/.local/bin/espanso-match-sync` by hand if you want them gone.
 
 Espanso's generated sample `match/base.yml` is never adopted. Enroll before the
 first daemon start, or remove the sample before enrolling an existing

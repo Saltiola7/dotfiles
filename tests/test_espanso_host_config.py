@@ -232,6 +232,27 @@ def test_sync_runs_only_in_an_unqualified_full_apply(tmp_path):
     assert len(runs()) == 2
 
 
+def test_retired_targets_are_left_in_place_not_deleted(tmp_path):
+    # chezmoi forgets a target that leaves the source, so retirement is a manual removal.
+    source, home = tmp_path / "source", tmp_path / "home"
+    source.mkdir()
+    home.mkdir()
+    (source / "dot_x").write_text("x\n")
+
+    def apply():
+        subprocess.run(
+            ["chezmoi", "-S", str(source), "--config", "/dev/null", "--config-format", "toml",
+             "--override-data", "{}", "--persistent-state", str(tmp_path / "state.boltdb"),
+             "--cache", str(tmp_path / "cache"), "apply"],
+            env={**os.environ, "HOME": str(home)}, capture_output=True, text=True, check=True,
+        )
+
+    apply()
+    (source / "dot_x").unlink()
+    apply()
+    assert (home / ".x").read_text() == "x\n"
+
+
 def test_scripts_install_then_load_matches_then_start(tmp_path):
     # The first daemon start must see deployed matches, so the kernel order is a naming contract.
     source = tmp_path / "source"

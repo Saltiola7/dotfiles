@@ -91,8 +91,9 @@ Given/When/Then in Domain terms; the apply contract above remains the authority.
 9. Given a targeted apply, `diff`, `status`, `--dry-run` or an unenrolled host,
    when chezmoi runs, then the sync is not executed and no private network or
    synchronization side effect occurs. The sync never invokes `chezmoi apply`.
-10. Given enrollment is removed, when a full apply runs, then the sync tool leaves
-    with the managed targets and every live match stays.
+10. Given enrollment is removed, when a full apply runs, then the sync leaves the
+    managed set, no sync runs and every live match stays; the already-deployed
+    tool file remains as an unmanaged file until removed by hand.
 11. Given the helper runs on an x86-64 Omarchy host, when installation finishes,
     then it verifies the packaged capability and stops: it writes no config, creates
     no local private source and registers no service.
@@ -187,8 +188,9 @@ install path is selected and qualified at the MBP rollout step.
   marker is expected and any other status line remains drift. The HP keeps its
   `espanso-wayland-bin` package, unit and live files until `espanso_enabled` is
   set; a preview with `chezmoi diff` follows enablement and precedes apply.
-  Turning enablement off removes the public
-  config, unit and enablement on the next apply but not the package or matches.
+  Turning enablement off returns the public config, unit and enablement to
+  unmanaged files: chezmoi neither updates nor deletes a target that left the
+  source, so retirement is a manual removal, and the package and matches stay.
   Restore a preimage only after confirming no newer edit depends on the live file.
 - **Security and reliability.** Git runs with prompts disabled; origin URLs are
   never printed. The recipe builds as the user and reaches root only through the
@@ -202,8 +204,10 @@ install path is selected and qualified at the MBP rollout step.
 - **Maintenance and retirement.** Raise `pkgver` and the archive checksum together
   and rerun `makepkg --verifysource`; the recipe tracks AUR `espanso-wayland`. No
   vulnerability feed covers the pinned archive beyond Semgrep on this source.
-  Turning enablement off retires the public config, unit and enablement; removing
-  the enrollment keys retires the sync tool and leaves matches; preimages stay until
+  Turning enablement off stops management of the public config, unit and
+  enablement, and removing the enrollment keys stops the sync; neither deletes
+  anything. Retired files are removed by hand: `config/default.yml`, the unit and
+  its wants symlink, and `~/.local/bin/espanso-match-sync`. Preimages stay until
   the operator deletes `~/.local/state/espanso-match-sync`. The legacy HP local
   private source is retained for recovery only and must not be applied over the
   chezmoi-managed configuration.
