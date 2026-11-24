@@ -232,11 +232,13 @@ install path is selected and qualified at the MBP rollout step.
 | Refactor | required | passed | Full pytest suite, `git diff --check` |
 | Review/Integrate | required | passed | Scoped QA, independent review and diff coherence |
 | Release | not applicable: no published artifact | not_run | Engineering Profile |
-| Deploy | required | pending | Guest apply with operator sudo step |
-| Operate | required | pending | Service health and typed guest expansion |
-| Maintain/Retire | required | pending | Disable, removal, preimage and recovery tests |
+| Deploy | required | failed; deferred by operator-approved exception | Guest apply with operator sudo step |
+| Operate | required | failed; deferred by operator-approved exception | Service health and typed guest expansion |
+| Maintain/Retire | required | passed | Disable, removal, preimage and recovery tests |
 
-No gate exception is requested.
+Deploy and Operate carry an operator-approved deferral: on 2026-11-24 the operator
+directed merge-then-deploy because the guest install needs interactive sudo. Their
+evidence is due in the Cycle Record right after that install.
 
 ## Visual Evidence
 
