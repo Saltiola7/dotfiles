@@ -178,14 +178,30 @@ def test_unknown_origin_is_refused_before_any_change(world):
     assert not world.match_dir.exists()
 
 
-def test_origin_identity_ignores_scheme_user_and_git_suffix(world):
+def test_origin_identity_ignores_user_and_git_suffix(world):
     git(world.checkout, "remote", "set-url", "origin", "ssh://git:Hunter2-Pass@forge.example/tis/dotfiles-private.git")
     result = world.sync(
-        origin="https://forge.example/tis/dotfiles-private",
+        origin="ssh://forge.example/tis/dotfiles-private",
         extra_env={"GIT_SSH_COMMAND": "ssh -o BatchMode=yes -o ConnectTimeout=5"},
     )
     assert_refused(result, "unreachable")
     assert "Hunter2-Pass" not in result.stdout + result.stderr
+
+
+def test_origin_identity_includes_the_transport_scheme(world):
+    git(world.checkout, "remote", "set-url", "origin", "http://forge.example/tis/dotfiles-private.git")
+    assert_refused(world.sync(origin="https://forge.example/tis/dotfiles-private"), "unknown-origin")
+    assert not world.match_dir.exists()
+
+
+def test_upstream_on_another_remote_is_refused(world):
+    other = world.root / "other.git"
+    git(world.root, "clone", "-q", "--bare", str(world.work), str(other))
+    git(world.checkout, "remote", "add", "other", str(other))
+    git(world.checkout, "fetch", "-q", "other")
+    git(world.checkout, "branch", "--set-upstream-to=other/main")
+    assert_refused(world.sync(), "unknown-origin")
+    assert not world.match_dir.exists()
 
 
 def test_dirty_tracked_checkout_is_refused(world):
@@ -428,6 +444,53 @@ def test_an_enclosing_git_context_cannot_retarget_the_checkout(world, tmp_path):
     assert world.head(world.origin) == world.head(world.work)
 
 
+def test_heals_a_crash_between_replacement_and_state_record(world):
+    assert world.sync().returncode == 0
+    world.push(lambda w: world.write(w, {"espanso/match/base.yml": BASE + "# v2\n"}))
+    # A sync that replaced the live leaf but died before recording the revision.
+    world.put("base.yml", BASE + "# v2\n")
+    healed = world.sync()
+    assert healed.returncode == 0, healed.stderr
+    assert "added=0 updated=0 removed=0 unchanged=1" in healed.stdout
+    assert json.loads((world.state / "state.json").read_text())["revision"] == world.head(world.checkout)
+
+
+def test_git_config_environment_cannot_rewrite_the_origin(world):
+    redirected = world.sync(extra_env={
+        "GIT_CONFIG_COUNT": "1", "GIT_CONFIG_KEY_0": "url./nonexistent.insteadOf",
+        "GIT_CONFIG_VALUE_0": str(world.origin)})
+    assert redirected.returncode == 0, redirected.stderr
+    assert world.live() == BASE.encode()
+
+
+def test_case_duplicate_leaves_are_refused(world):
+    world.push(lambda w: world.write(w, {"espanso/match/BASE.yml": EMPTY}))
+    assert_refused(world.sync(), "invalid-scope", "BASE.yml")
+
+
+def test_adoption_only_sync_still_parses_the_adopted_leaves(world):
+    world.push(lambda w: world.write(w, {"espanso/match/curly.yml": "matches: [unterminated"}))
+    world.put("base.yml", BASE)
+    world.put("curly.yml", "matches: [unterminated")
+    result = world.sync()
+    assert_refused(result, "invalid-yaml", "curly.yml")
+    assert not (world.state / "state.json").exists()
+
+
+def test_malformed_state_and_missing_git_fail_closed(world, tmp_path):
+    assert world.sync().returncode == 0
+    (world.state / "state.json").write_text("{not json")
+    world.push(lambda w: world.write(w, {"espanso/match/base.yml": BASE + "# v2\n"}))
+    malformed = world.sync()
+    assert malformed.returncode == 1 and "reason=failed" in malformed.stderr
+    assert world.live() == BASE.encode()
+    empty = tmp_path / "empty-bin"
+    empty.mkdir()
+    absent = world.sync(extra_env={"PATH": str(empty)})
+    assert absent.returncode == 1 and "reason=failed" in absent.stderr
+    assert world.live() == BASE.encode()
+
+
 def test_concurrent_sync_is_refused(world):
     world.state.mkdir(parents=True)
     with (world.state / "lock").open("a") as handle:
@@ -461,6 +524,24 @@ def load_sync():
     loaded = importlib.util.module_from_spec(module)
     loader.exec_module(loaded)
     return loaded
+
+
+def test_failed_staging_leaves_no_temporary_file_in_the_match_directory(tmp_path, monkeypatch):
+    module = load_sync()
+    match_dir, state = tmp_path / "match", tmp_path / "state"
+    match_dir.mkdir()
+    state.mkdir()
+    real_stage = module.stage
+
+    def flaky(directory, content):
+        if content == b"second\n":
+            raise OSError("simulated full disk")
+        return real_stage(directory, content)
+
+    monkeypatch.setattr(module, "stage", flaky)
+    with pytest.raises(module.Refused):
+        module.apply_plan(match_dir, {"a.yml": b"first\n", "b.yml": b"second\n"}, [], state)
+    assert list(match_dir.iterdir()) == []
 
 
 def test_partial_write_failure_restores_every_preimage(tmp_path, monkeypatch):

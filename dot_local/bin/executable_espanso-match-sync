@@ -19,6 +19,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 MATCH_TREE = 'espanso/match'
 LEAF_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml\Z')
@@ -32,21 +33,25 @@ YAML_PROBE = ('{{ $document := fromYaml (output "cat" "--" %s) }}'
               '{{ fail "not a mapping" }}{{ end }}{{ end }}ok')
 INTERRUPTED = ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply',
                'BISECT_LOG')
+GIT_PASSTHROUGH = ('GIT_SSH', 'GIT_SSH_COMMAND', 'GIT_SSH_VARIANT')
 
 
 class Refused(Exception):
     """An incomplete sync; carries a reason code and leaf names, never values."""
 
-    def __init__(self, reason: str, *leaves: str) -> None:
+    def __init__(self, reason: str, *leaves: str, intact: bool = True) -> None:
         super().__init__(reason)
         self.reason = reason
         self.leaves = leaves
+        # False only when a failed replacement could not be rolled back completely.
+        self.intact = intact
 
 
 def git(checkout: Path, *args: str) -> subprocess.CompletedProcess:
-    # Drop repository-selection variables so an enclosing Git context cannot retarget calls.
+    # Drop Git's environment so an enclosing repository or injected config cannot retarget
+    # the call; only the SSH transport selection and prompt suppression travel with it.
     environment = {key: value for key, value in os.environ.items()
-                   if key not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE')}
+                   if not key.startswith('GIT_') or key in GIT_PASSTHROUGH}
     return subprocess.run(
         ['git', '--no-optional-locks', '-C', str(checkout), *args],
         capture_output=True, stdin=subprocess.DEVNULL, timeout=GIT_TIMEOUT,
@@ -59,46 +64,55 @@ def text_of(result: subprocess.CompletedProcess) -> str:
 
 
 def normalize_origin(url: str) -> str:
-    """Reduce a Git URL to its host/path identity; a local path resolves to its real path."""
+    """Reduce a Git URL to scheme, host and path; a local path resolves to its real path."""
     url = url.strip()
     if '://' in url:
-        host, _, path = url.split('://', 1)[1].partition('/')
+        scheme, location = url.split('://', 1)
+        scheme = scheme.lower()
+        host, _, path = location.partition('/')
     elif re.fullmatch(r'[^/@]+@[^/:]+:.+', url):
-        host, _, path = url.partition('@')[2].partition(':')
+        scheme, location = 'ssh', url.partition('@')[2]
+        host, _, path = location.partition(':')
     else:
         return os.path.realpath(url)
     path = re.sub(r'\.git$', '', re.sub(r'/+$', '', '/' + path.lstrip('/')))
-    return host.rpartition('@')[2].lower() + path
+    return f'{scheme}://{host.rpartition("@")[2].lower()}{path}'
 
 
-def validate_checkout(checkout: Path, origin: str) -> None:
+def validate_checkout(checkout: Path, origin: str) -> str:
+    """Refuse any checkout state that is not a clean clone of the configured origin."""
     top = git(checkout, 'rev-parse', '--show-toplevel')
     if top.returncode != 0 or Path(text_of(top)).resolve() != checkout.resolve():
         raise Refused('checkout-unavailable')
     if git(checkout, 'symbolic-ref', '--quiet', '--short', 'HEAD').returncode != 0:
         raise Refused('detached-head')
-    if git(checkout, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}').returncode != 0:
+    upstream = git(checkout, 'rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}')
+    if upstream.returncode != 0:
         raise Refused('no-upstream')
     configured = git(checkout, 'config', '--get', 'remote.origin.url')
     if configured.returncode != 0 or \
             normalize_origin(text_of(configured)) != normalize_origin(origin):
+        raise Refused('unknown-origin')
+    # Only origin's tracking ref is fast-forwarded, so the branch must track origin itself.
+    if not text_of(upstream).startswith('origin/'):
         raise Refused('unknown-origin')
     if text_of(git(checkout, 'status', '--porcelain', '--untracked-files=no')):
         raise Refused('dirty-checkout')
     git_dir = Path(text_of(git(checkout, 'rev-parse', '--absolute-git-dir')))
     if any((git_dir / marker).exists() for marker in INTERRUPTED):
         raise Refused('in-progress-operation')
+    return text_of(upstream)
 
 
-def fast_forward(checkout: Path) -> None:
+def fast_forward(checkout: Path, upstream: str) -> None:
     try:
         if git(checkout, 'fetch', '--quiet', 'origin').returncode != 0:
             raise Refused('unreachable')
-        merged = git(checkout, 'merge', '--ff-only', '--quiet', '@{u}')
+        merged = git(checkout, 'merge', '--ff-only', '--quiet', upstream)
     except subprocess.TimeoutExpired:
         raise Refused('unreachable') from None
     if merged.returncode != 0:
-        ancestor = git(checkout, 'merge-base', '--is-ancestor', 'HEAD', '@{u}')
+        ancestor = git(checkout, 'merge-base', '--is-ancestor', 'HEAD', upstream)
         raise Refused('diverged' if ancestor.returncode == 1 else 'unowned-collision')
 
 
@@ -115,6 +129,12 @@ def incoming_leaves(checkout: Path, revision: str) -> dict[str, bytes]:
         blobs[name] = blob
     if not blobs:
         raise Refused('invalid-scope')
+    # Case-insensitive filesystems would collapse such pairs onto one live file.
+    folded: dict[str, str] = {}
+    for name in blobs:
+        if name.lower() in folded:
+            raise Refused('invalid-scope', folded[name.lower()], name)
+        folded[name.lower()] = name
     leaves = {}
     for name, blob in blobs.items():
         size = git(checkout, 'cat-file', '-s', blob)
@@ -159,10 +179,12 @@ def build_plan(match_dir: Path, incoming: dict[str, bytes], deployed: dict[str, 
         elif not regular_file(live):
             raise Refused('non-regular-live-file', name)
         elif name in deployed:
-            if live.read_bytes() != deployed[name]:
+            current = live.read_bytes()
+            if current == content:
+                continue  # Already at the incoming content; also heals a sync interrupted before recording.
+            if current != deployed[name]:
                 raise Refused('local-edit', name)
-            if live.read_bytes() != content:
-                writes[name] = content
+            writes[name] = content
         elif live.read_bytes() == content:
             adopted.append(name)
         else:
@@ -235,10 +257,15 @@ def parses_as_mapping(executable: str, state_dir: Path, content: bytes) -> bool:
 def stage(match_dir: Path, content: bytes) -> Path:
     # Same-directory temporary file: the rename is atomic and espanso ignores non-YAML names.
     handle, temporary = tempfile.mkstemp(dir=match_dir, prefix='.espanso-match-sync-', suffix='.tmp')
-    with os.fdopen(handle, 'wb') as stream:
-        stream.write(content)
-        stream.flush()
-        os.fsync(stream.fileno())
+    try:
+        with os.fdopen(handle, 'wb') as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
     return Path(temporary)
 
 
@@ -273,17 +300,26 @@ def apply_plan(match_dir: Path, writes: dict[str, bytes], removes: list[str],
             (match_dir / name).unlink()
             changed.append(name)
     except OSError:
+        intact = True
+
+        def rollback(step: Callable[[], None]) -> None:
+            nonlocal intact
+            try:
+                step()
+            except OSError:
+                intact = False
+
         for path in staged.values():
-            with contextlib.suppress(OSError):
-                path.unlink(missing_ok=True)
+            rollback(lambda path=path: path.unlink(missing_ok=True))
         for name in reversed(changed):
             copy = preimages / name if preimages else None
-            with contextlib.suppress(OSError):
-                if copy and copy.exists():
-                    shutil.copyfile(copy, match_dir / name)
-                else:
-                    (match_dir / name).unlink(missing_ok=True)
-        raise Refused('write-failed') from None
+            if copy and copy.exists():
+                def restore(copy: Path = copy, name: str = name) -> None:
+                    os.replace(stage(match_dir, copy.read_bytes()), match_dir / name)
+                rollback(restore)
+            else:
+                rollback(lambda name=name: (match_dir / name).unlink(missing_ok=True))
+        raise Refused('write-failed', intact=intact) from None
 
 
 def record(state_dir: Path, revision: str, leaves: list[str]) -> None:
@@ -298,24 +334,28 @@ def record(state_dir: Path, revision: str, leaves: list[str]) -> None:
 def sync(checkout: Path, origin: str, config_root: Path, state_dir: Path) -> str:
     executable = chezmoi_executable()
     match_dir = config_root / 'match'
-    validate_checkout(checkout, origin)
+    upstream = validate_checkout(checkout, origin)
     if match_dir.is_symlink() or (match_dir.exists() and not match_dir.is_dir()):
         raise Refused('non-regular-live-file', 'match')
     assert_public_leaves_stay_out(executable, match_dir)
-    fast_forward(checkout)
-    revision = text_of(git(checkout, 'rev-parse', 'HEAD'))
+    fast_forward(checkout, upstream)
+    head = git(checkout, 'rev-parse', 'HEAD')
+    if head.returncode != 0:
+        raise Refused('checkout-unavailable')
+    revision = text_of(head)
     incoming = incoming_leaves(checkout, revision)
     if match_dir.exists():
         writes, removes, adopted = build_plan(match_dir, incoming, deployed_leaves(checkout, state_dir))
     else:
         writes, removes, adopted = dict(incoming), [], []
     added = [name for name in writes if not regular_file(match_dir / name)]
-    if writes or removes:
-        # Parse changed and newly adopted leaves before anything live is replaced.
+    if writes or adopted:
+        # Parse changed and newly adopted leaves before anything is recorded or replaced.
         candidates = {**writes, **{name: (match_dir / name).read_bytes() for name in adopted}}
         for name, content in candidates.items():
             if not parses_as_mapping(executable, state_dir, content):
                 raise Refused('invalid-yaml', name)
+    if writes or removes:
         match_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
         apply_plan(match_dir, writes, removes, state_dir)
     record(state_dir, revision, list(incoming))
@@ -355,8 +395,10 @@ def main(argv: list[str] | None = None) -> int:
                            args.config_root or default_config_root(), state_dir)
     except Refused as refused:
         leaves = f" leaves={','.join(refused.leaves)}" if refused.leaves else ''
-        print(f'espanso-match-sync: incomplete reason={refused.reason}{leaves}; '
-              'live matches unchanged', file=sys.stderr)
+        state = ('live matches unchanged' if refused.intact else
+                 'a failed rollback may have left live matches changed; preimages are kept')
+        print(f'espanso-match-sync: incomplete reason={refused.reason}{leaves}; {state}',
+              file=sys.stderr)
         return 1
     except (OSError, ValueError, subprocess.SubprocessError):
         print('espanso-match-sync: incomplete reason=failed', file=sys.stderr)

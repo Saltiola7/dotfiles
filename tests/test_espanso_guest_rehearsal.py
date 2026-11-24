@@ -1,4 +1,4 @@
-"""A real chezmoi apply of the Espanso slice into an isolated home, with system commands faked."""
+"""Real chezmoi applies of the Espanso slice into an isolated home, with system commands faked."""
 import json
 import os
 import platform
@@ -11,7 +11,7 @@ import pytest
 from tests.test_espanso_match_sync import BASE, GIT_ENV, World
 
 ROOT = Path(__file__).parents[1]
-pytestmark = pytest.mark.skipif(platform.machine() != "aarch64", reason="guest recipe is arm64-only")
+pytestmark = pytest.mark.skipif(shutil.which("chezmoi") is None, reason="chezmoi applies the slice")
 FAKES = {
     "sudo": '#!/bin/sh\necho "sudo $*" >> "$REHEARSAL_LOG"\n'
             'case " $* " in *" pacman -U "*) printf \'#!/bin/sh\\nexit 0\\n\' > "$REHEARSAL_BIN/espanso"\n'
@@ -21,19 +21,22 @@ FAKES = {
     "makepkg": '#!/bin/sh\necho "makepkg $*" >> "$REHEARSAL_LOG"\n'
                ': > espanso-wayland-2.4.1-1-aarch64.pkg.tar.zst\n',
     "getcap": '#!/bin/sh\necho "/usr/bin/espanso cap_dac_override+p"\n',
+    # The daemon remembers that it was started, like a real user manager would.
     "systemctl": '#!/bin/sh\necho "systemctl $*" >> "$REHEARSAL_LOG"\n'
                  'case " $* " in\n'
                  '  *" is-active "*" graphical-session.target ") exit 0 ;;\n'
-                 '  *" is-active "*" espanso.service ") exit 3 ;;\n'
-                 '  *" start espanso.service ") [ -f "$HOME/.config/espanso/match/base.yml" ] '
+                 '  *" is-active "*" espanso.service ") [ -e "$REHEARSAL_STATE" ] && exit 0\n'
+                 '    exit 3 ;;\n'
+                 '  *" start espanso.service ") touch "$REHEARSAL_STATE"\n'
+                 '    [ -f "$HOME/.config/espanso/match/base.yml" ] '
                  '&& echo matches-present-at-start >> "$REHEARSAL_LOG" ;;\n'
                  'esac\nexit 0\n',
 }
-# Only the Espanso slice and the installer it needs; unrelated guest scripts stay out.
+# Only the Espanso slice and, for the guest, the installer it needs; other guest scripts stay out.
 SLICE = {
     "run_onchange_after_install-omarchy-apps.sh": ("render", "run_onchange_after_install-omarchy-apps.tmpl"),
     "run_after_load-espanso-matches.sh": ("render", "run_after_load-espanso-matches.sh.tmpl"),
-    "run_onchange_after_start-espanso.sh": ("render", "run_onchange_after_start-espanso.sh.tmpl"),
+    "run_after_start-espanso.sh": ("render", "run_after_start-espanso.sh.tmpl"),
     "dot_config/omarchy-apps/recipes.json": ("render", "private_dot_config/omarchy-apps/recipes.json.tmpl"),
     "dot_config/espanso/config/default.yml.tmpl": ("copy", "private_dot_config/espanso/config/default.yml.tmpl"),
     "dot_config/systemd/user/espanso.service": ("copy", "private_dot_config/systemd/user/espanso.service"),
@@ -47,72 +50,122 @@ SLICE = {
     "dot_local/lib/omarchy-apps/recipes/espanso-wayland/espanso-wayland.install": (
         "copy", "dot_local/lib/omarchy-apps/recipes/espanso-wayland/espanso-wayland.install"),
 }
+SYNC_AND_START = ("run_after_load-espanso-matches.sh", "run_after_start-espanso.sh",
+                  "dot_config/espanso/config/default.yml.tmpl", "dot_config/systemd/user/espanso.service",
+                  "dot_config/systemd/user/graphical-session.target.wants/symlink_espanso.service",
+                  "dot_local/bin/executable_espanso-match-sync")
+INSTALLER = tuple(name for name in SLICE if name not in SYNC_AND_START)
 
 
-def test_guest_apply_installs_then_deploys_matches_then_starts(tmp_path):
-    world = World(tmp_path)
-    log, commands, source = tmp_path / "calls.log", tmp_path / "bin", tmp_path / "slice"
-    commands.mkdir()
-    for name, body in FAKES.items():
-        (commands / name).write_text(body)
-    for present in ("pycharm", "rustdesk", "wfica", "zen"):
-        (commands / present).write_text("#!/bin/sh\nexit 0\n")
-    for path in commands.iterdir():
-        path.chmod(0o755)
+class Stage:
+    def __init__(self, tmp_path, present=()):
+        self.world = World(tmp_path)
+        self.log, self.commands, self.source = tmp_path / "calls.log", tmp_path / "bin", tmp_path / "slice"
+        self.state, self.tmp_path = tmp_path / "service-active", tmp_path
+        self.commands.mkdir()
+        for name, body in FAKES.items():
+            (self.commands / name).write_text(body)
+        for name in present:
+            (self.commands / name).write_text("#!/bin/sh\nexit 0\n")
+        for path in self.commands.iterdir():
+            path.chmod(0o755)
+        self.data = {
+            "machine_type": "omarchy-try", "name": "Test User", "email": "test@example.com",
+            "atuin_sync_address": "https://api.atuin.sh", "espanso_enabled": True,
+            "espanso_private_checkout": str(self.world.checkout),
+            "espanso_private_origin": str(self.world.origin),
+            "chezmoi": {"os": "linux", "arch": "arm64", "homeDir": str(self.world.home),
+                        "hostname": "try-omarchy"},
+        }
 
-    data = {
-        "machine_type": "omarchy-try", "name": "Test User", "email": "test@example.com",
-        "atuin_sync_address": "https://api.atuin.sh", **{"espanso_enabled": True},
-        "espanso_private_checkout": str(world.checkout),
-        "espanso_private_origin": str(world.origin),
-        "chezmoi": {"os": "linux", "arch": "arm64", "homeDir": str(world.home),
-                    "hostname": "try-omarchy"},
-    }
-    chezmoi = ["chezmoi", "-S", str(ROOT), "--config", "/dev/null", "--config-format", "toml",
-               "--override-data", json.dumps(data)]
-    for target, (kind, name) in SLICE.items():
-        if kind == "copy":
-            text = (ROOT / name).read_text()
-        else:
-            text = subprocess.run(chezmoi + ["execute-template"], input=(ROOT / name).read_text(),
-                                  capture_output=True, text=True, check=True).stdout
-        path = source / target
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(text)
+    def write_slice(self, targets):
+        for target in targets:
+            kind, name = SLICE[target]
+            if kind == "copy":
+                text = (ROOT / name).read_text()
+            else:
+                text = subprocess.run(
+                    ["chezmoi", "-S", str(ROOT), "--config", "/dev/null", "--config-format", "toml",
+                     "--override-data", json.dumps(self.data), "execute-template"],
+                    input=(ROOT / name).read_text(), capture_output=True, text=True, check=True,
+                ).stdout
+            path = self.source / target
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
 
-    def apply():
+    def apply(self):
+        # XDG variables are exported on real desktops; keep every default under the scratch home.
         return subprocess.run(
-            ["chezmoi", "-S", str(source), "--config", "/dev/null", "--config-format", "toml",
-             "--override-data", json.dumps(data), "--persistent-state", str(tmp_path / "state.boltdb"),
-             "--cache", str(tmp_path / "cache"), "apply"],
-            # XDG variables are exported on real desktops; keep every default under the scratch home.
-            env={**os.environ, **GIT_ENV, "HOME": str(world.home),
-                 "XDG_CONFIG_HOME": str(world.home / ".config"), "XDG_STATE_HOME": str(world.home / ".local/state"),
-                 "XDG_CACHE_HOME": str(world.home / ".cache"),
-                 "PATH": f"{commands}:{Path(shutil.which('chezmoi')).parent}:/usr/bin:/bin",
-                 "ESPANSO_BIN": str(commands / "espanso"), "REHEARSAL_LOG": str(log),
-                 "REHEARSAL_BIN": str(commands)},
+            ["chezmoi", "-S", str(self.source), "--config", "/dev/null", "--config-format", "toml",
+             "--override-data", json.dumps(self.data), "--persistent-state", str(self.tmp_path / "state.boltdb"),
+             "--cache", str(self.tmp_path / "cache"), "apply"],
+            env={**os.environ, **GIT_ENV, "HOME": str(self.world.home),
+                 "XDG_CONFIG_HOME": str(self.world.home / ".config"),
+                 "XDG_STATE_HOME": str(self.world.home / ".local/state"),
+                 "XDG_CACHE_HOME": str(self.world.home / ".cache"),
+                 "PATH": f"{self.commands}:{Path(shutil.which('chezmoi')).parent}:/usr/bin:/bin",
+                 "ESPANSO_BIN": str(self.commands / "espanso"), "REHEARSAL_LOG": str(self.log),
+                 "REHEARSAL_BIN": str(self.commands), "REHEARSAL_STATE": str(self.state)},
             capture_output=True, text=True, stdin=subprocess.DEVNULL,
         )
 
-    first = apply()
-    assert first.returncode == 0, first.stderr
-    settings = (world.config_root / "config/default.yml").read_text()
-    assert settings.endswith("keyboard_layout:\n  layout: fi\n")
-    assert (world.home / ".config/systemd/user/espanso.service").is_file()
-    wants = world.home / ".config/systemd/user/graphical-session.target.wants/espanso.service"
-    assert wants.is_symlink() and os.readlink(wants) == "../espanso.service"
-    assert world.live() == BASE.encode()
+    def calls(self):
+        return self.log.read_text().splitlines() if self.log.exists() else []
 
-    calls = log.read_text().splitlines()
+
+def assert_settings_and_matches(stage):
+    settings = (stage.world.config_root / "config/default.yml").read_text()
+    assert settings.endswith("keyboard_layout:\n  layout: fi\n")
+    assert (stage.world.home / ".config/systemd/user/espanso.service").is_file()
+    wants = stage.world.home / ".config/systemd/user/graphical-session.target.wants/espanso.service"
+    assert wants.is_symlink() and os.readlink(wants) == "../espanso.service"
+    assert stage.world.live() == BASE.encode()
+
+
+def test_real_apply_deploys_matches_before_the_service_ever_starts(tmp_path):
+    stage = Stage(tmp_path, present=("espanso",))
+    stage.write_slice(SYNC_AND_START)
+    first = stage.apply()
+    assert first.returncode == 0, first.stderr
+    assert_settings_and_matches(stage)
+    calls = stage.calls()
+    start = calls.index("systemctl --user start espanso.service")
+    assert calls.index("systemctl --user daemon-reload") < start
+    # The real sync ran before the first daemon start, so Espanso never generates its sample.
+    assert calls.index("matches-present-at-start") == len(calls) - 1
+
+    before = stage.world.snapshot()
+    assert stage.apply().returncode == 0
+    assert stage.world.snapshot() == before
+    assert stage.calls().count("systemctl --user start espanso.service") == 1
+
+
+def test_start_is_retried_on_every_apply_until_the_binary_exists(tmp_path):
+    stage = Stage(tmp_path)
+    stage.write_slice(SYNC_AND_START)
+    absent = stage.apply()
+    assert absent.returncode == 0, absent.stderr
+    assert "missing" in absent.stderr
+    assert not [call for call in stage.calls() if "systemctl" in call]
+    assert stage.world.live() == BASE.encode()
+
+    (stage.commands / "espanso").write_text("#!/bin/sh\nexit 0\n")
+    (stage.commands / "espanso").chmod(0o755)
+    present = stage.apply()
+    assert present.returncode == 0, present.stderr
+    assert "systemctl --user start espanso.service" in stage.calls()
+
+
+@pytest.mark.skipif(platform.machine() != "aarch64", reason="guest recipe is arm64-only")
+def test_guest_apply_installs_the_package_before_the_first_start(tmp_path):
+    stage = Stage(tmp_path, present=("pycharm", "rustdesk", "wfica", "zen"))
+    stage.write_slice(SLICE)
+    first = stage.apply()
+    assert first.returncode == 0, first.stderr
+    assert_settings_and_matches(stage)
+    calls = stage.calls()
     package = next(i for i, call in enumerate(calls) if call.startswith("sudo pacman -U --needed "))
     start = calls.index("systemctl --user start espanso.service")
     assert calls.index("makepkg --noconfirm --cleanbuild") == package - 1 < start, calls
-    # The real sync ran before the first daemon start, so Espanso never generates its sample.
     assert "matches-present-at-start" in calls
-    assert not [p for p in (world.home / ".local/state/omarchy-apps").iterdir() if p.is_dir()]
-
-    before = world.snapshot()
-    assert apply().returncode == 0
-    assert world.snapshot() == before
-    assert log.read_text().splitlines().count("systemctl --user start espanso.service") == 1
+    assert not [p for p in (stage.world.home / ".local/state/omarchy-apps").iterdir() if p.is_dir()]

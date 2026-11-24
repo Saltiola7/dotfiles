@@ -233,7 +233,7 @@ def test_espanso_is_an_explicit_guest_opt_in():
     assert set(enabled.splitlines()) == TARGETS | additions
     config = render("private_dot_config/espanso/config/default.yml.tmpl", {**DATA, "espanso_enabled": True})
     assert "layout: fi\n" in config and "colemak" not in config
-    start = render("run_onchange_after_start-espanso.sh.tmpl", {**DATA, "espanso_enabled": True})
+    start = render("run_after_start-espanso.sh.tmpl", {**DATA, "espanso_enabled": True})
     assert start.startswith("#!/bin/bash\n")
     subprocess.run(['bash', '-n'], input=start, text=True, check=True)
 

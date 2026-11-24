@@ -533,9 +533,9 @@ a configuration archive here. To enroll a machine, set `espanso_private_checkout
 chezmoi data. A normal full `chezmoi apply` then runs `espanso-match-sync`, which
 validates the checkout and its origin, fast-forwards it, accepts only top-level
 YAML files, parses them and replaces changed match files once. Targeted applies,
-`diff`, `status` and dry runs execute none of it; on an enrolled host `diff` and
-`status` list the always-run `load-espanso-matches.sh`, and any other status line
-remains drift. The sync never pushes: publish an edit by committing and pushing
+`diff`, `status` and dry runs execute none of it; `diff` and `status` always list
+the idempotent always-run scripts `start-espanso.sh` and, when enrolled,
+`load-espanso-matches.sh`, and any other status line remains drift. The sync never pushes: publish an edit by committing and pushing
 from the private checkout. A modified live match
 file, a local file whose name arrives from private Git, a divergent checkout, an
 offline origin or invalid YAML stops the whole sync with a reason code and leaves
@@ -543,8 +543,10 @@ live matches untouched. Replaced and removed files stay as owner-only preimages
 under `~/.local/state/espanso-match-sync/preimages`; restore one only after
 checking for newer edits. Removing the enrollment keys stops the sync and leaves
 every match in place. Chezmoi does not delete a target that leaves the source:
-after turning `espanso_enabled` off, remove `config/default.yml`, the unit, its
-wants symlink and `~/.local/bin/espanso-match-sync` by hand if you want them gone.
+after turning `espanso_enabled` off, the config, the unit and its enablement stay
+as they were last applied, so the daemon keeps starting at login until you run
+`systemctl --user disable espanso.service` and remove `config/default.yml`, the unit
+and `~/.local/bin/espanso-match-sync` by hand.
 
 Espanso's generated sample `match/base.yml` is never adopted. Enroll before the
 first daemon start, or remove the sample before enrolling an existing

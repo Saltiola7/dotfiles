@@ -259,7 +259,7 @@ def test_scripts_install_then_load_matches_then_start(tmp_path):
     source.mkdir()
     (source / "run_onchange_after_install-omarchy-apps.sh").write_text("#!/bin/sh\necho install\n")
     (source / "run_after_load-espanso-matches.sh").write_text("#!/bin/sh\necho load\n")
-    (source / "run_onchange_after_start-espanso.sh").write_text("#!/bin/sh\necho start\n")
+    (source / "run_after_start-espanso.sh").write_text("#!/bin/sh\necho start\n")
     output = subprocess.run(
         ["chezmoi", "-S", str(source), "--config", "/dev/null", "--config-format", "toml",
          "--override-data", "{}", "--persistent-state", str(tmp_path / "state.boltdb"),
@@ -270,7 +270,7 @@ def test_scripts_install_then_load_matches_then_start(tmp_path):
 
 
 def test_start_script_guards_binary_capability_and_session(tmp_path):
-    script = render("run_onchange_after_start-espanso.sh.tmpl", GUEST | ENABLED)
+    script = render("run_after_start-espanso.sh.tmpl", GUEST | ENABLED)
     subprocess.run(["bash", "-n"], input=script, text=True, check=True)
     assert "graphical-session.target" in script and "systemctl --user start espanso.service" in script
 
@@ -329,7 +329,7 @@ def test_start_script_guards_binary_capability_and_session(tmp_path):
 
 def test_start_script_is_inert_when_disabled_or_off_profile():
     for data in (GUEST, OLD, MAC | ENABLED, profile("omarchy-try", "linux", "amd64", "try-omarchy") | ENABLED):
-        assert render("run_onchange_after_start-espanso.sh.tmpl", data).strip() == "exit 0"
+        assert render("run_after_start-espanso.sh.tmpl", data).strip() == "exit 0"
 
 
 def test_enrollment_keys_pass_through_the_chezmoi_config():

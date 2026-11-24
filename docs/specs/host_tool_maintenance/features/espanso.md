@@ -57,8 +57,8 @@ or product UI is introduced.
   enablement, `dot_local/lib/omarchy-apps/recipes/espanso-wayland/`, the guest
   recipe manifest and its install hook, `dot_local/bin/executable_omarchy-apps`
   (build-scratch removal after a successful package install),
-  `run_onchange_after_start-espanso.sh.tmpl`,
-  `run_after_load-espanso-matches.sh.tmpl`, `dot_local/bin/executable_espanso-match-sync`,
+  `run_after_load-espanso-matches.sh.tmpl`, `run_after_start-espanso.sh.tmpl`,
+  `dot_local/bin/executable_espanso-match-sync`,
   `dot_local/bin/executable_omarchy-espanso-setup`, their tests, README,
   `docs/OMARCHY_TRY.md` and the HP next-steps document.
 
@@ -108,7 +108,7 @@ Given/When/Then in Domain terms; the apply contract above remains the authority.
 | `private_Library/Application Support/espanso/config/default.yml` (byte-identical to the Mac's stock 2.1.8 file, SHA-256 `cf8f40f250c263655a008b004f2c37d0f937a607bcac2500b888dee64de17a0e`) | public Git | 2 |
 | `private_dot_config/systemd/user/espanso.service`, `.../graphical-session.target.wants/symlink_espanso.service` | public Git | 2 |
 | `dot_local/lib/omarchy-apps/recipes/espanso-wayland/{PKGBUILD,espanso-wayland.install}` and the arm64 guest manifest entry | public Git | 2 |
-| `run_onchange_after_start-espanso.sh.tmpl` (target `start-espanso.sh`) | public Git | 2, 3 |
+| `run_after_start-espanso.sh.tmpl` (target `start-espanso.sh`) | public Git | 2, 3 |
 | `run_after_load-espanso-matches.sh.tmpl` (target `load-espanso-matches.sh`) | public Git | 4–10 |
 | `espanso-match-sync --checkout DIR --origin URL [--config-root DIR] [--state-dir DIR]` | public Git | 4–10 |
 | `omarchy-espanso-setup` | public Git | 11 |
@@ -133,20 +133,24 @@ during Deploy.
 
 Script ordering. chezmoi runs same-phase scripts by target name, so
 `install-omarchy-apps` < `load-espanso-matches` < `start-espanso`: the first daemon
-start sees deployed matches instead of generating the default sample.
+start sees deployed matches instead of generating the default sample. Both Espanso
+scripts run on every full apply because they are idempotent; a change-triggered
+start script would never notice a binary or capability that appears later.
 
 Sync sequence. Lock one sync per state directory; validate the checkout (real
-repository root, attached branch, upstream, normalized origin equality with the
-configured identity, no tracked modifications, no interrupted operation); refuse
-when any public managed leaf is the match directory or below it; `git fetch`, then
-`git merge --ff-only @{u}`; read the incoming `espanso/match` tree; plan; apply;
-record.
+repository root, attached branch tracking `origin`, origin identity equal to the
+configured URL in scheme, host and path, no tracked modifications, no interrupted
+operation); refuse when any public managed leaf is the match directory or below it;
+`git fetch origin`, then `git merge --ff-only` of the branch's `origin/` tracking ref,
+so only the validated origin is ever merged; read the incoming `espanso/match` tree;
+plan; apply; record. Git runs without the caller's `GIT_*` environment apart from the
+SSH transport selection.
 
 Match scope. Only top-level blobs with mode `100644`, names matching
 `[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml` and size at most 1 MiB are deployable. Any other
 entry under `espanso/match` — subdirectory, script, executable or symlink — fails
-the whole sync, as does a candidate without the tree. Other private paths are never
-deployed.
+the whole sync, as does a candidate without the tree or with names that differ only
+by case. Other private paths are never deployed.
 
 Ignore rules. `.chezmoiignore` is evaluated per path, and a matching `!` pattern
 always wins over ignore patterns regardless of line order. Re-includes therefore
@@ -178,14 +182,18 @@ install path is selected and qualified at the MBP rollout step.
 - **Invariants.** Only regular files directly in `match/` are written, with mode
   `0600` through same-directory temporary files and atomic rename; symlinks are
   never followed or replaced; no live leaf changes unless the whole plan passed;
-  YAML is parsed with chezmoi's embedded parser before replacement and chezmoi's
-  error text, which quotes file content, is discarded.
+  YAML is parsed with chezmoi's embedded parser before anything is recorded or
+  replaced and chezmoi's error text, which quotes file content, is discarded. A
+  deployed leaf already at its incoming content counts as deployed, which heals a
+  sync interrupted between replacement and recording; an interrupted write is
+  rolled back from preimages and, if that rollback itself fails, the reason says so.
 - **Failure semantics.** Any reason code leaves live matches as they were. A write
   error after the first replacement restores all preimages before reporting
   `write-failed`. An unreachable origin therefore fails the outer apply visibly.
-- **Compatibility and rollback.** On an enrolled host `chezmoi status` and `diff`
-  always list the run-on-every-apply script `load-espanso-matches.sh`; that single
-  marker is expected and any other status line remains drift. The HP keeps its
+- **Compatibility and rollback.** `chezmoi status` and `diff` always list the
+  run-on-every-apply scripts: `start-espanso.sh` where enabled and
+  `load-espanso-matches.sh` where enrolled. Those markers are expected and any other
+  status line remains drift. The HP keeps its
   `espanso-wayland-bin` package, unit and live files until `espanso_enabled` is
   set; a preview with `chezmoi diff` follows enablement and precedes apply.
   Turning enablement off returns the public config, unit and enablement to
@@ -222,7 +230,7 @@ install path is selected and qualified at the MBP rollout step.
 | Contract | required | passed | Rendered-profile and fake-command tests |
 | Test-driven implementation | required | passed | Failing-first pytest fixtures |
 | Refactor | required | passed | Full pytest suite, `git diff --check` |
-| Review/Integrate | required | pending | Scoped QA and diff coherence |
+| Review/Integrate | required | passed | Scoped QA, independent review and diff coherence |
 | Release | not applicable: no published artifact | not_run | Engineering Profile |
 | Deploy | required | pending | Guest apply with operator sudo step |
 | Operate | required | pending | Service health and typed guest expansion |
