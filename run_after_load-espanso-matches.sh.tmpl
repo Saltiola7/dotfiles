@@ -1,0 +1,12 @@
+{{- /* Only an enrolled host renders the sync; targeted applies and previews never run it. */ -}}
+{{- $espansoLinux := and (eq .chezmoi.os "linux") (or (and (eq .machine_type "omarchy-try") (eq .chezmoi.arch "arm64")) (and (eq .machine_type "omarchy") (ne .chezmoi.hostname "old-omarchy"))) -}}
+{{- $espansoHost := or $espansoLinux (and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini")) -}}
+{{- $checkout := default "" (get . "espanso_private_checkout") -}}
+{{- $origin := default "" (get . "espanso_private_origin") -}}
+{{- if and $espansoHost (ne $checkout "") (ne $origin "") -}}
+#!/bin/bash
+set -euo pipefail
+exec "$HOME/.local/bin/espanso-match-sync" --checkout {{ $checkout | quote }} --origin {{ $origin | quote }}
+{{- else -}}
+exit 0
+{{- end -}}

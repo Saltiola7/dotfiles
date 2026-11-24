@@ -64,7 +64,24 @@
       "sha256": "8591434fcf498a836a32bc7314eb89fbdc4bdc8f03a2d735774b1ae69b6b21d5",
       "binary": "zen/zen",
       "gui": true
-    }
+    }{{ if default false (get . "espanso_enabled") }},
+    {
+      "name": "espanso-wayland",
+      "command": "espanso",
+      "method": "aur",
+      "recipe": "espanso-wayland",
+      "dependencies": [
+        "base-devel",
+        "cargo",
+        "bzip2",
+        "dbus",
+        "libxkbcommon",
+        "openssl",
+        "wl-clipboard",
+        "wxwidgets-common",
+        "wxwidgets-gtk3"
+      ]
+    }{{ end }}
   ]
 }
 {{ else if eq .chezmoi.arch "amd64" }}

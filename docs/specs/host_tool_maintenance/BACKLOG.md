@@ -1,5 +1,10 @@
 # Host maintenance backlog
 
+- ESPANSO-HOST-001: deployed on the guest (package, config, service) ahead of
+  delivery. Remaining: the operator's typed guest-only expansion, then adopt the Mac
+  matches in private Git, enroll the guest and verify the shared match and offline
+  behavior. Final Push tracked in Cycle Record.
+
 - OMARCHY-SHELL-001: deployed and qualified on HP; guard the null-focus crash,
   select sparse capture and safely retain dead logs. Final Push tracked in Cycle Record.
 

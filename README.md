@@ -403,10 +403,12 @@ does not overwrite this machine’s managed preset.
 6. Copy the AI repository’s Omarchy example config, substitute home and username
    paths, apply it, then run `dotfiles-ai-omarchy-setup`. Authenticate each AI
    provider separately.
-7. Run `omarchy-espanso-setup`, restore the private Espanso source from the
-   encrypted backup, and apply it using its separate chezmoi config. Test on
-   both built-in and remote keyboards. See `~/.config/omarchy-host/next-steps.md`
-   for the interactive sign-ins, transfer, theme import, and access checks.
+7. Run `omarchy-espanso-setup` for the package, then set `espanso_enabled = true`
+   in the chezmoi data and apply again for `config/`, the service and startup.
+   Enroll the host in private Git when its rollout step is due, as described
+   under Espanso configuration. Test on both built-in and remote keyboards. See
+   `~/.config/omarchy-host/next-steps.md` for the interactive sign-ins, transfer,
+   theme import, and access checks.
 
 Configuration and installation are reproducible; authentication is interactive.
 To preserve the RustDesk server’s identity across a wipe, securely back up
@@ -509,33 +511,53 @@ For long-lived server availability, review this device's key expiry in the
 Tailscale admin console and disable expiry there if that matches your policy.
 Enrollment and expiry are tailnet state, not settings chezmoi can recreate.
 
-### Private Espanso configuration
+### Espanso configuration
 
-`omarchy-espanso-setup` installs the prebuilt Wayland release through AUR and
-enables its managed desktop service. It skips the first-run wxWidgets wizard,
-which crashes with the prebuilt Debian executable on this Arch installation.
-Search/forms still use that GUI library and need separate verification. The
-service limits repeated restarts and core dumps. The helper initializes the
-built-in keyboard as `us(colemak_dh_ortho)` and disables the double-Alt toggle.
-Personal Espanso files must remain in a separate
-private chezmoi source; this public source does not manage `~/.config/espanso`
-and ignores accidental Espanso source directories in Git. Never add snippet
-contents or a configuration archive to this public repository.
+Espanso is an explicit per-machine opt-in. With `espanso_enabled = true` in the
+chezmoi data, this source manages `config/default.yml` under the platform Espanso
+config root, one graphical user service on Linux and its enablement. The ARM64
+Try Omarchy guest builds a reviewed, checksum-pinned native package from source
+through `omarchy-apps`. The HP keeps `espanso-wayland-bin`, which
+`omarchy-espanso-setup` installs and verifies; the helper no longer writes config,
+registers a service or copies anything into a private source. The daemon never
+runs as root: the package grants `cap_dac_override+p` to the binary alone so it
+can read input devices, and the start script refuses to launch an uncapped binary.
+The first-run wxWidgets wizard, which crashes with the prebuilt Debian executable
+on this Arch installation, is skipped. Search and forms still use that GUI library
+and need separate verification.
 
-Transfer the Mac configuration through the private Samba share for initial
-import. The recovery helper includes live Espanso configuration and the local
-private source in its encrypted archive. Recreate and verify the off-machine
-backup after changing those files. Wayland Espanso reads kernel input devices;
-expansions from Waynergy's compositor-level virtual keyboard require separate
-verification and are not guaranteed by installing Espanso.
+Personal matches belong only to private Git. This source ignores every Espanso
+`match/` tree in Git and chezmoi on Linux and macOS; never add snippet contents or
+a configuration archive here. To enroll a machine, set `espanso_private_checkout`
+(the private checkout path) and `espanso_private_origin` (its Git URL) in the
+chezmoi data. A normal full `chezmoi apply` then runs `espanso-match-sync`, which
+validates the checkout and its origin, fast-forwards it, accepts only top-level
+YAML files, parses them and replaces changed match files once. Targeted applies,
+`diff`, `status` and dry runs execute none of it; `diff` and `status` always list
+the idempotent always-run scripts `start-espanso.sh` and, when enrolled,
+`load-espanso-matches.sh`, and any other status line remains drift. The sync never pushes: publish an edit by committing and pushing
+from the private checkout. A modified live match
+file, a local file whose name arrives from private Git, a divergent checkout, an
+offline origin or invalid YAML stops the whole sync with a reason code and leaves
+live matches untouched. Replaced and removed files stay as owner-only preimages
+under `~/.local/state/espanso-match-sync/preimages`; restore one only after
+checking for newer edits. Removing the enrollment keys stops the sync and leaves
+every match in place. Chezmoi does not delete a target that leaves the source:
+after turning `espanso_enabled` off, the config, the unit and its enablement stay
+as they were last applied, so the daemon keeps starting at login until you run
+`systemctl --user disable espanso.service` and remove `config/default.yml`, the unit
+and `~/.local/bin/espanso-match-sync` by hand.
 
-The local private source is `~/.local/share/chezmoi-private/espanso`, configured
-by `~/.config/chezmoi-private/espanso.toml`; it has no public Git remote. Manage it
-with `chezmoi --config ~/.config/chezmoi-private/espanso.toml ...`. After editing
-the live configuration, use that command with
-`add ~/.config/espanso/config ~/.config/espanso/match` to save it,
-then refresh the encrypted recovery backup. A private Git remote can be added
-later; never push this source to the public dotfiles repository.
+Espanso's generated sample `match/base.yml` is never adopted. Enroll before the
+first daemon start, or remove the sample before enrolling an existing
+installation, because the sync refuses to overwrite it.
+
+The recovery helper still includes the live Espanso configuration and the retired
+local private source (`~/.config/chezmoi-private`, `~/.local/share/chezmoi-private`)
+in its encrypted archive. Recreate and verify the off-machine backup after
+changing those files. Wayland Espanso reads kernel input devices; expansions from
+Waynergy's compositor-level virtual keyboard require separate verification and
+are not guaranteed by installing Espanso.
 
 ## Headless Fedora / Pi400
 

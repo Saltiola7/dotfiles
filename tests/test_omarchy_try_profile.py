@@ -162,7 +162,35 @@ def test_current_guest_installer_does_not_require_legacy_kernel_holds(monkeypatc
     monkeypatch.setattr(module, 'run', lambda command, **kwargs: calls.append(command))
     monkeypatch.setattr(module.platform, 'machine', lambda: 'aarch64')
     module.install_repository(['podman'])
-    assert calls == [['sudo', 'pacman', '-Syu', '--needed', 'podman']]
+    # Sync without --sysupgrade: Omarchy's pacman guard reserves upgrades for `omarchy update`.
+    assert calls == [['sudo', 'pacman', '-S', '--needed', 'podman']]
+
+
+def test_community_build_keeps_its_scratch_only_after_failure(tmp_path, monkeypatch):
+    module = load_installer()
+    state, library = tmp_path / "state", tmp_path / "lib"
+    state.mkdir()
+    (library / "recipes" / "demo").mkdir(parents=True)
+    monkeypatch.setattr(module, "STATE", state)
+    monkeypatch.setattr(module, "LIB", library)
+
+    def failing(fails):
+        def run(command, **kwargs):
+            if command[0] == "makepkg":
+                (Path(kwargs["cwd"]) / "demo-1-1-aarch64.pkg.tar.zst").write_text("package")
+            done = subprocess.CompletedProcess(command, int(fails))
+            if done.returncode:
+                raise subprocess.CalledProcessError(done.returncode, command)
+            return done
+        return run
+
+    monkeypatch.setattr(module, "run", failing(False))
+    module.install_aur({"name": "demo", "recipe": "demo"})
+    assert not list(state.iterdir())
+    monkeypatch.setattr(module, "run", failing(True))
+    with pytest.raises(subprocess.CalledProcessError):
+        module.install_aur({"name": "demo", "recipe": "demo"})
+    assert len(list(state.iterdir())) == 1
 
 
 def test_release_checksum_failure_preserves_existing_command(tmp_path, monkeypatch):
@@ -192,6 +220,23 @@ def test_native_share_picker_is_scoped_to_try_guest():
     for machine, os_name in [("omarchy", "linux"), ("mac-mini", "darwin")]:
         data = {**DATA, "machine_type": machine, "chezmoi": {**DATA["chezmoi"], "os": os_name}}
         assert ".config/hypr/xdph.conf" not in chezmoi("managed", "--include", "files", data=data).splitlines()
+
+
+def test_espanso_is_an_explicit_guest_opt_in():
+    # Unenrolled guests keep the exact ownership above; nothing contacts private Git.
+    additions = {
+        ".config/espanso/config/default.yml", ".config/systemd/user/espanso.service",
+        ".config/systemd/user/graphical-session.target.wants/espanso.service", "start-espanso.sh",
+        ".local/lib/omarchy-apps/recipes/espanso-wayland/PKGBUILD",
+        ".local/lib/omarchy-apps/recipes/espanso-wayland/espanso-wayland.install",
+    }
+    enabled = chezmoi("managed", "--include", "files,scripts,symlinks", data={**DATA, "espanso_enabled": True})
+    assert set(enabled.splitlines()) == TARGETS | additions
+    config = render("private_dot_config/espanso/config/default.yml.tmpl", {**DATA, "espanso_enabled": True})
+    assert "layout: fi\n" in config and "colemak" not in config
+    start = render("run_after_start-espanso.sh.tmpl", {**DATA, "espanso_enabled": True})
+    assert start.startswith("#!/bin/bash\n")
+    subprocess.run(['bash', '-n'], input=start, text=True, check=True)
 
 # CI trigger 202611-17: path-filtered test workflow must report on branch updates.
 

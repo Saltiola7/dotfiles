@@ -85,7 +85,9 @@ def link_command(target: Path, destination: Path) -> None:
 def install_repository(packages: list[str]) -> None:
     if not packages:
         return
-    run(['sudo', 'pacman', '-Syu', '--needed', *packages])
+    # Sync without --sysupgrade: Omarchy's pacman guard reserves system upgrades for
+    # `omarchy update`, and the existing sync databases already match the installed system.
+    run(['sudo', 'pacman', '-S', '--needed', *packages])
 
 
 def download(recipe: dict, directory: Path) -> Path:
@@ -155,6 +157,8 @@ def install_aur(recipe: dict) -> None:
     if not packages:
         raise ValueError('Community build produced no package')
     run(['sudo', 'pacman', '-U', '--needed', *map(str, packages)])
+    # Source builds leave multi-gigabyte trees; the scratch stays only after a failure.
+    shutil.rmtree(scratch, ignore_errors=True)
 
 
 def load_profile() -> tuple[list[str], list[dict]]:

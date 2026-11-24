@@ -1,0 +1,32 @@
+{{- $espansoLinux := and (eq .chezmoi.os "linux") (or (and (eq .machine_type "omarchy-try") (eq .chezmoi.arch "arm64")) (and (eq .machine_type "omarchy") (ne .chezmoi.hostname "old-omarchy"))) -}}
+{{- if and $espansoLinux (default false (get . "espanso_enabled")) -}}
+#!/bin/bash
+set -euo pipefail
+# Unit: {{ include "private_dot_config/systemd/user/espanso.service" | sha256sum }}
+# Enablement: {{ include "private_dot_config/systemd/user/graphical-session.target.wants/symlink_espanso.service" | sha256sum }}
+espanso="${ESPANSO_BIN:-/usr/bin/espanso}"
+if [[ ! -x "$espanso" ]]; then
+    echo "[espanso] $espanso is missing; omarchy-apps --install on the guest or omarchy-espanso-setup installs it." >&2
+    exit 0
+fi
+# Espanso's unprivileged Wayland model: the packaged binary carries the capability
+# to read input devices. Never fall back to running the daemon as root. libcap
+# prints the permitted bit as "=p"; older releases spelled it "+p".
+if ! getcap "$espanso" | grep -Eq 'cap_dac_override[+=]e?p([^a-z_]|$)'; then
+    echo "[espanso] $espanso lacks cap_dac_override+p; reinstall the package." >&2
+    exit 0
+fi
+# The graphical service has no terminal for the first-run wizard and welcome screen.
+kvs="${XDG_CACHE_HOME:-$HOME/.cache}/espanso/kvs"
+mkdir -p "$kvs"
+for key in has_completed_wizard has_displayed_welcome; do
+    [[ -f "$kvs/$key" ]] || printf 'true\n' > "$kvs/$key"
+done
+systemctl --user daemon-reload
+if systemctl --user is-active --quiet graphical-session.target \
+    && ! systemctl --user is-active --quiet espanso.service; then
+    systemctl --user start espanso.service
+fi
+{{- else -}}
+exit 0
+{{- end -}}

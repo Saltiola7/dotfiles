@@ -94,36 +94,30 @@ does not verify a real provider request or a multiplexer session.
 
 Official Codex guidance: https://learn.chatgpt.com/docs/auth
 
-## Private Espanso
+## Espanso
 
 Espanso is installed, running, and enabled for desktop startup. Its crashing
 first-run wizard is skipped. GUI search/forms still need testing. The bootstrap
 configuration uses the built-in Colemak DH layout.
 
-On your Mac, run `espanso path` to locate the configuration directory. In Finder,
-connect to `smb://100.86.125.94/Shared` while Tailscale is connected. Copy that
-configuration folder there as `espanso-private`. Do not put it in either public
-repository or paste your snippets into chat. Tell me when the copy is complete
-so I can adapt Mac-specific commands and app filters before activating it.
+Public chezmoi owns Espanso's `config/`, service and startup after
+`espanso_enabled = true` is added to the chezmoi data; preview with `chezmoi diff`
+before applying. Personal matches come only from private Git. To enroll this
+host, set `espanso_private_checkout` and `espanso_private_origin` in the chezmoi
+data and run a full `chezmoi apply`: it fast-forwards that checkout and copies the
+reviewed match files into `~/.config/espanso/match`. The sync never pushes.
+Publish an edit by committing and pushing from the private checkout.
 
-Before importing, type `:espanso` in an ordinary text field with the built-in
-keyboard; the installed default example should expand to `Hi there!`. Repeat
-through Synergy. Waynergy injects compositor events, while Espanso reads kernel
-input devices, so remote expansion may fail even when built-in expansion works.
-If it fails, report which keyboard failed; don't switch Waynergy backends yet.
+Type `:espanso` in an ordinary text field with the built-in keyboard before and
+after enrolling; the installed default example should expand to `Hi there!`.
+Repeat through Synergy. Waynergy injects compositor events, while Espanso reads
+kernel input devices, so remote expansion may fail even when built-in expansion
+works. If it fails, report which keyboard failed; don't switch Waynergy backends yet.
 
-Private source: `~/.local/share/chezmoi-private/espanso`
-Private config: `~/.config/chezmoi-private/espanso.toml`
-
-After intentional edits, save them locally with:
-
-```sh
-chezmoi --config ~/.config/chezmoi-private/espanso.toml add ~/.config/espanso/config ~/.config/espanso/match
-```
-
-To restore from that source, run `chezmoi --config ~/.config/chezmoi-private/espanso.toml apply`.
-This private source has no remote. The encrypted recovery backup includes it.
-A private Git repository can be added later if you prefer.
+The earlier local private source (`~/.local/share/chezmoi-private/espanso`,
+`~/.config/chezmoi-private/espanso.toml`) is retained for recovery only and is
+still covered by the encrypted backup. Do not apply it after enrolling: it would
+restore machine-owned files over the chezmoi-managed configuration.
 
 ## Dark Reader Mocha
 

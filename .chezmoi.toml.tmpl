@@ -41,6 +41,15 @@ encryption = "age"
 {{ if eq $machineType "omarchy-try" }}
     omarchy_keyboard_layout = {{ default "fi" (get . "omarchy_keyboard_layout") | quote }}
 {{ end }}
+{{ if hasKey . "espanso_enabled" }}
+    espanso_enabled = {{ .espanso_enabled }}
+{{ end }}
+{{ with default "" (get . "espanso_private_checkout") }}
+    espanso_private_checkout = {{ . | quote }}
+{{ end }}
+{{ with default "" (get . "espanso_private_origin") }}
+    espanso_private_origin = {{ . | quote }}
+{{ end }}
     atuin_sync_address = {{ $atuinSyncAddress | quote }}
 {{ if eq $machineType "fedora-server" }}
     homelab_target = {{ default "" (get . "homelab_target") | quote }}

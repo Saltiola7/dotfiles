@@ -8,3 +8,12 @@ name = "Your Name"
 email = "you@example.com"
 omarchy_keyboard_layout = "fi"
 atuin_sync_address = "https://api.atuin.sh"
+
+# Espanso is an explicit opt-in. Enable it for the pinned native package, the
+# public machine settings and graphical startup:
+# espanso_enabled = true
+# Enroll only after the private shortcut repository holds reviewed content; both
+# values stay on this machine. A full apply then fast-forwards that checkout and
+# deploys its match files. Never point them at a public repository.
+# espanso_private_checkout = "/path/to/dotfiles-private"
+# espanso_private_origin = "https://<private-forgejo-host>/tis/dotfiles-private.git"

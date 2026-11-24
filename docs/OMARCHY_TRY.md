@@ -44,10 +44,11 @@ chezmoi --config ~/.config/chezmoi/omarchy-try.toml apply
 ```
 
 The apply hook runs the same missing-only installer when its source changes.
-Signed repository packages use `pacman -Syu --needed`, so installing a missing
-package can also upgrade the guest: this is a full transaction, not a partial
-upgrade. Review the ordinary package-manager prompt. Factory Try Omarchy has its
-own kernel/update policy; this installer imposes no historical Parallels holds.
+Signed repository packages are installed with `pacman -S --needed` from the guest's
+existing sync databases: no refresh and no system upgrade, so no partial upgrade
+either. Omarchy reserves upgrades for `omarchy update`, and its pacman guard rejects
+a direct `-Syu`. Review the ordinary package-manager prompt. Factory Try Omarchy has
+its own kernel/update policy; this installer imposes no historical Parallels holds.
 
 The personal role owns only:
 
@@ -79,6 +80,13 @@ are retained. The reviewed application catalog is deliberately limited to:
 - RustDesk 1.5.3, using the retained reviewed community PKGBUILD and upstream
   artifact hashes. `makepkg` runs unprivileged; only dependency/package installation
   uses sudo. Its package hook does not automatically enable remote access.
+- Espanso 2.4.1, only after `espanso_enabled = true` is added to the guest's
+  chezmoi data: a reviewed copy of the AUR `espanso-wayland` recipe builds natively
+  for ARM64 from a checksum-pinned source archive with unprivileged `makepkg`. Its
+  hook grants `cap_dac_override+p` to the binary so the daemon reads input devices
+  without root. Chezmoi then manages the Finnish `config/`, the graphical service
+  and startup. Personal matches come from an enrolled private Git checkout; see
+  Espanso configuration in the README.
 
 No Zed, Docker, office/media suite, hardware packages or broad HP app catalog are
 installed. These are reproducible retained versions, not a claim that each is
