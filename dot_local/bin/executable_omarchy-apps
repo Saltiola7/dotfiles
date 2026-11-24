@@ -85,7 +85,9 @@ def link_command(target: Path, destination: Path) -> None:
 def install_repository(packages: list[str]) -> None:
     if not packages:
         return
-    run(['sudo', 'pacman', '-Syu', '--needed', *packages])
+    # Sync without --sysupgrade: Omarchy's pacman guard reserves system upgrades for
+    # `omarchy update`, and the existing sync databases already match the installed system.
+    run(['sudo', 'pacman', '-S', '--needed', *packages])
 
 
 def download(recipe: dict, directory: Path) -> Path:

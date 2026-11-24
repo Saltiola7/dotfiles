@@ -202,7 +202,9 @@ install path is selected and qualified at the MBP rollout step.
   Restore a preimage only after confirming no newer edit depends on the live file.
 - **Security and reliability.** Git runs with prompts disabled; origin URLs are
   never printed. The recipe builds as the user and reaches root only through the
-  operator's `pacman -U`. Concurrency is bounded by the state lock. No log value,
+  operator's `pacman -S --needed` for dependencies and `pacman -U` for the built
+  package, never a system upgrade: Omarchy's pacman guard reserves `-Syu` for
+  `omarchy update`. Concurrency is bounded by the state lock. No log value,
   trigger or replacement is emitted.
 - **Stale artifacts and validation.** `uv run --group test pytest tests/` is the
   configured authority; `bash -n` covers rendered scripts; `makepkg --verifysource`

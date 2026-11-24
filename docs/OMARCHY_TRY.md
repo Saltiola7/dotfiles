@@ -44,10 +44,11 @@ chezmoi --config ~/.config/chezmoi/omarchy-try.toml apply
 ```
 
 The apply hook runs the same missing-only installer when its source changes.
-Signed repository packages use `pacman -Syu --needed`, so installing a missing
-package can also upgrade the guest: this is a full transaction, not a partial
-upgrade. Review the ordinary package-manager prompt. Factory Try Omarchy has its
-own kernel/update policy; this installer imposes no historical Parallels holds.
+Signed repository packages are installed with `pacman -S --needed` from the guest's
+existing sync databases: no refresh and no system upgrade, so no partial upgrade
+either. Omarchy reserves upgrades for `omarchy update`, and its pacman guard rejects
+a direct `-Syu`. Review the ordinary package-manager prompt. Factory Try Omarchy has
+its own kernel/update policy; this installer imposes no historical Parallels holds.
 
 The personal role owns only:
 

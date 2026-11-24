@@ -6,7 +6,9 @@
   `config/default.yml`, one graphical user service with its enablement, an always-run
   start script and a checksum-pinned native ARM64 source recipe for the Try Omarchy
   guest. Unenabled hosts keep their live state; `omarchy-espanso-setup` now only
-  installs and verifies the HP package.
+  installs and verifies the HP package. The guest installer now adds missing packages
+  with `pacman -S --needed` instead of `-Syu`, which Omarchy's pacman guard had begun
+  rejecting during the first deployment attempt.
 - Added `espanso-match-sync`. An enrolled host, declared by `espanso_private_checkout`
   and `espanso_private_origin`, fast-forwards its private checkout on a full apply and
   deploys top-level match YAML once, after origin, scope, ownership and syntax checks,
@@ -21,7 +23,7 @@
   review. Maintain/Retire passed on the retirement and recovery tests. Deployment
   evidence is due in the Cycle Record right after the guest install.
 - Implementation checkpoints: `0a2d8a5`, `5e634e6`, `f15a027`, `f21e686`, `ac80092`,
-  `32d891c`, `a410f40`, `dc6db8d` and this entry.
+  `32d891c`, `a410f40`, `dc6db8d`, `0fabcae` and the installer fix commit that follows.
   Intended Final Push: feature branch and draft PR into main; actual delivery is
   recorded in Cycle Record.
 

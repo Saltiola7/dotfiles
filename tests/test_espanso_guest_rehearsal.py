@@ -166,6 +166,10 @@ def test_guest_apply_installs_the_package_before_the_first_start(tmp_path):
     calls = stage.calls()
     package = next(i for i, call in enumerate(calls) if call.startswith("sudo pacman -U --needed "))
     start = calls.index("systemctl --user start espanso.service")
-    assert calls.index("makepkg --noconfirm --cleanbuild") == package - 1 < start, calls
+    build = calls.index("makepkg --noconfirm --cleanbuild")
+    dependencies = next(i for i, call in enumerate(calls) if call.startswith("sudo pacman -S --needed "))
+    assert dependencies < build == package - 1 < start, calls
+    # Omarchy's pacman guard rejects a direct system upgrade; dependencies are a plain sync.
+    assert not [call for call in calls if "-Syu" in call], calls
     assert "matches-present-at-start" in calls
     assert not [p for p in (stage.world.home / ".local/state/omarchy-apps").iterdir() if p.is_dir()]

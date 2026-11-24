@@ -162,7 +162,8 @@ def test_current_guest_installer_does_not_require_legacy_kernel_holds(monkeypatc
     monkeypatch.setattr(module, 'run', lambda command, **kwargs: calls.append(command))
     monkeypatch.setattr(module.platform, 'machine', lambda: 'aarch64')
     module.install_repository(['podman'])
-    assert calls == [['sudo', 'pacman', '-Syu', '--needed', 'podman']]
+    # Sync without --sysupgrade: Omarchy's pacman guard reserves upgrades for `omarchy update`.
+    assert calls == [['sudo', 'pacman', '-S', '--needed', 'podman']]
 
 
 def test_community_build_keeps_its_scratch_only_after_failure(tmp_path, monkeypatch):
