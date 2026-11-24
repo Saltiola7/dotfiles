@@ -14,9 +14,8 @@ uv.lock
 graphify-out/
 # Operator-local identity routing and other private machine configuration.
 /local/
-# Personal Espanso content is owned by a separate private chezmoi source.
-/private_dot_config/espanso/
-/dot_config/espanso/
+# Espanso matches belong to private Git on every platform; public source owns only config/.
+**/espanso/**/match/
 /espanso-private/
 
 /private_dot_config/omarchy-backup/

@@ -3,6 +3,12 @@
 {{/* Waynergy client is opt-out per Omarchy host; the default keeps existing hosts unchanged. */}}
 {{- $waynergyEnabled := true -}}
 {{- if hasKey . "waynergy_enabled" }}{{- $waynergyEnabled = .waynergy_enabled }}{{- end -}}
+{{/* Espanso is an explicit per-machine opt-in; private Git owns match/ everywhere. */}}
+{{- $espansoLinux := and (eq .chezmoi.os "linux") (or (and (eq .machine_type "omarchy-try") (eq .chezmoi.arch "arm64")) (and (eq .machine_type "omarchy") (ne .chezmoi.hostname "old-omarchy"))) -}}
+{{- $espansoMac := and (eq .chezmoi.os "darwin") (eq .machine_type "mac-mini") -}}
+{{- $espansoHost := or $espansoLinux $espansoMac -}}
+{{- $espansoEnabled := and $espansoHost (default false (get . "espanso_enabled")) -}}
+{{- $espansoEnrolled := and $espansoHost (ne (default "" (get . "espanso_private_checkout")) "") (ne (default "" (get . "espanso_private_origin")) "") -}}
 .config/hypr/xdph.conf
 {{ if ne .machine_type "omarchy" }}
 .config/hypr/input.lua
@@ -89,6 +95,18 @@ apply-omarchy-theme.sh
 .config/autostart/*
 !.config/autostart/synergy-3.desktop
 !.config/systemd/user/espanso.service
+{{ if $espansoEnabled }}
+!.config/espanso/
+.config/espanso/*
+!.config/espanso/config/
+.config/espanso/config/*
+!.config/espanso/config/default.yml
+!.config/systemd/user/graphical-session.target.wants/
+.config/systemd/user/graphical-session.target.wants/*
+!.config/systemd/user/graphical-session.target.wants/espanso.service
+!start-espanso.sh
+{{ end }}
+{{ if $espansoEnrolled }}!load-espanso-matches.sh{{ end }}
 !apply-omarchy-theme.sh
 !setup-tailscale.sh
 !.local/bin/atuin-init-bash
@@ -114,6 +132,7 @@ apply-omarchy-theme.sh
 !.local/bin/omarchy-recovery-backup
 !.local/bin/omarchy-espanso-setup
 !.local/bin/omarchy-backup-setup
+{{ if $espansoEnrolled }}!.local/bin/espanso-match-sync{{ end }}
 !.local/share/
 .local/share/*
 !.local/share/fonts/
@@ -262,8 +281,38 @@ zz-remote-workspace-nvim.sh
 # Operator-local inputs must never become managed home-directory targets.
 local/
 docs/
+{{/* Espanso: match trees stay private on every platform and profile. */}}
+**/espanso/match/**
+**/espanso/packages/**
 .config/espanso/
 .config/espanso/**
+Library/Application Support/espanso/
+Library/Application Support/espanso/**
+{{/* Its machine settings and scripts exist only where the operator opted in. */}}
+start-espanso.sh
+load-espanso-matches.sh
+.local/bin/espanso-match-sync
+.config/systemd/user/graphical-session.target.wants/espanso.service
+{{ if and $espansoEnabled $espansoLinux }}
+!.config/espanso/
+.config/espanso/*
+!.config/espanso/config/
+.config/espanso/config/*
+!.config/espanso/config/default.yml
+!start-espanso.sh
+!.config/systemd/user/graphical-session.target.wants/espanso.service
+{{ end }}
+{{ if $espansoEnrolled }}
+!load-espanso-matches.sh
+!.local/bin/espanso-match-sync
+{{ end }}
+{{ if and $espansoEnabled $espansoMac }}
+!Library/Application Support/espanso/
+Library/Application Support/espanso/*
+!Library/Application Support/espanso/config/
+Library/Application Support/espanso/config/*
+!Library/Application Support/espanso/config/default.yml
+{{ end }}
 tests/
 .gitattributes
 pyproject.toml
@@ -507,6 +556,14 @@ install-nerd-fonts.sh
 !.config/systemd/user/
 .config/systemd/user/*
 !.config/systemd/user/omarchy-deskflow.service
+{{ if $espansoEnabled }}
+!.config/systemd/user/espanso.service
+!.config/espanso/
+.config/espanso/*
+!.config/espanso/config/
+.config/espanso/config/*
+!.config/espanso/config/default.yml
+{{ end }}
 !.config/foot/
 .config/foot/*
 !.config/foot/foot.ini
@@ -538,6 +595,7 @@ install-nerd-fonts.sh
 !.config/systemd/user/graphical-session.target.wants/
 .config/systemd/user/graphical-session.target.wants/*
 !.config/systemd/user/graphical-session.target.wants/herdr.service
+{{ if $espansoEnabled }}!.config/systemd/user/graphical-session.target.wants/espanso.service{{ end }}
 !.config/autostart/
 .config/autostart/*
 !.config/autostart/chatgpt.desktop
@@ -554,10 +612,21 @@ install-nerd-fonts.sh
 !.local/bin/omarchy-herdr-server
 !.local/bin/omarchy-herdr-shell
 !.local/bin/kitty-plain
+{{ if $espansoEnrolled }}!.local/bin/espanso-match-sync{{ end }}
 !.local/lib/
 .local/lib/*
 !.local/lib/omarchy-apps/
-!.local/lib/omarchy-apps/**
+.local/lib/omarchy-apps/*
+!.local/lib/omarchy-apps/recipes/
+.local/lib/omarchy-apps/recipes/*
+!.local/lib/omarchy-apps/recipes/rustdesk-bin/
+!.local/lib/omarchy-apps/recipes/rustdesk-bin/**
+!.local/lib/omarchy-apps/recipes/icaclient/
+!.local/lib/omarchy-apps/recipes/icaclient/**
+{{ if $espansoEnabled }}
+!.local/lib/omarchy-apps/recipes/espanso-wayland/
+!.local/lib/omarchy-apps/recipes/espanso-wayland/**
+{{ end }}
 !.local/share/
 .local/share/*
 !.local/share/applications/
@@ -583,6 +652,8 @@ install-nerd-fonts.sh
 .local/state/omarchy/indicators/*
 !.local/state/omarchy/indicators/stay-awake
 !install-omarchy-apps
+{{ if $espansoEnabled }}!start-espanso.sh{{ end }}
+{{ if $espansoEnrolled }}!load-espanso-matches.sh{{ end }}
 !configure-desktop-startup.sh
 !start-omarchy-deskflow.sh
 !setup-blackarch.sh

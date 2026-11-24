@@ -193,6 +193,23 @@ def test_native_share_picker_is_scoped_to_try_guest():
         data = {**DATA, "machine_type": machine, "chezmoi": {**DATA["chezmoi"], "os": os_name}}
         assert ".config/hypr/xdph.conf" not in chezmoi("managed", "--include", "files", data=data).splitlines()
 
+
+def test_espanso_is_an_explicit_guest_opt_in():
+    # Unenrolled guests keep the exact ownership above; nothing contacts private Git.
+    additions = {
+        ".config/espanso/config/default.yml", ".config/systemd/user/espanso.service",
+        ".config/systemd/user/graphical-session.target.wants/espanso.service", "start-espanso.sh",
+        ".local/lib/omarchy-apps/recipes/espanso-wayland/PKGBUILD",
+        ".local/lib/omarchy-apps/recipes/espanso-wayland/espanso-wayland.install",
+    }
+    enabled = chezmoi("managed", "--include", "files,scripts,symlinks", data={**DATA, "espanso_enabled": True})
+    assert set(enabled.splitlines()) == TARGETS | additions
+    config = render("private_dot_config/espanso/config/default.yml.tmpl", {**DATA, "espanso_enabled": True})
+    assert "layout: fi\n" in config and "colemak" not in config
+    start = render("run_onchange_after_start-espanso.sh.tmpl", {**DATA, "espanso_enabled": True})
+    assert start.startswith("#!/bin/bash\n")
+    subprocess.run(['bash', '-n'], input=start, text=True, check=True)
+
 # CI trigger 202611-17: path-filtered test workflow must report on branch updates.
 
 # CI trigger 202611-17b: re-run after 92 merge.

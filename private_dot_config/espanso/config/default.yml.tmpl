@@ -1,0 +1,8 @@
+# Managed by chezmoi. Personal matches come from the enrolled private Git checkout.
+toggle_key: OFF
+keyboard_layout:{{ if eq .machine_type "omarchy-try" }}
+  layout: fi
+{{- else }}
+  layout: us
+  variant: colemak_dh_ortho
+{{- end }}

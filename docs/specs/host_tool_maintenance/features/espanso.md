@@ -133,13 +133,19 @@ start sees deployed matches instead of generating the default sample.
 Sync sequence. Lock one sync per state directory; validate the checkout (real
 repository root, attached branch, upstream, normalized origin equality with the
 configured identity, no tracked modifications, no interrupted operation); refuse
-when any public managed leaf is the match directory or below it; `git pull
---ff-only`; read the incoming `espanso/match` tree; plan; apply; record.
+when any public managed leaf is the match directory or below it; `git fetch`, then
+`git merge --ff-only @{u}`; read the incoming `espanso/match` tree; plan; apply;
+record.
 
 Match scope. Only top-level blobs with mode `100644`, names matching
 `[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml` and size at most 1 MiB are deployable. Any other
 entry under `espanso/match` — subdirectory, script, executable or symlink — fails
-the whole sync. Other private paths are never deployed.
+the whole sync, as does a candidate without the tree. Other private paths are never
+deployed.
+
+Ignore rules. `.chezmoiignore` is evaluated per path, and a matching `!` pattern
+always wins over ignore patterns regardless of line order. Re-includes therefore
+never overlap the match-tree patterns, which carry no `!` form anywhere.
 
 State. `~/.local/state/espanso-match-sync/` (mode `0700`) holds `state.json`
 (`revision`, deployed leaf names), `lock`, and `preimages/<UTC timestamp>/` copies
@@ -149,7 +155,12 @@ Reason codes. `checkout-unavailable`, `detached-head`, `no-upstream`,
 `unknown-origin`, `dirty-checkout`, `in-progress-operation`, `public-overlap`,
 `unreachable`, `diverged`, `invalid-scope`, `invalid-yaml`, `local-edit`,
 `unowned-collision`, `non-regular-live-file`, `write-failed`, `busy`,
-`chezmoi-unavailable`. Exit `0` for a complete sync, `1` for an incomplete one.
+`chezmoi-unavailable`, `failed` (an unexpected local error, which may have changed
+live leaves). Exit `0` for a complete sync, `1` for an incomplete one.
+
+Install ownership. The guest recipe covers the ARM64 Try Omarchy profile. The
+helper installs and verifies only on the x86-64 HP and refuses elsewhere; the MBP
+install path is selected and qualified at the MBP rollout step.
 
 ## Contract
 
@@ -270,7 +281,7 @@ sequenceDiagram
     O->>Z: chezmoi apply
     Z->>Z: Apply files, then install script
     Z->>G: Validate origin and state
-    Z->>G: git pull --ff-only
+    Z->>G: fetch, then merge --ff-only
     alt validation, reachability, scope or syntax fails
         Z-->>O: reason code, live matches unchanged, nonzero exit
     else plan has no conflict
