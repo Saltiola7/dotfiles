@@ -165,6 +165,33 @@ def test_current_guest_installer_does_not_require_legacy_kernel_holds(monkeypatc
     assert calls == [['sudo', 'pacman', '-Syu', '--needed', 'podman']]
 
 
+def test_community_build_keeps_its_scratch_only_after_failure(tmp_path, monkeypatch):
+    module = load_installer()
+    state, library = tmp_path / "state", tmp_path / "lib"
+    state.mkdir()
+    (library / "recipes" / "demo").mkdir(parents=True)
+    monkeypatch.setattr(module, "STATE", state)
+    monkeypatch.setattr(module, "LIB", library)
+
+    def failing(fails):
+        def run(command, **kwargs):
+            if command[0] == "makepkg":
+                (Path(kwargs["cwd"]) / "demo-1-1-aarch64.pkg.tar.zst").write_text("package")
+            done = subprocess.CompletedProcess(command, int(fails))
+            if done.returncode:
+                raise subprocess.CalledProcessError(done.returncode, command)
+            return done
+        return run
+
+    monkeypatch.setattr(module, "run", failing(False))
+    module.install_aur({"name": "demo", "recipe": "demo"})
+    assert not list(state.iterdir())
+    monkeypatch.setattr(module, "run", failing(True))
+    with pytest.raises(subprocess.CalledProcessError):
+        module.install_aur({"name": "demo", "recipe": "demo"})
+    assert len(list(state.iterdir())) == 1
+
+
 def test_release_checksum_failure_preserves_existing_command(tmp_path, monkeypatch):
     module = load_installer()
     monkeypatch.setattr(module, 'LIB', tmp_path / 'bundles')
