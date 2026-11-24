@@ -33,3 +33,20 @@ SHA. Release has no versioned artifact. UBI10 userland smoke is separate
 from eventual actual RHEL owner qualification and private rollout. Only a
 regression found during approved Build work permits an in-scope source correction;
 this Discovery authorizes none. Normal PR approval applies without admin bypass.
+
+## RRW-007I Approved Discovery
+
+Initiative `rhel-remote-workspace`, slice `rrw-007i-overlay-editor-recovery`
+(INT-085), planned cycle `RRW-007I`, defines controlled first-run recovery of
+the owner's editor preparation in
+[EDITOR_RECOVERY.md](EDITOR_RECOVERY.md). Risk is **critical**, as registered
+for the cycle and above this profile's default: the change prepares, seals and
+promotes plugin generations inside the owner's home, and a wrong guard there
+affects the owner's working editor. Kernel gates, Review/Integrate, Deploy,
+Operate and Maintain/Retire are required; Release is not applicable.
+
+The paired qualification uses the merged foundation revision recorded at
+cycle registration, not a revision fixed in the contract. Build qualifies
+disposable installations only; the owner of the Initiative owns every live
+apply and any repair of existing state. This Discovery authorizes no
+implementation, live apply or repair.

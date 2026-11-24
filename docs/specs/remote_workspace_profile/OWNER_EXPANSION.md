@@ -72,7 +72,11 @@ plugin commit and owner-lock digest, verify after restore and second startup,
 and publish only after readiness. Reapply admits only that unchanged output;
 tracked edits, other untracked files, changed/missing tags, unsafe/missing
 receipts and preexisting dirty plugins still refuse. Never blanket-ignore or
-delete dirty files. A failed first setup does not adopt its leftover files.
+delete dirty files. RRW-007I supersedes the first-run retry boundary with
+[controlled editor recovery](EDITOR_RECOVERY.md): future attempts use isolated
+private generations and durable seals, never dirty-shape adoption. Existing
+unreceipted partial state still refuses and stays intact for Fork A's separately
+reviewed one-time repair. Readiness remains success-only.
 
 Headless setup explicitly enables plugin loading, restores locked plugins and
 verifies every selected plugin SHA. Lock drift or startup errors fail apply.
