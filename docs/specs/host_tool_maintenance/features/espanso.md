@@ -185,9 +185,9 @@ install path is selected and qualified at the MBP rollout step.
 - **Compatibility and rollback.** On an enrolled host `chezmoi status` and `diff`
   always list the run-on-every-apply script `load-espanso-matches.sh`; that single
   marker is expected and any other status line remains drift. The HP keeps its
-  `espanso-wayland-bin` package,
-  unit and live files until `espanso_enabled` is set; a preview with `chezmoi diff`
-  follows enablement and precedes apply. Turning enablement off removes the public
+  `espanso-wayland-bin` package, unit and live files until `espanso_enabled` is
+  set; a preview with `chezmoi diff` follows enablement and precedes apply.
+  Turning enablement off removes the public
   config, unit and enablement on the next apply but not the package or matches.
   Restore a preimage only after confirming no newer edit depends on the live file.
 - **Security and reliability.** Git runs with prompts disabled; origin URLs are
@@ -199,6 +199,14 @@ install path is selected and qualified at the MBP rollout step.
   checks the pinned archive; `chezmoi diff` previews each host before apply.
   Residual risk: the YAML pre-check is not Espanso's own schema parser, and the
   `cap_dac_override` capability widens file access for the Espanso process itself.
+- **Maintenance and retirement.** Raise `pkgver` and the archive checksum together
+  and rerun `makepkg --verifysource`; the recipe tracks AUR `espanso-wayland`. No
+  vulnerability feed covers the pinned archive beyond Semgrep on this source.
+  Turning enablement off retires the public config, unit and enablement; removing
+  the enrollment keys retires the sync tool and leaves matches; preimages stay until
+  the operator deletes `~/.local/state/espanso-match-sync`. The legacy HP local
+  private source is retained for recovery only and must not be applied over the
+  chezmoi-managed configuration.
 
 ## Gate ledger
 
@@ -214,7 +222,7 @@ install path is selected and qualified at the MBP rollout step.
 | Release | not applicable: no published artifact | not_run | Engineering Profile |
 | Deploy | required | pending | Guest apply with operator sudo step |
 | Operate | required | pending | Service health and typed guest expansion |
-| Maintain/Retire | required | pending | Removal, preimage and disable tests |
+| Maintain/Retire | required | pending | Disable, removal, preimage and recovery tests |
 
 No gate exception is requested.
 
