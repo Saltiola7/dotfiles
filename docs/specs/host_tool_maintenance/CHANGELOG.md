@@ -8,7 +8,8 @@
   guest. Unenabled hosts keep their live state; `omarchy-espanso-setup` now only
   installs and verifies the HP package. The guest installer now adds missing packages
   with `pacman -S --needed` instead of `-Syu`, which Omarchy's pacman guard had begun
-  rejecting during the first deployment attempt.
+  rejecting during the first deployment attempt. The capability check accepts both
+  `getcap` spellings, because current libcap prints `cap_dac_override=p`, not `+p`.
 - Added `espanso-match-sync`. An enrolled host, declared by `espanso_private_checkout`
   and `espanso_private_origin`, fast-forwards its private checkout on a full apply and
   deploys top-level match YAML once, after origin, scope, ownership and syntax checks,

@@ -290,7 +290,7 @@ def test_start_script_guards_binary_capability_and_session(tmp_path):
                          '  *" is-active "*" graphical-session.target ") exit ' + str(0 if graphical else 3) + ' ;;\n'
                          '  *" is-active "*" espanso.service ") exit ' + str(0 if active else 3) + ' ;;\n'
                          'esac\nexit 0\n',
-            "getcap": '#!/bin/sh\necho "/usr/bin/espanso ' + ("cap_dac_override+p" if capability else "") + '"\n',
+            "getcap": '#!/bin/sh\necho "/usr/bin/espanso ' + capability + '"\n',
         }
         for name, body in fakes.items():
             path = commands / name
@@ -308,14 +308,20 @@ def test_start_script_guards_binary_capability_and_session(tmp_path):
         calls = log.read_text().splitlines() if log.exists() else []
         return result, calls, home
 
-    missing, calls, home = run(binary=False, capability=True, graphical=True, active=False)
+    missing, calls, home = run(binary=False, capability="cap_dac_override=p", graphical=True, active=False)
     assert missing.returncode == 0 and "missing" in missing.stderr and calls == []
     assert not (home / ".cache/espanso/kvs").exists()
 
-    uncapped, calls, _ = run(binary=True, capability=False, graphical=True, active=False)
+    uncapped, calls, _ = run(binary=True, capability="", graphical=True, active=False)
     assert uncapped.returncode == 0 and "cap_dac_override" in uncapped.stderr and calls == []
 
-    started, calls, home = run(binary=True, capability=True, graphical=True, active=False)
+    # libcap prints the permitted bit as "=p"; older releases spelled it "+p".
+    for notation in ("cap_dac_override=p", "cap_dac_override=ep", "cap_dac_override+p",
+                     "cap_net_raw,cap_dac_override=ep"):
+        assert run(binary=True, capability=notation, graphical=True, active=False)[0].returncode == 0
+    for wrong in ("cap_dac_read_search=p", "cap_dac_override"):
+        assert "cap_dac_override" in run(binary=True, capability=wrong, graphical=True, active=False)[0].stderr
+    started, calls, home = run(binary=True, capability="cap_dac_override=p", graphical=True, active=False)
     assert started.returncode == 0, started.stderr
     assert calls == ["--user daemon-reload", "--user is-active --quiet graphical-session.target",
                      "--user is-active --quiet espanso.service", "--user start espanso.service"]
@@ -323,7 +329,7 @@ def test_start_script_guards_binary_capability_and_session(tmp_path):
         assert (home / ".cache/espanso/kvs" / key).read_text() == "true\n"
 
     for graphical, active in ((False, False), (True, True)):
-        _, calls, _ = run(binary=True, capability=True, graphical=graphical, active=active)
+        _, calls, _ = run(binary=True, capability="cap_dac_override=p", graphical=graphical, active=active)
         assert "start" not in " ".join(calls), (graphical, active)
 
 
@@ -406,7 +412,7 @@ def test_helper_installs_and_verifies_without_owning_config_or_matches(
         "omarchy": '#!/bin/sh\necho "omarchy $*" >> "' + str(log) + '"\n',
         "systemctl": '#!/bin/sh\necho "systemctl $*" >> "' + str(log) + '"\n',
         "chezmoi": '#!/bin/sh\necho "chezmoi $*" >> "' + str(log) + '"\n',
-        "getcap": '#!/bin/sh\n' + ('echo "/usr/bin/espanso cap_dac_override+p"\n' if capability else 'exit 1\n'),
+        "getcap": '#!/bin/sh\necho "/usr/bin/espanso ' + ("cap_dac_override=p" if capability else "") + '"\n',
     }
     test_dir = tmp_path / "run"
     test_dir.mkdir()

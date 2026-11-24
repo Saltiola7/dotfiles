@@ -13,8 +13,9 @@ if ! pacman -Q espanso-wayland-bin >/dev/null 2>&1; then
 fi
 espanso --version
 # Espanso's unprivileged Wayland model: the packaged binary carries the capability
-# to read input devices. Never run the daemon as root instead.
-getcap /usr/bin/espanso | grep -q 'cap_dac_override+p' || {
+# to read input devices. Never run the daemon as root instead. libcap prints the
+# permitted bit as "=p"; older releases spelled it "+p".
+getcap /usr/bin/espanso | grep -Eq 'cap_dac_override[+=]e?p([^a-z_]|$)' || {
   echo 'Missing cap_dac_override+p on /usr/bin/espanso; reinstall espanso-wayland-bin.' >&2
   exit 1
 }

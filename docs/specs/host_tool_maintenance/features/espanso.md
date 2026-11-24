@@ -74,6 +74,7 @@ Given/When/Then in Domain terms; the apply contract above remains the authority.
    its packaged capability exist in an active graphical session.
 3. Given the binary or its `cap_dac_override+p` capability is missing, when the
    start script runs, then it reports the condition and does not start the daemon.
+   The check reads the permitted bit in either `getcap` spelling, `=p` or `+p`.
 4. Given enrollment on a host with a clean tracked checkout whose origin matches
    the configured identity, when a full apply finishes its files, then the sync
    checks disjoint ownership, fast-forwards, validates scope and syntax, replaces

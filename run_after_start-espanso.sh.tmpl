@@ -10,8 +10,9 @@ if [[ ! -x "$espanso" ]]; then
     exit 0
 fi
 # Espanso's unprivileged Wayland model: the packaged binary carries the capability
-# to read input devices. Never fall back to running the daemon as root.
-if ! getcap "$espanso" | grep -q 'cap_dac_override+p'; then
+# to read input devices. Never fall back to running the daemon as root. libcap
+# prints the permitted bit as "=p"; older releases spelled it "+p".
+if ! getcap "$espanso" | grep -Eq 'cap_dac_override[+=]e?p([^a-z_]|$)'; then
     echo "[espanso] $espanso lacks cap_dac_override+p; reinstall the package." >&2
     exit 0
 fi

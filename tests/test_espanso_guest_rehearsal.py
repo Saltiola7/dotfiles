@@ -20,7 +20,7 @@ FAKES = {
               '  exit 1\nfi\necho "pacman $*" >> "$REHEARSAL_LOG"\n',
     "makepkg": '#!/bin/sh\necho "makepkg $*" >> "$REHEARSAL_LOG"\n'
                ': > espanso-wayland-2.4.1-1-aarch64.pkg.tar.zst\n',
-    "getcap": '#!/bin/sh\necho "/usr/bin/espanso cap_dac_override+p"\n',
+    "getcap": '#!/bin/sh\necho "/usr/bin/espanso cap_dac_override=p"\n',
     # The daemon remembers that it was started, like a real user manager would.
     "systemctl": '#!/bin/sh\necho "systemctl $*" >> "$REHEARSAL_LOG"\n'
                  'case " $* " in\n'
@@ -32,6 +32,9 @@ FAKES = {
                  '&& echo matches-present-at-start >> "$REHEARSAL_LOG" ;;\n'
                  'esac\nexit 0\n',
 }
+# A curated PATH keeps the rehearsal independent of whatever the test machine has installed;
+# an espanso found in /usr/bin would make the real installer skip the recipe.
+TOOLS = ("bash", "sh", "env", "python3", "git", "cat", "grep", "mkdir", "chmod", "touch")
 # Only the Espanso slice and, for the guest, the installer it needs; other guest scripts stay out.
 SLICE = {
     "run_onchange_after_install-omarchy-apps.sh": ("render", "run_onchange_after_install-omarchy-apps.tmpl"),
@@ -69,6 +72,10 @@ class Stage:
             (self.commands / name).write_text("#!/bin/sh\nexit 0\n")
         for path in self.commands.iterdir():
             path.chmod(0o755)
+        self.tools = tmp_path / "tools"
+        self.tools.mkdir()
+        for name in TOOLS:
+            self.tools.joinpath(name).symlink_to(shutil.which(name))
         self.data = {
             "machine_type": "omarchy-try", "name": "Test User", "email": "test@example.com",
             "atuin_sync_address": "https://api.atuin.sh", "espanso_enabled": True,
@@ -103,7 +110,7 @@ class Stage:
                  "XDG_CONFIG_HOME": str(self.world.home / ".config"),
                  "XDG_STATE_HOME": str(self.world.home / ".local/state"),
                  "XDG_CACHE_HOME": str(self.world.home / ".cache"),
-                 "PATH": f"{self.commands}:{Path(shutil.which('chezmoi')).parent}:/usr/bin:/bin",
+                 "PATH": f"{self.commands}:{Path(shutil.which('chezmoi')).parent}:{self.tools}",
                  "ESPANSO_BIN": str(self.commands / "espanso"), "REHEARSAL_LOG": str(self.log),
                  "REHEARSAL_BIN": str(self.commands), "REHEARSAL_STATE": str(self.state)},
             capture_output=True, text=True, stdin=subprocess.DEVNULL,
