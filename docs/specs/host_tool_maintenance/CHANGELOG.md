@@ -1,5 +1,19 @@
 # Host maintenance changelog
 
+## 2026-11-24 — OMARCHY-HERDR-LOGIN-001
+
+- Personal Try Omarchy source now declares a real graphical-login wants link.
+  The oneshot restores layout only. A fresh root Bash pane starts its own
+  mapped OpenCode client; occupied or unverified panes receive no input.
+- Linux pytest covered managed file-to-link migration, systemd's offline
+  enablement check, foreground ownership and refusing ambiguous mappings. An
+  isolated Herdr 0.9.5 server restored a retained pane's fixture session after
+  restart. Repeated layout did not relaunch the client; no live reboot or
+  activation was performed. No gate exceptions or separate package release.
+- Source commits `2edcb9e` and `8b7a290` for a feature-branch draft PR to
+  `main`. Install helpers before enabling the reviewed link; see the
+  [recovery contract](features/omarchy-herdr-login.md) for rollback.
+
 ## 2026-11-24 — ESPANSO-MBP-KEYMAP-001
 
 - Persist the tested MBP Hyprland override: Espanso's virtual keyboard uses
