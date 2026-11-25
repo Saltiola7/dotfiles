@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from tests.remote_workspace_nvim_contract import EXPANDED, check_result
+from tests.remote_workspace_ubi_diagnose import summary
 
 
 ROOT = Path(__file__).parents[1]
@@ -123,6 +124,7 @@ def test_ubi_qualification_uses_an_exact_shared_revision_and_existing_smoke():
     assert "repository: Saltiola7/dotfiles-ai" in workflow
     assert "persist-credentials: false" in workflow
     for path in ("tests/remote_workspace_profile_smoke.sh", "tests/remote_workspace_ubi_compiler.sh",
+                 "tests/remote_workspace_ubi_diagnose.py",
                  "tests/remote_workspace_nvim_contract.py"):
         assert f'      - "{path}"' in workflow
     assert "DOTFILES_AI_SOURCE" in workflow
@@ -209,6 +211,62 @@ def test_offline_lua_contract_rejects_wrong_failure_or_incomplete_success():
         check_result('success', 0, stages, list(EXPANDED))
     with pytest.raises(AssertionError):
         check_result('success', 0, success, [lang for lang in EXPANDED if lang != 'markdown_inline'])
+
+
+@pytest.mark.skipif(sys.platform != 'linux', reason='UBI state and ownership preflight')
+def test_ubi_first_apply_distinguishes_state_guard_before_any_native_command(tmp_path):
+    # Exercise real chezmoi state creation and the real helper entry/lock gate.
+    # The lock input is deliberately absent: neither execution can invoke Git.
+    chezmoi = shutil.which('chezmoi')
+    assert chezmoi is not None
+    src = tmp_path / 'src'
+    src.mkdir()
+    (src / 'dot_probe').write_bytes(b'force the normal persistent-state write')
+    (src / 'run_after_zz-remote-workspace-nvim.sh').write_text(
+        '#!/bin/sh\nexec "$FIXTURE_PYTHON" "$FIXTURE_EDITOR"\n')
+    for name, mode, cause, marker in (
+            ('permissive', 0o755, 'editor recovery requires operator review', 'unreported'),
+            ('private', 0o700, 'unsafe editor lock', 'inputs')):
+        home = tmp_path / name
+        state = home / '.local/state/remote-workspace'
+        state.parent.mkdir(parents=True)
+        if name == 'private':
+            state.mkdir(mode=mode)
+        env = dict(HOME=str(home), PATH=os.defpath, XDG_CONFIG_HOME=str(home / '.config'),
+                   FIXTURE_PYTHON=sys.executable, FIXTURE_EDITOR=str(ROOT / 'dot_local/bin/executable_remote-workspace-nvim'))
+        result = subprocess.run([chezmoi, '--color=false', '-S', str(src), '-D', str(home), '--config', '/dev/null',
+                                 '--config-format', 'toml', '--persistent-state', str(state / 'chezmoi.boltdb'), 'apply'],
+                                cwd=home, env=env, umask=0o022, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT, timeout=10)
+        assert result.returncode != 0 and (state.stat().st_mode & 0o777) == mode
+        log = tmp_path / 'private-log'
+        log.write_bytes(result.stdout)
+        observed = summary(log, home, tmp_path / 'compiler')
+        assert f'hook=editor; last-marker={marker}; stage=preflight; cause={cause};' in observed
+        assert ('setup-lock' in observed.partition('missing=')[2]) == (name == 'permissive')
+        assert not (state / 'editor-attempts').exists() and not (state / 'editor-ready.json').exists()
+
+
+def test_ubi_diagnostic_reports_fixed_labels_only_from_bounded_log_tail(tmp_path):
+    log = tmp_path / 'log'
+    secret = b'ghp_TEST_ONLY/private-path'
+    log.write_bytes(b'remote editor preparation headless-restore\n' + b'x' * 90000 + b'\n' +
+                    b'\x1b[31mchezmoi: install-01-remote-workspace-tools.sh: exit status 1\x1b[0m\n' +
+                    b'remote overlay tool installation failed; prior generations retained\n' +
+                    b'::error::' + secret + b'\nchezmoi: ' + secret + b': exit status 1\n')
+    home = tmp_path / 'empty'
+    notice = summary(log, home, tmp_path)
+    assert 'hook=tools; last-marker=unreported; stage=unreported; cause=tool installation failed;' in notice
+    assert 'tree-sitter' in notice.partition('missing=')[2]
+    assert len(notice) < 512 and secret.decode() not in notice and '::' not in notice
+    # A genuine native failure is distinguishable from preflight, but neither
+    # the diagnostic nor a color-stripped log is the compiler rejection witness.
+    prefix = b'remote owner editor setup failed: editor exit 1; stage parser-build; '
+    log.write_bytes(b'\x1b[31m' + prefix + b'parser installation failed\x1b[0m\n')
+    assert 'stage=parser-build; cause=parser installation failed;' in summary(log, home, tmp_path)
+    log.write_bytes(prefix + b'parser installation failed ' + secret + b'\n')
+    notice = summary(log, home, tmp_path)
+    assert 'stage=unreported; cause=unreported;' in notice and secret.decode() not in notice
 
 
 def test_expanded_contract_keeps_private_inputs_and_source_ownership():

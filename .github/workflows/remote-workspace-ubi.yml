@@ -18,6 +18,7 @@ on:
       - "tests/test_remote_workspace_profile.py"
       - "tests/remote_workspace_profile_smoke.sh"
       - "tests/remote_workspace_ubi_compiler.sh"
+      - "tests/remote_workspace_ubi_diagnose.py"
       - "tests/remote_workspace_nvim_contract.py"
       - "docs/specs/remote_workspace_profile/**"
   workflow_dispatch:

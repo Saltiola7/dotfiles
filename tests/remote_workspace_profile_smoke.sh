@@ -83,7 +83,7 @@ printf 'UBI qualification: owner %s with foundation %s\n' "$baseline" "$shared_r
 git -C "$tmp/owner-source" config user.name Test
 git -C "$tmp/owner-source" config user.email test@example.com
 owner() {
-  chezmoi -S "$tmp/owner-source" -D "$HOME" --config /dev/null --config-format toml \
+  chezmoi --color=false -S "$tmp/owner-source" -D "$HOME" --config /dev/null --config-format toml \
     --persistent-state "$HOME/.local/state/remote-workspace/chezmoi.boltdb" --override-data "$owner_data" "$@"
 }
 check_pair() {
@@ -149,8 +149,12 @@ attempts="$state/editor-attempts"
 first="$attempts/attempt-0001"
 second="$attempts/attempt-0002"
 data="$HOME/.local/share/nvim"
-absent "$ready" && absent "$attempts" && absent "$data" ||
+absent "$state" && absent "$data" ||
   fail 'expected no prior owner editor or parser preparation'
+# We selected a BoltDB inside the editor's private state owner. Don't let
+# chezmoi create its parent with 0755 before the editor lock checks for 0700.
+# This is a new disposable directory, never chmod/repair an existing one.
+mkdir -m 0700 -- "$state"
 
 # Give promotion a real, clean locked preimage to retain. No ready record,
 # parser binaries or generated files are seeded. Capture its bytes BEFORE apply.
@@ -182,16 +186,38 @@ for tool in cc c++ gcc g++; do
   ln -s "$fixture/$tool" "$HOME/.local/bin/$tool"
 done
 
-if owner apply >"$tmp/failed-apply.log" 2>&1; then
-  fail 'first apply succeeded with the parser compiler fault armed'
-fi
-stage=$(sed -nE 's/^remote owner editor setup failed: editor exit [0-9]+; stage (owner-init|plugin-restore|plugin-verify|parser-build|parser-verify|native-command); .*/\1/p' "$tmp/failed-apply.log")
+first_log=$(mktemp "$tmp/failed-apply.XXXXXXXX")
+began=$SECONDS
+first_status=0
+owner apply >"$first_log" 2>&1 || first_status=$?
+printf 'first apply: exit=%d elapsed=%ds\n' "$first_status" "$((SECONDS - began))"
+# Keep only allowlisted diagnostics in the hosted log. Never print/tail/upload
+# the private combined output, even when an earlier installer or preflight fails.
+python3 "$owner_source/tests/remote_workspace_ubi_diagnose.py" "$first_log" "$HOME" "$fixture"
+version_status() {
+  if [[ ! -x "$1" ]]; then printf 'missing'
+  elif [[ ! -s "$state/installed-tools.json" ]]; then printf 'unverified'
+  elif timeout --kill-after=1 5 "$1" --version 2>/dev/null | head -c 4096 | grep -E "$2" >/dev/null; then printf 'pinned'
+  else printf 'mismatch-or-error'; fi
+}
+printf 'first apply: nvim-0.12.6=%s tree-sitter-0.26.1=%s\n' \
+  "$(version_status "$HOME/.local/bin/nvim" '^NVIM v0\.12\.6$')" \
+  "$(version_status "$HOME/.local/libexec/remote-workspace/tree-sitter" '^tree-sitter 0\.26\.1([[:space:]]|$)')"
+file_status() {
+  if [[ ! -f "$2" || -L "$2" ]]; then printf 'missing-or-not-regular'
+  elif cmp -s -- "$1" "$2"; then printf 'matches'
+  else printf 'differs'; fi
+}
+printf 'first apply: managed-lock=%s preseed-HEAD=%s\n' \
+  "$(file_status "$tmp/owner-source/private_dot_config/nvim/lazy-lock.json" "$HOME/.config/nvim/lazy-lock.json")" \
+  "$(file_status "$tmp/previous-data/lazy/lazy.nvim/.git/HEAD" "$previous_lazy/.git/HEAD")"
+(( first_status != 0 )) || fail 'first apply succeeded with the parser compiler fault armed'
 grep -Fsxq 'compiler rejected SQL parser.c' "$fixture/rejected" ||
-  fail "first apply did not reach the intended compiler rejection (stage ${stage:-unreported})"
+  fail 'first apply did not reach the intended compiler rejection'
 # Depending on the install task's wait result, Lua can report the build failure
 # itself or the subsequent mandatory check for the missing compiled file.
-grep -Eq '^remote owner editor setup failed: editor exit [1-9][0-9]*; stage (parser-build; parser installation failed|parser-verify; required compiled parser absent)$' "$tmp/failed-apply.log" ||
-  fail "compiler fault fired but did not produce the expected parser failure (stage ${stage:-unreported})"
+grep -Eq '^remote owner editor setup failed: editor exit [1-9][0-9]*; stage (parser-build; parser installation failed|parser-verify; required compiled parser absent)$' "$first_log" ||
+  fail 'compiler fault fired but did not produce the expected parser failure'
 absent "$ready" && absent "$first/previous" && absent "$second" || fail 'first failure was selected or published'
 check_previous "$data"
 check_pair
