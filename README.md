@@ -174,6 +174,11 @@ and keeps running when Kitty closes. The unit is not stopped with the graphical
 session; its lifetime still depends on the user systemd manager. The installed
 user-local Herdr takes precedence over the distribution binary.
 
+On Try Omarchy, `herdr-pane-reconcile.service` fills missing layout at graphical
+login. Fresh mapped Bash panes open their own OpenCode client; running the
+service again does not type into existing terminals. See the
+[guest recovery contract](docs/specs/host_tool_maintenance/features/omarchy-herdr-login.md).
+
 Ordinary Kitty windows, tabs and panes attach to Herdr by default. Explicit
 commands such as `kitty -- bash` still run directly. For a plain shell, launch
 **Kitty (Plain)** from the application menu or run `kitty-plain`. Inside Kitty,

@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Try Omarchy Herdr recovery: the service owns layout; new shells own clients."""
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+
+
+HOME = Path.home()
+MAPPING = HOME / '.local/share/dotfiles/herdr-pane-mapping.json'
+OPENCODE = HOME / '.opencode/bin/opencode'
+SPACES = ('dotfiles', 'tsc-data')  # Existing personal map sections only.
+
+
+def native(*args: str, deadline: float | None = None) -> dict:
+    timeout = 4 if deadline is None else min(1, deadline - time.monotonic())
+    if timeout <= 0:
+        raise TimeoutError
+    reply = subprocess.run(['herdr', *args], check=True, capture_output=True,
+                           text=True, timeout=timeout)
+    return json.loads(reply.stdout)['result']
+
+
+def only(rows, **fields):
+    matches = [r for r in rows if all(r.get(k) == v for k, v in fields.items())]
+    return matches[0] if len(matches) == 1 else None
+
+
+def local_directory(entry: object) -> Path | None:
+    raw = entry.get('cwd') if isinstance(entry, dict) else None
+    if not isinstance(raw, str) or not os.path.isabs(raw):
+        return None
+    path = Path(raw).resolve()
+    # Preserve the existing exclusion for company-VM sessions, including aliases.
+    if any('/Work/MGM/' in str(p).rstrip('/') + '/' for p in (raw, path)):
+        return None
+    return path if path.is_dir() else None
+
+
+def matching_tabs(workspace: str, label: str) -> list[dict]:
+    return [t for t in native('tab', 'list')['tabs']
+            if t['workspace_id'] == workspace and t.get('label') == label]
+
+
+def layout(mapping: dict) -> None:
+    spaces = native('workspace', 'list')['workspaces']
+    for name in SPACES:
+        workspace = only(spaces, label=name)
+        if not workspace:
+            continue
+        ws = workspace['workspace_id']
+        for label, entries in mapping.get(name, {}).items():
+            if not isinstance(entries, list) or not isinstance(label, str) or not label:
+                continue
+            matches = matching_tabs(ws, label)
+            if not matches:
+                cwd = local_directory(entries[0]) if entries else None
+                native('tab', 'create', '--workspace', ws, '--label', label, '--no-focus',
+                       *(['--cwd', str(cwd)] if cwd else []))
+                matches = matching_tabs(ws, label)
+            if len(matches) != 1:
+                continue
+            tab_id = matches[0]['tab_id']
+            for _ in range(30):  # Keep the existing bound; do not replay ambiguous splits.
+                current = sorted((p['pane_id'] for p in native('pane', 'list')['panes']
+                                  if p['workspace_id'] == ws and p['tab_id'] == tab_id))
+                if not current or len(current) >= len(entries):
+                    break
+                cwd = local_directory(entries[len(current)])
+                native('pane', 'split', current[-1], '--no-focus', '--direction',
+                       'down' if len(current) % 2 else 'right', *(['--cwd', str(cwd)] if cwd else []))
+                after = native('pane', 'list')['panes']
+                if sum(p['workspace_id'] == ws and p['tab_id'] == tab_id for p in after) <= len(current):
+                    break
+
+
+def mapped_session(mapping: dict, deadline: float) -> str | None:
+    info = native('pane', 'process-info', '--current', deadline=deadline)['process_info']
+    if type(info.get('shell_pid')) is not int or info['shell_pid'] != os.getppid():
+        return None  # Nested or unrelated shell: only the pane's root Bash may launch.
+    panes = native('pane', 'list', deadline=deadline)['panes']
+    pane = only(panes, pane_id=info['pane_id'])
+    if not pane:
+        raise LookupError('pane not registered')
+    if pane.get('agent') or pane.get('agent_session') or pane.get('restore_error'):
+        return None  # Native restore/another program retains ownership.
+    workspaces = native('workspace', 'list', deadline=deadline)['workspaces']
+    workspace = only(workspaces, workspace_id=pane['workspace_id'])
+    if not workspace or workspace.get('label') not in SPACES or not only(workspaces, label=workspace['label']):
+        return None
+    tabs = native('tab', 'list', deadline=deadline)['tabs']
+    tab = only(tabs, workspace_id=workspace['workspace_id'], tab_id=pane['tab_id'])
+    if not tab or not only(tabs, workspace_id=workspace['workspace_id'], label=tab.get('label')):
+        return None
+    entries = mapping.get(workspace['label'], {}).get(tab.get('label'))
+    if not isinstance(entries, list) or not entries:
+        return None
+    ids = sorted(p['pane_id'] for p in panes if p['tab_id'] == tab['tab_id']
+                 and p['workspace_id'] == workspace['workspace_id'])
+    if len(ids) > len(entries) or len(set(ids)) != len(ids):
+        return None  # A later or ambiguous layout cannot establish an ordinal.
+    if len(ids) < len(entries) or len(ids) != tab.get('pane_count'):
+        raise LookupError('layout is not settled')
+    entry = entries[ids.index(info['pane_id'])]
+    if local_directory(entry) != Path.cwd():
+        return None
+    sid = entry.get('sid')
+    return sid if isinstance(sid, str) and re.fullmatch(r'ses_[A-Za-z0-9]+', sid) else None
+
+
+def shell_start(mapping: dict) -> None:
+    # We are a *child* of the shell requesting recovery, with its real foreground
+    # terminal. Nothing in this program can supply input to a different pane.
+    if (not os.environ.get('HERDR_PANE_ID') or os.environ.get('HERDR_SESSION', '') not in ('', 'default')
+            or not os.isatty(0) or not os.isatty(1) or os.tcgetpgrp(0) != os.getpgrp()
+            or not os.access(OPENCODE, os.X_OK)):
+        return
+    deadline = time.monotonic() + 4
+    while time.monotonic() < deadline:
+        try:
+            sid = mapped_session(mapping, deadline)
+        except (LookupError, OSError, subprocess.SubprocessError):
+            # During boot the shell can precede publication of its pane. Retry
+            # reads only. If still unverified, give the operator a normal prompt.
+            time.sleep(0.1)
+            continue
+        if sid and os.tcgetpgrp(0) == os.getpgrp():
+            os.execv(OPENCODE, [str(OPENCODE), '--session', sid])
+        return
+
+
+def main(args: list[str]) -> int:
+    if args not in (['layout'], ['shell-start']):
+        return 2
+    try:
+        with MAPPING.open() as stream:
+            mapping = json.load(stream)
+    except FileNotFoundError:
+        return 0
+    if not isinstance(mapping, dict) or any(not isinstance(mapping.get(k, {}), dict) for k in SPACES):
+        raise ValueError('invalid mapping')
+    if args == ['layout']:
+        layout(mapping)
+    else:
+        shell_start(mapping)
+    return 0
+
+
+if __name__ == '__main__':
+    try:
+        raise SystemExit(main(sys.argv[1:]))
+    except (ValueError, LookupError, TypeError, OSError, subprocess.SubprocessError):
+        print('Herdr login recovery unavailable; existing sessions retained', file=sys.stderr)
+        raise SystemExit(1)

@@ -42,6 +42,9 @@ fi
 # after fzf (which would otherwise own ctrl-r) and after ble-attach
 # (so ble adopts atuin's bindings rather than replacing them).
 [ -x "$(command -v atuin)" ] && eval "$(atuin-init-bash)"
+{{ if and (eq .machine_type "omarchy-try") (eq .chezmoi.os "linux") -}}
+{{ include ".chezmoitemplates/omarchy-herdr-shell-start.sh" }}
+{{ end -}}
 {{ else -}}
 # --- Source Common Configuration ---
 if [ -f "$HOME/.common_profile" ]; then

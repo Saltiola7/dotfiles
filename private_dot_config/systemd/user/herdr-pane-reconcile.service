@@ -1,12 +1,11 @@
 [Unit]
-Description=Reconcile herdr panes with the mapped opencode sessions after restart
+Description=Restore mapped Herdr layout at graphical login
 After=herdr.service graphical-session.target
 Wants=herdr.service
 
 [Service]
 Type=oneshot
-ExecStartPre=/bin/sleep 20
-ExecStart=/home/tis/.local/bin/herdr-pane-reconcile
+ExecStart=%h/.local/bin/omarchy-herdr-recovery layout
 
 [Install]
 WantedBy=graphical-session.target
