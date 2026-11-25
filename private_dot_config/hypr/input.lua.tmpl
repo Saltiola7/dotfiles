@@ -34,6 +34,16 @@ hl.device({
   name = "keyd virtual keyboard",
   kb_file = "{{ .chezmoi.homeDir }}/.config/xkb/keymap/tis.xkb",
 })
+{{ if default false (get . "espanso_enabled") -}}
+-- Espanso's EVDEV injector uses the same Colemak-DH keymap as the physical
+-- keyboards; without this the virtual device falls back to Finnish and
+-- injection produces the wrong symbols.
+hl.device({
+  name = "espanso-virtual-device",
+  kb_file = "{{ .chezmoi.homeDir }}/.config/xkb/keymap/tis.xkb",
+  keybinds = false,
+})
+{{ end -}}
 {{ else -}}
 -- Other Omarchy laptops without ZSA firmware use the software Colemak-DH
 -- Matrix, with Right-Alt held selecting the Finnish group so ä/ö type from

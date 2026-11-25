@@ -164,6 +164,23 @@ def test_mac_config_is_the_byte_identical_stock_file():
     assert all(not line.strip() or line.startswith(b"#") for line in raw.split(b"\n"))
 
 
+@pytest.mark.parametrize("data, expected", [
+    (MBP | ENABLED, True), (MBP, False), (HP | ENABLED, False),
+    (OLD | ENABLED, False), (GUEST | ENABLED, False), (MAC | ENABLED, False),
+])
+def test_espanso_virtual_keyboard_uses_mbp_keymap_only_when_enabled(data, expected):
+    rendered = render("private_dot_config/hypr/input.lua.tmpl", data)
+    devices = [block for block in rendered.split("hl.device({")[1:]
+               if 'name = "espanso-virtual-device"' in block.split("})", 1)[0]]
+    if expected:
+        device, = devices
+        options = device.split("})", 1)[0]
+        assert 'kb_file = "/home/test/.config/xkb/keymap/tis.xkb"' in options
+        assert "keybinds = false" in options
+    else:
+        assert not devices
+
+
 def test_guest_recipe_is_pinned_native_and_opt_in():
     def names(data):
         return {r["name"] for r in json.loads(render("private_dot_config/omarchy-apps/recipes.json.tmpl", data))["apps"]}
