@@ -1,5 +1,8 @@
 # Host tool maintenance
 
+[Try Omarchy Herdr login recovery](features/omarchy-herdr-login.md) covers the
+guest login dependency, layout repair and safe startup of mapped OpenCode panes.
+
 The [Espanso machine contract](features/espanso.md) defines desktop installation, settings and optional private shortcut synchronization.
 
 The [Omarchy shell reliability contract](features/omarchy-shell-reliability.md)
