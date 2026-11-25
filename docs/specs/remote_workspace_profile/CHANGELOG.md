@@ -1,5 +1,14 @@
 # Remote Workspace Profile Changelog
 
+## Controlled first-run recovery implementation (RRW-007I-R2)
+
+- Prepare a private Neovim data generation. Keep failed and previous
+  generations, verify the original preimage again, and publish readiness
+  only after a normal-path startup loads the selected native parsers.
+- Add a paired UBI10 smoke with a controlled compiler failure, fresh retry
+  and rollback against the foundation recorded at registration. This
+  owner overlay introduces no public setup input or bootstrap change.
+
 ## 2026-11-24 — Controlled first-run recovery Discovery (RRW-007I)
 
 - Define controlled recovery for a failed first AstroNvim preparation

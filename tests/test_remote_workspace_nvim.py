@@ -5,6 +5,7 @@ import os
 import subprocess
 import pytest
 from pathlib import Path
+import shutil
 
 ROOT = Path(__file__).parents[1]
 PARSERS = {'bash', 'python', 'lua', 'vim', 'vimdoc', 'json', 'yaml', 'toml', 'markdown', 'sql'}
@@ -23,6 +24,8 @@ def test_headless_restore_uses_locked_plugins_and_verifies_ten_native_parsers():
     assert 'assert(require("nvim-treesitter").install' in script
     assert 'norm_languages' in script
     assert 'remote_workspace_verify_' in script and 'symbol_name = lang' in script
+    assert 'get_string_parser("", alias):parse()[1]' in script
+    assert 'assert(seen[lang]' in script and 'assert(seen.markdown_inline' in script
     assert 'has_errors(plugin)' in script
     assert script.index('lock_manager._loaded = true') < script.index('dofile(config')
     assert 'lock_manager.lock = vim.deepcopy(lock)' in script
@@ -33,7 +36,7 @@ def test_editor_setup_keeps_lock_and_uses_overlay_private_cli():
     script = (ROOT / 'dot_local/bin/executable_remote-workspace-nvim').read_text()
     assert '.local/libexec/remote-workspace' in script
     assert 'lazy-lock.json' in script
-    assert 'before != lock.read_bytes()' in script
+    assert 'before != private_read(lock, private=False)' in script
     assert "'-u', 'NONE', '-l'" in script
     assert "'-i', 'NONE'" in script
     assert "'symbolic-ref', 'refs/remotes/origin/HEAD'" in script
@@ -81,14 +84,41 @@ def editor_module():
     return module
 
 
-def test_generated_tags_require_new_install_then_exact_receipt(tmp_path, monkeypatch):
+def test_guard_uses_the_shipped_owner_configuration(tmp_path):
+    config = tmp_path / '.config/nvim'
+    shutil.copytree(ROOT / 'private_dot_config/nvim', config)
+    for path in config.glob('dot_*'):
+        path.rename(config / ('.' + path.name.removeprefix('dot_')))
+    core = editor_module()
+    assert core.OWNER_SHA256 == core.owner_digest(config, ROOT / 'private_dot_config/remote-workspace/restore-nvim.lua')
+
+
+def model_receipt_commands(core, monkeypatch, plugin, revision, status):
+    # Synthetic commit tree with one tracked help file, plus generated tags.
+    import hashlib
+    (plugin / '.git').mkdir(exist_ok=True)
+    (plugin / 'doc').mkdir(exist_ok=True)
+    (plugin / 'doc/help.txt').write_bytes(b'help')
+    blob = hashlib.sha1(b'blob 4\0help').hexdigest()
+    def run(*args, **kwargs):
+        if 'rev-parse' in args:
+            return revision
+        if 'ls-tree' in args:
+            return f'100644 blob {blob}\tdoc/help.txt\0'
+        assert 'status' in args
+        return status
+    monkeypatch.setattr(core, 'run', run)
+
+
+@pytest.mark.parametrize('status', ['?? doc/tags', ''])
+def test_generated_tags_require_new_install_then_exact_receipt(tmp_path, monkeypatch, status):
     core = editor_module()
     plugin = tmp_path / 'plugin'
     (plugin / 'doc').mkdir(parents=True)
     tags = plugin / 'doc/tags'
     tags.write_text('generated help tags\n')
     revision = 'a' * 40
-    monkeypatch.setattr(core, 'run', lambda *args, **kw: revision if 'rev-parse' in args else '?? doc/tags')
+    model_receipt_commands(core, monkeypatch, plugin, revision, status)
     with pytest.raises(ValueError):
         core.plugin_receipt(plugin, revision, None, newly_installed=False, env={})
     receipt = core.plugin_receipt(plugin, revision, None, newly_installed=True, env={})
@@ -103,7 +133,7 @@ def test_generated_tags_require_new_install_then_exact_receipt(tmp_path, monkeyp
 @pytest.mark.parametrize('status', [' M doc/help.txt', '?? owner-note', '?? doc/tags\n?? owner-note'])
 def test_generated_receipt_never_admits_other_changes(tmp_path, monkeypatch, status):
     core = editor_module()
-    monkeypatch.setattr(core, 'run', lambda *args, **kw: 'a' * 40 if 'rev-parse' in args else status)
+    model_receipt_commands(core, monkeypatch, tmp_path, 'a' * 40, status)
     with pytest.raises(ValueError):
         core.plugin_receipt(tmp_path, 'a' * 40, None, newly_installed=True, env={})
 
@@ -113,7 +143,12 @@ def test_receipt_requires_private_single_link_lock_binding(tmp_path):
     target = tmp_path / 'receipt.json'
     target.write_text(json.dumps({'lock_sha256': 'a' * 64, 'generated_tags': {}}))
     target.chmod(0o600)
-    assert core.read_receipts(target, 'a' * 64) == {}
+    with pytest.raises(ValueError, match='readiness manifest'):
+        core.read_receipts(target, 'a' * 64)
+    saved = {'lock_sha256': 'a' * 64, 'generated_tags': {}, 'required_parsers': core.PARSERS,
+             'files': sorted('.local/share/nvim/site/parser/' + p + '.so' for p in PARSERS | {'markdown_inline'})}
+    target.write_text(json.dumps(saved))
+    assert core.read_receipts(target, 'a' * 64) == saved
     with pytest.raises(ValueError):
         core.read_receipts(target, 'b' * 64)
     os.link(target, tmp_path / 'retained-link')
@@ -159,12 +194,14 @@ def test_missing_receipted_plugin_refuses_before_restore(tmp_path, monkeypatch):
     (plugin / 'doc').mkdir(parents=True)
     (plugin / 'doc/tags').write_text('generated tags\n')
     revision = 'a' * 40
-    monkeypatch.setattr(core, 'run', lambda *args, **kw: revision if 'rev-parse' in args else '?? doc/tags')
+    model_receipt_commands(core, monkeypatch, plugin, revision, '?? doc/tags')
     receipt = core.plugin_receipt(plugin, revision, None, newly_installed=True, env={})
     entries = {'plugin': {'commit': revision}}
-    core.validate_existing_receipts(tmp_path, entries, {'plugin': receipt}, env={})
+    core.precheck(tmp_path, entries, {'plugin': receipt}, env={})
+    root = tmp_path / 'root'
+    root.mkdir()
     plugin.rename(tmp_path / 'retained-plugin')
     with pytest.raises(ValueError):
-        core.validate_existing_receipts(tmp_path, entries, {'plugin': receipt}, env={})
+        core.precheck(root, entries, {'plugin': receipt}, env={})
     assert not plugin.exists()
     assert (tmp_path / 'retained-plugin/doc/tags').read_text() == 'generated tags\n'

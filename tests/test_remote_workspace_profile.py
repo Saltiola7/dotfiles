@@ -1,10 +1,16 @@
+import hashlib
 import json
 import os
+import re
+import shutil
 import subprocess
+import sys
 import tomllib
+from pathlib import Path
 
 import pytest
-from pathlib import Path
+
+from tests.remote_workspace_nvim_contract import EXPANDED, check_result
 
 
 ROOT = Path(__file__).parents[1]
@@ -116,15 +122,93 @@ def test_ubi_qualification_uses_an_exact_shared_revision_and_existing_smoke():
     assert "container: registry.access.redhat.com/ubi10/ubi" in workflow
     assert "repository: Saltiola7/dotfiles-ai" in workflow
     assert "persist-credentials: false" in workflow
-    assert "tests/remote_workspace_profile_smoke.sh" in workflow
+    for path in ("tests/remote_workspace_profile_smoke.sh", "tests/remote_workspace_ubi_compiler.sh",
+                 "tests/remote_workspace_nvim_contract.py"):
+        assert f'      - "{path}"' in workflow
     assert "DOTFILES_AI_SOURCE" in workflow
     assert "timeout-minutes:" in workflow
-    # An immutable public source revision is required; final paired acceptance
-    # additionally verifies that the selected RRW-002 revision has merged.
-    import re
-    assert re.search(r"ref: [0-9a-f]{40}\s", workflow)
-    assert 'ref: 83137ab69d3ac66f3ddd2f88ae208e818a4dfb82' in workflow
+    # Exact merged foundation at RRW-007I registration, including the bootstrap
+    # bytes the paired native fixture actually executes.
+    foundation = 'd9fec2457b0c1f65e644f921ae7a4e97b21b3c59'
+    shared_checkout = workflow.split("repository: Saltiola7/dotfiles-ai\n", 1)[1].split("\n      -", 1)[0]
+    assert re.findall(r'^\s*ref:\s*(\S+)\s*$', shared_checkout, re.MULTILINE) == [foundation]
+    smoke = text('tests/remote_workspace_profile_smoke.sh')
+    assert foundation in smoke
+    assert '89da48232d9352a2eee2dd953fa29d42b7e358a4c2490a59e45cee899d4af666' in smoke
     assert 'qualification candidate' not in workflow
+
+
+@pytest.mark.skipif(sys.platform != 'linux' or not Path('/usr/bin/gcc').is_file() or not shutil.which('readelf'),
+                    reason='Linux compiler fixture check requires gcc and readelf')
+def test_ubi_compiler_witness_distinguishes_fault_and_passes_through_real_build(tmp_path):
+    """Test the CI observer, not Neovim or a native Treesitter installation."""
+    fixture = tmp_path / 'fixture'
+    fixture.mkdir()
+    driver = fixture / 'gcc'
+    driver.write_text(text('tests/remote_workspace_ubi_compiler.sh'))
+    driver.chmod(0o700)
+    header = tmp_path / 'tree_sitter/parser.h'
+    header.parent.mkdir()
+    header.touch()
+    parser = tmp_path / 'parser.c'
+    c_source = '#include "tree_sitter/parser.h"\nint tree_sitter_LANG(void){return 1;}\n'
+    parser.write_text(c_source.replace('LANG', 'sql'))
+    home = tmp_path / 'home'
+    attempts = home / '.local/state/remote-workspace/editor-attempts'
+    env = {'HOME': str(home), 'PATH': '/usr/bin:/bin'}
+
+    def run(*args):
+        return subprocess.run([str(driver), *args], cwd=tmp_path, env=env, capture_output=True).returncode
+
+    def begin(number):
+        gen = attempts / f'attempt-{number:04d}'
+        (gen / 'candidate').mkdir(parents=True)
+        (gen / 'record.json').write_text(json.dumps({'state': 'running'}))
+        env['XDG_DATA_HOME'] = str(gen / 'candidate')
+
+    cause = fixture / 'reject.h'
+    cause.write_text('#error RRW_UBI_CONTROLLED_PARSER_FAULT\n')
+    compile_args = ('-fPIC', '-c', 'parser.c', '-o', 'parser.o')
+    assert run(*compile_args) == 0  # No running private attempt.
+    assert (fixture / 'outside').is_file()
+    begin(1)
+    parser.write_text(c_source.replace('LANG', 'other'))
+    assert run(*compile_args) == 0
+    parser.write_text(c_source.replace('LANG', 'sql'))
+    assert run(*compile_args, '--invalid-compiler-option') != 0
+    assert not (fixture / 'rejected').exists()
+    assert run(*compile_args) != 0
+    assert (fixture / 'rejected').read_text().splitlines() == ['compiler rejected SQL parser.c']
+
+    cause.unlink()
+    begin(2)
+    assert run(*compile_args) == 0
+    assert run('-shared', 'parser.o', '-o', 'grammar.so') == 0
+    digest = hashlib.sha256((tmp_path / 'grammar.so').read_bytes()).hexdigest()
+    assert (fixture / 'compiled').read_text().splitlines() == ['sql']
+    assert (fixture / 'linked').read_text().splitlines() == [f'sql {digest}']
+
+
+def test_offline_lua_contract_rejects_wrong_failure_or_incomplete_success():
+    # This tests the harness's decision, not Lua execution or native parsers.
+    plugin = ['remote editor stage owner-init', 'remote editor stage plugin-restore', 'remote editor stage plugin-verify']
+    parser = [*plugin, 'remote editor stage parser-build']
+    failure = 'remote owner AstroNvim restore/parser verification failed'
+    build_error = '\n'.join([*plugin, failure, 'remote editor invariant locked plugin restore/build failed'])
+    parser_error = '\n'.join([*parser, failure, 'remote editor invariant parser installation failed'])
+    check_result('plugin-build', 1, build_error, [])
+    check_result('parser-install', 1, parser_error, [])
+    with pytest.raises(AssertionError):
+        check_result('parser-install', 1, build_error, [])
+    with pytest.raises(AssertionError):
+        check_result('plugin-build', 1, '', [])
+    stages = '\n'.join([*parser, 'remote editor stage parser-verify'])
+    success = stages + '\nremote owner AstroNvim ten parsers verified\n'
+    check_result('success', 0, success, list(EXPANDED))
+    with pytest.raises(AssertionError):
+        check_result('success', 0, stages, list(EXPANDED))
+    with pytest.raises(AssertionError):
+        check_result('success', 0, success, [lang for lang in EXPANDED if lang != 'markdown_inline'])
 
 
 def test_expanded_contract_keeps_private_inputs_and_source_ownership():

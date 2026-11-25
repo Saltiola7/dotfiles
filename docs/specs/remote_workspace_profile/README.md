@@ -9,8 +9,9 @@
 > [RRW-007I controlled editor preparation recovery](EDITOR_RECOVERY.md)
 > supersedes the first-run retry boundary of that expansion for a failed first
 > AstroNvim preparation: later attempts use isolated private generations and
-> durable seals instead of adopting leftover state. It is approved Discovery;
-> source approval does not authorize live rollout or apply.
+> durable seals instead of adopting leftover state. The helper stages both
+> plugins and native parsers and rechecks the owner preimage before
+> publishing readiness. Fork A owns live rollout.
 
 ## Outcome
 

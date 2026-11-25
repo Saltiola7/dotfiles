@@ -1,15 +1,35 @@
 #!/usr/bin/env python3
 """Restore the owner's locked editor and await every required parser build."""
+import ctypes
 import hashlib
+from itertools import islice
+from contextlib import contextmanager
+import fcntl
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import time
+
+MAX_ENTRIES = 150000
+MAX_FILE_BYTES = 128 * 1024 * 1024
+MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
+MAX_MANIFEST_BYTES = 1024 * 1024
+MAX_READY_BYTES = 32 * 1024 * 1024
+MAX_ATTEMPTS = 8
+REVIEW = 'editor recovery requires operator review'
+PARSERS = ['bash', 'python', 'lua', 'vim', 'vimdoc', 'json', 'yaml', 'toml', 'markdown', 'sql']
+PROOF = 'remote owner AstroNvim ten parsers verified'
+# Digest of the shipped config (rendered names and bytes, including the exact
+# lock) and restore Lua. Never derive the expected configuration from the home
+# being prepared. The source parity test covers changes to either input.
+OWNER_SHA256 = '67610fa1c7c26928dae635d41f3e491c4661480ad63930f59e299764daad5a68'
 
 LUA_STAGES = {'owner-init', 'plugin-restore', 'plugin-verify', 'parser-build', 'parser-verify'}
 LUA_REASONS = {'locked plugin absent', 'locked plugin restore/build failed',
@@ -21,6 +41,7 @@ PREPARATION_REASONS = frozenset({
     'installed lazy identity differs from lock', 'unsafe plugin link',
     'plugin contains local work; refusing restore', 'managed editor lock changed during restore',
     'unsafe editor state directory', 'unsafe editor readiness manifest',
+    REVIEW,
 })
 
 
@@ -52,188 +73,810 @@ class EditorSetupFailure(ValueError):
         super().__init__(f'editor exit {code}; stage {stage}; {reason}')
 
 
-def run(*args: str, env: dict, timeout: int = 60) -> str:
-    result = subprocess.run(args, env=env, cwd=env['HOME'], text=True, capture_output=True, timeout=timeout)
-    if result.returncode:
-        raise EditorSetupFailure(result.returncode, result.stderr + '\n' + result.stdout)
-    return result.stdout.strip()
+def run(*args: str, env: dict, timeout: int = 60, limit: int = 65536, tail=False) -> str:
+    # Each controlled command owns a new session. Never seal while its children
+    # could still write. Unknown cleanup failures propagate, leaving RUNNING.
+    with tempfile.TemporaryFile() as output:
+        process = subprocess.Popen(args, env=env, cwd=env['HOME'], stdout=output,
+                                   stderr=subprocess.STDOUT, start_new_session=True, close_fds=True)
+        try:
+            code = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            stop_group(process)
+            raise EditorSetupFailure(1, '') from None
+        stop_group(process)
+        size = output.seek(0, os.SEEK_END)
+        output.seek(max(0, size - limit) if tail else 0)
+        data = output.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError(REVIEW)
+        text = data.decode('utf-8', errors='replace' if tail or code else 'strict')
+    if code:
+        raise EditorSetupFailure(code, text)
+    return text.rstrip('\r\n')
 
 
-def read_receipts(target: Path, lock_digest: str) -> dict:
-    for parent in (target.parent, *target.parent.parents):
-        if parent.is_symlink():
-            raise ValueError('unsafe editor state directory')
+def stop_group(process) -> None:
+    def exists():
+        try:
+            os.killpg(process.pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        if not exists():
+            process.wait()
+            return
+        os.killpg(process.pid, sig)
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            process.poll()  # Reap our leader; no inspection of unrelated processes.
+            if not exists():
+                process.wait()
+                return
+            time.sleep(0.02)
+    raise ValueError(REVIEW)
+
+
+def ancestry(path: Path) -> None:
+    for parent in (path, *path.parents):
+        if os.path.lexists(parent):
+            info = parent.lstat()
+            if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, os.getuid()}
+                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
+                raise ValueError(REVIEW)
+
+
+def private_directory(path: Path) -> None:
+    ancestry(path)
+    info = path.lstat()
+    if info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
+        raise ValueError(REVIEW)
+
+
+def private_read(path: Path, *, private=True, limit=MAX_MANIFEST_BYTES) -> bytes:
+    ancestry(path.parent)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                or info.st_nlink != 1 or private and stat.S_IMODE(info.st_mode) != 0o600
+                or info.st_size > limit):
+            raise ValueError(REVIEW)
+        data = stream.read(info.st_size + 1)
+        if len(data) != info.st_size or os.fstat(fd).st_ctime_ns != info.st_ctime_ns:
+            raise ValueError(REVIEW)
+        return data
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(REVIEW)
+        result[key] = value
+    return result
+
+
+def durable_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def publish(path: Path, document: dict, *, create=False, limit=MAX_MANIFEST_BYTES, check=None) -> None:
+    private_directory(path.parent)
+    if os.path.lexists(path):
+        private_read(path)
+    data = (json.dumps(document, sort_keys=True) + '\n').encode()
+    if len(data) > limit:
+        raise ValueError(REVIEW)
+    fd, temporary = tempfile.mkstemp(prefix='.editor-', dir=path.parent)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if check is not None:
+            check()
+        if create:  # Do not overwrite a readiness/journal that appeared meanwhile.
+            os.link(temporary, path)
+            os.unlink(temporary)
+        else:
+            os.replace(temporary, path)
+        durable_directory(path.parent)
+    finally:
+        if os.path.lexists(temporary):
+            os.unlink(temporary)
+
+
+@contextmanager
+def setup_lock(state: Path):
+    ancestry(state)
+    state.mkdir(parents=True, exist_ok=True, mode=0o700)
+    private_directory(state)
+    path = state / 'editor-setup.lock'
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
+    try:
+        def guard():
+            held = os.fstat(fd)
+            if (not os.path.samestat(held, path.lstat()) or private_read(path) != b''
+                    or held.st_nlink != 1):
+                raise ValueError(REVIEW)
+        guard()
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise ValueError(REVIEW) from None
+        yield guard
+    finally:
+        os.close(fd)
+
+
+def inventory(root: Path, *, files: list | None = None) -> dict | None:
+    """Bounded exact path/object/byte inventory, not a Git authorship heuristic."""
+    ancestry(root.parent)
+    if not os.path.lexists(root):
+        return None
+    rows = []
+    total = 0
+    def identity(info):
+        # Reading may update atime; that is not a concurrent content mutation.
+        return (info.st_dev, info.st_ino, info.st_mode, info.st_nlink, info.st_uid,
+                info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+    def visit(path, depth=0):
+        nonlocal total
+        info = path.lstat()
+        relative = str(path.relative_to(root))
+        if (depth > 64 or len(relative.encode()) > 4096 or len(rows) >= MAX_ENTRIES
+                or info.st_uid != os.getuid()):
+            raise ValueError(REVIEW)
+        row = [relative, info.st_dev, info.st_ino, stat.S_IMODE(info.st_mode)]
+        if stat.S_ISDIR(info.st_mode):
+            rows.append(row + ['directory'])
+            children = list(islice(path.iterdir(), MAX_ENTRIES - len(rows) + 1))
+            if len(children) > MAX_ENTRIES - len(rows):
+                raise ValueError(REVIEW)
+            for child in sorted(children):
+                visit(child, depth + 1)
+            if identity(path.lstat()) != identity(info):
+                raise ValueError(REVIEW)
+        elif stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_size <= MAX_FILE_BYTES:
+            total += info.st_size
+            if total > MAX_TOTAL_BYTES:
+                raise ValueError(REVIEW)
+            fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+            with os.fdopen(fd, 'rb') as stream:
+                if identity(os.fstat(stream.fileno())) != identity(info):
+                    raise ValueError(REVIEW)
+                digest = hashlib.sha256()
+                size = 0
+                while chunk := stream.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_FILE_BYTES or size > info.st_size:
+                        raise ValueError(REVIEW)
+                    digest.update(chunk)
+                if size != info.st_size or identity(os.fstat(stream.fileno())) != identity(info):
+                    raise ValueError(REVIEW)
+            rows.append(row + ['file', size, digest.hexdigest()])
+            if files is not None:
+                files.append(relative)
+        else:
+            raise ValueError(REVIEW)
+    visit(root)
+    info = root.lstat()
+    if not stat.S_ISDIR(info.st_mode):
+        raise ValueError(REVIEW)
+    return dict(dev=info.st_dev, ino=info.st_ino, entries=len(rows), bytes=total,
+                sha256=hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode()).hexdigest())
+
+
+def stable_inventory(root: Path, *, files=None) -> dict | None:
+    result = inventory(root, files=files)
+    if result != inventory(root):
+        raise ValueError(REVIEW)
+    return result
+
+
+def owner_digest(config: Path, restore: Path) -> str:
+    # Includes unexpected files: a locally added after/plugin file
+    # can run even when init.lua and the lock have not changed.
+    files = []
+    snapshot = inventory(config, files=files)
+    if snapshot is None:
+        raise ValueError(REVIEW)
+    rows = [[name, hashlib.sha256(private_read(config / name, private=False)).hexdigest()]
+            for name in sorted(files)]
+    rows.append(['../remote-workspace/restore-nvim.lua',
+                 hashlib.sha256(private_read(restore, private=False)).hexdigest()])
+    if inventory(config) != snapshot:
+        raise ValueError(REVIEW)
+    return hashlib.sha256(json.dumps(rows, separators=(',', ':')).encode()).hexdigest()
+
+
+def valid_snapshot(value) -> bool:
+    return (value is None or isinstance(value, dict)
+            and set(value) == {'dev', 'ino', 'entries', 'bytes', 'sha256'}
+            and all(type(value[key]) is int and 0 <= value[key] <= limit for key, limit in
+                    [('dev', 2**64), ('ino', 2**64), ('entries', MAX_ENTRIES), ('bytes', MAX_TOTAL_BYTES)])
+            and isinstance(value['sha256'], str) and re.fullmatch('[0-9a-f]{64}', value['sha256']) is not None)
+
+
+def read_attempt(path: Path) -> dict:
+    saved = json.loads(private_read(path), object_pairs_hook=unique_object)
+    if (not isinstance(saved, dict) or set(saved) != {'version', 'state', 'lock_sha256',
+            'owner_sha256', 'normal', 'candidate', 'generated_tags'} or type(saved['version']) is not int
+            or saved['version'] != 2 or saved['owner_sha256'] != OWNER_SHA256
+            or not isinstance(saved['state'], str) or saved['state'] not in
+            {'prepared', 'running', 'failed_sealed', 'verified', 'promoting', 'promoted',
+             'withdrawing', 'withdrawn', 'accepted'}
+            or not isinstance(saved['lock_sha256'], str)
+            or not re.fullmatch('[0-9a-f]{64}', saved['lock_sha256'])
+            or not valid_snapshot(saved['normal']) or not valid_snapshot(saved['candidate'])
+            or not isinstance(saved['generated_tags'], dict)):
+        raise ValueError(REVIEW)
+    validate_tags(saved['generated_tags'])
+    if ((saved['state'] in {'prepared', 'running'}) != (saved['candidate'] is None)
+            or saved['state'] in {'prepared', 'running', 'failed_sealed'} and saved['generated_tags']):
+        raise ValueError(REVIEW)
+    return saved
+
+
+def write_attempt(generation: Path, record: dict) -> None:
+    publish(generation / 'record.json', record, create=record['state'] == 'prepared')
+
+
+def transition(generation, record, state):
+    if read_attempt(generation / 'record.json') != record:
+        raise ValueError(REVIEW)
+    record['state'] = state
+    write_attempt(generation, record)
+
+
+def locations(generation, normal):
+    # XDG_DATA_HOME=candidate, NVIM_APPNAME=nvim. The entire verified Nvim data
+    # directory travels, including parser binaries, queries and install metadata.
+    return normal, generation / 'candidate/nvim', generation / 'previous'
+
+
+def check_layout(generation, normal, expected):
+    if tuple(stable_inventory(p) for p in locations(generation, normal)) != expected:
+        raise ValueError(REVIEW)
+
+
+def move_no_replace(source, destination):
+    # Linux/UBI10: rename(2) could discard a newly appeared *empty* owner
+    # directory. The kernel must enforce destination absence. No fallback.
+    try:
+        rename = ctypes.CDLL(None, use_errno=True).renameat2
+    except AttributeError:
+        raise ValueError(REVIEW) from None
+    rename.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
+    rename.restype = ctypes.c_int
+    if rename(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:  # AT_FDCWD, RENAME_NOREPLACE
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+
+
+def move_generation(generation, record, normal, guard, *, withdraw=False):
+    """Only the recorded layouts are actionable, in either direction."""
+    paths = locations(generation, normal)
+    candidate, previous = paths[1:]
+    old, new = record['normal'], record['candidate']
+    if new is None or new['dev'] != normal.parent.stat().st_dev:
+        raise ValueError(REVIEW)
+    before, middle, after = (old, new, None), (None, new, old), (new, None, old)
+    steps = [(before, normal, previous), (middle, candidate, normal)]
+    if withdraw:
+        steps = [(after, normal, candidate), (middle, previous, normal)]
+    guard()
+    for expected, source, destination in steps:
+        guard()
+        if read_attempt(generation / 'record.json') != record:
+            raise ValueError(REVIEW)
+        if tuple(stable_inventory(path) for path in paths) == expected and os.path.lexists(source):
+            # Inventorying siblings may take time. Recheck the source last,
+            # then let the kernel check the destination in the rename itself.
+            if stable_inventory(source) != expected[paths.index(source)]:
+                raise ValueError(REVIEW)
+            move_no_replace(source, destination)
+            durable_directory(source.parent)
+            durable_directory(destination.parent)
+    guard()
+    check_layout(generation, normal, before if withdraw else after)
+    transition(generation, record, 'withdrawn' if withdraw else 'promoted')
+
+
+def promote(generation, record, normal, guard):
+    if record['state'] in {'promoted', 'accepted'}:
+        guard()
+        check_layout(generation, normal, (record['candidate'], None, record['normal']))
+    elif record['state'] == 'promoting':
+        move_generation(generation, record, normal, guard)
+    else:
+        raise ValueError(REVIEW)
+
+
+def read_receipts(target: Path, lock_digest: str) -> dict | None:
     if not os.path.lexists(target):
-        return {}
-    info = target.lstat()
-    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
-            or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o600):
+        return None
+    saved = json.loads(private_read(target, limit=MAX_READY_BYTES), object_pairs_hook=unique_object)
+    base = {'lock_sha256', 'generated_tags', 'required_parsers', 'files'}
+    if (not isinstance(saved, dict) or set(saved) not in (base, base | {'generation'})
+            or saved['lock_sha256'] != lock_digest or not isinstance(saved['generated_tags'], dict)
+            or saved['required_parsers'] != PARSERS or not isinstance(saved['files'], list)
+            or not 0 < len(saved['files']) <= MAX_ENTRIES or 'generation' in saved and
+            (not isinstance(saved['generation'], str) or not re.fullmatch(r'attempt-\d{4}', saved['generation']))):
         raise ValueError('unsafe editor readiness manifest')
-    saved = json.loads(target.read_text())
-    if (not isinstance(saved, dict) or saved.get('lock_sha256') != lock_digest
-            or not isinstance(saved.get('generated_tags'), dict)):
+    validate_tags(saved['generated_tags'])
+    files = saved['files']
+    for file in files:
+        if (not isinstance(file, str) or len(file.encode()) > 4096 or '\0' in file
+                or set(file.split('/')) & {'', '.', '..'}
+                or not file.startswith(('.local/share/nvim/', '.local/state/nvim/', '.cache/nvim/'))):
+            raise ValueError('unsafe editor readiness manifest')
+    if sorted(set(files)) != files or not parser_files(files):
         raise ValueError('unsafe editor readiness manifest')
-    for receipt in saved['generated_tags'].values():
+    return saved
+
+
+def validate_tags(tags: dict) -> None:
+    for name, receipt in tags.items():
+        if not isinstance(name, str) or not re.fullmatch('[A-Za-z0-9_.-]{1,200}', name) or name in {'.', '..'}:
+            raise ValueError('unsafe editor readiness manifest')
         if (not isinstance(receipt, dict) or set(receipt) != {'commit', 'sha256'}
                 or not isinstance(receipt['commit'], str) or not re.fullmatch('[0-9a-f]{40}', receipt['commit'])
                 or not isinstance(receipt['sha256'], str) or not re.fullmatch('[0-9a-f]{64}', receipt['sha256'])):
             raise ValueError('unsafe editor readiness manifest')
-    return saved['generated_tags']
+
+
+DIRTY = 'plugin contains local work; refusing restore'
+
+
+def locked_files(plugin, revision, env):
+    # status alone can hide ignored/untracked files, skip-worktree and
+    # assume-unchanged files. Read the *commit* tree, not the local index.
+    listing = run('git', '-C', str(plugin), 'ls-tree', '-rz', '--full-tree', revision,
+                  env=env, limit=MAX_READY_BYTES)
+    result = {}
+    if not listing.endswith('\0'):
+        raise ValueError(DIRTY)
+    for row in listing[:-1].split('\0'):
+        header, name = row.split('\t', 1)
+        mode, kind, blob = header.split(' ')
+        if (kind != 'blob' or mode not in {'100644', '100755'} or not re.fullmatch('[a-f0-9]{40}', blob)
+                or set(name.split('/')) & {'.', '..', '', '.git'} or name in result
+                or len(result) >= MAX_ENTRIES):
+            raise ValueError(DIRTY)
+        result[name] = (mode, blob)
+    return result
+
+
+def worktree_files(plugin):
+    files = set()
+    count = total = 0
+    def walk(path):
+        nonlocal count, total
+        for entry in path.iterdir():
+            if entry == plugin / '.git':
+                continue
+            name = str(entry.relative_to(plugin))
+            info = entry.lstat()
+            count += 1
+            if (count > MAX_ENTRIES or len(name.encode()) > 4096 or name.count('/') >= 64
+                    or info.st_uid != os.getuid()):
+                raise ValueError(REVIEW)
+            if stat.S_ISDIR(info.st_mode):
+                files.add(name + '/')
+                walk(entry)
+            elif (stat.S_ISREG(info.st_mode) and info.st_nlink == 1 and info.st_size <= MAX_FILE_BYTES):
+                total += info.st_size
+                if total > MAX_TOTAL_BYTES:
+                    raise ValueError(REVIEW)
+                files.add(name)
+            else:
+                raise ValueError(REVIEW)
+    walk(plugin)
+    return files
 
 
 def plugin_receipt(plugin: Path, revision: str, saved: dict | None, *,
-                   newly_installed: bool, env: dict) -> dict | None:
-    if plugin.is_symlink() or run('git', '-C', str(plugin), 'rev-parse', 'HEAD', env=env) != revision:
-        raise ValueError('plugin contains local work; refusing restore')
-    status = run('git', '-C', str(plugin), 'status', '--porcelain', env=env)
-    if not status and saved is None:
+                   newly_installed: bool, env: dict, entries=None) -> dict | None:
+    # Inspection of a partially materialized normal checkout must not fetch
+    # objects or refresh its index. Do not consult its filesystem monitor.
+    env = dict(env, GIT_NO_LAZY_FETCH='1', GIT_OPTIONAL_LOCKS='0', GIT_NO_REPLACE_OBJECTS='1')
+    ancestry(plugin)
+    if (not (plugin / '.git').is_dir() or (plugin / '.git').is_symlink()
+            or run('git', '-C', str(plugin), 'rev-parse', 'HEAD', env=env) != revision):
+        raise ValueError(DIRTY)
+    status = run('git', '-C', str(plugin), '-c', 'core.fsmonitor=false',
+                 'status', '--porcelain=v1', '--untracked-files=all',
+                 '--ignore-submodules=none', env=env)
+    if status and status != '?? doc/tags':
+        if entries is not None:
+            print(dirty_summary(plugin.name, entries, status), file=sys.stderr, flush=True)
+        raise ValueError(DIRTY)
+    expected = locked_files(plugin, revision, env)
+    actual = worktree_files(plugin)
+    directories = {str(parent) + '/' for name in expected for parent in Path(name).parents if parent != Path('.')}
+    generated = 'doc/tags' in actual - expected.keys()
+    if generated:
+        actual.remove('doc/tags')
+    # Some commits ignore their generated tags. The receipt (or empty private
+    # generation), never an ignore rule, authorizes exactly those bytes.
+    if actual != expected.keys() | directories or status and not generated:
+        raise ValueError(DIRTY)
+    for name, (mode, blob) in expected.items():
+        path = plugin / name
+        data = private_read(path, private=False, limit=MAX_FILE_BYTES)
+        header = f'blob {len(data)}\0'.encode()
+        digest = hashlib.sha1(header, usedforsecurity=False)
+        digest.update(data)
+        if digest.hexdigest() != blob or bool(path.lstat().st_mode & 0o100) != (mode == '100755'):
+            raise ValueError(DIRTY)
+    if not generated and saved is None:
         return None
-    if status != '?? doc/tags' or (saved is None and not newly_installed):
-        raise ValueError('plugin contains local work; refusing restore')
-    tags = plugin / 'doc/tags'
-    if (plugin / 'doc').is_symlink():
-        raise ValueError('unsafe plugin link')
-    info = tags.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_nlink != 1:
-        raise ValueError('unsafe plugin link')
-    observed = {'commit': revision, 'sha256': hashlib.sha256(tags.read_bytes()).hexdigest()}
+    if not generated or saved is None and not newly_installed:
+        raise ValueError(DIRTY)
+    tags = private_read(plugin / 'doc/tags', private=False, limit=MAX_FILE_BYTES)
+    observed = {'commit': revision, 'sha256': hashlib.sha256(tags).hexdigest()}
     if saved is not None and saved != observed:
-        raise ValueError('plugin contains local work; refusing restore')
+        raise ValueError(DIRTY)
     return observed
 
 
-def validate_existing_receipts(root: Path, entries: dict, receipts: dict, *, env: dict) -> None:
-    for name, saved in receipts.items():
-        plugin = root / name
-        if (name not in entries or not plugin.is_dir() or not (plugin / 'doc/tags').is_file()):
-            raise ValueError('plugin contains local work; refusing restore')
-        plugin_receipt(plugin, entries[name]['commit'], saved, newly_installed=False, env=env)
+def bootstrap(lazy: Path, revision: str, branch: str, env: dict) -> None:
+    if not lazy.exists():
+        # Partial bootstrap stays inside this retained attempt; never delete it.
+        run('git', 'init', '-q', str(lazy), env=env)
+        run('git', '-C', str(lazy), 'remote', 'add', 'origin', 'https://github.com/folke/lazy.nvim.git', env=env)
+        run('git', '-C', str(lazy), 'fetch', '--depth', '1', 'origin', revision, env=env, timeout=180)
+        run('git', '-C', str(lazy), 'checkout', '--detach', revision, env=env)
+        run('git', '-C', str(lazy), 'check-ref-format', 'refs/remotes/origin/' + branch, env=env)
+        run('git', '-C', str(lazy), 'update-ref', 'refs/remotes/origin/' + branch, revision, env=env)
+        run('git', '-C', str(lazy), 'symbolic-ref', 'refs/remotes/origin/HEAD',
+            'refs/remotes/origin/' + branch, env=env)
+
+
+def precheck(root: Path, entries: dict, receipts: dict, env: dict) -> None:
+    if not os.path.lexists(root):
+        if receipts:
+            raise ValueError(DIRTY)
+        return
+    ancestry(root)
+    present = set()
+    for entry in children(root, len(entries)):
+        if entry.name not in entries:
+            raise ValueError(DIRTY)
+        present.add(entry.name)
+        plugin_receipt(entry, entries[entry.name]['commit'], receipts.get(entry.name),
+                       newly_installed=False, env=env, entries=entries)
+    if set(receipts) - present:
+        raise ValueError(DIRTY)
+
+
+def check_plugins(root: Path, entries: dict, receipts: dict, env: dict, *, fresh=False) -> dict:
+    ancestry(root)
+    if {p.name for p in children(root, len(entries))} != set(entries) or set(receipts) - set(entries):
+        raise ValueError(DIRTY)
+    result = {}
+    for name, pin in entries.items():
+        receipt = plugin_receipt(root / name, pin['commit'], receipts.get(name),
+                                 newly_installed=fresh, env=env)
+        if receipt is not None:
+            result[name] = receipt
+    return result
+
+
+def editor(home, env, *, restore=False):
+    # Do not load compiled Lua, a Lazy package cache, or state referring to
+    # plugin paths from an earlier process (especially before the rename).
+    session = 'restore' if restore else 'candidate' if 'REMOTE_WORKSPACE_LAZY_ROOT' in env else 'final'
+    env = dict(env, XDG_CACHE_HOME=str(Path(env['XDG_CACHE_HOME']) / session),
+               XDG_STATE_HOME=str(Path(env['XDG_STATE_HOME']) / session))
+    script = home / '.config/remote-workspace/restore-nvim.lua'
+    if restore:
+        args = ('-u', 'NONE', '-l', str(script))
+    else:
+        # A genuine -u owner startup at this process's ordinary data/lazy path.
+        command = ('lua vim.g.remote_workspace_check_only=true; _G.remote_workspace_verifying=true; '
+                   '_G.remote_setup_errors=0; '
+                   'local old=vim.notify; vim.notify=function(m,l,o) if l==vim.log.levels.ERROR '
+                   'then _G.remote_setup_errors=_G.remote_setup_errors+1 end; return old(m,l,o) end')
+        args = ('--cmd', command, '-u', str(home / '.config/nvim/init.lua'),
+                '+lua dofile(vim.fn.stdpath("config").."/../remote-workspace/restore-nvim.lua")', '+cquit 1')
+    output = run(str(home / '.local/bin/nvim'), '--headless', '-i', 'NONE', *args,
+                 env=env, timeout=900 if restore else 90, tail=True)
+    if PROOF not in output.splitlines():
+        # init or a plugin can exit successfully before reaching our +commands.
+        raise EditorSetupFailure(1, 'remote editor stage parser-verify')
+
+
+def children(directory, maximum):
+    paths = sorted(islice(directory.iterdir(), maximum + 1))
+    if len(paths) > maximum:
+        raise ValueError(REVIEW)
+    return paths
+
+
+def history(attempts, digest, entries):
+    """Read bounded journals and validate *all* retained failed seals."""
+    records = []
+    if os.path.lexists(attempts):
+        private_directory(attempts)
+        paths = children(attempts, MAX_ATTEMPTS)
+        for index, gen in enumerate(paths, 1):
+            if gen.name != f'attempt-{index:04d}':
+                raise ValueError(REVIEW)
+            private_directory(gen)
+            if {p.name for p in children(gen, 3)} - {'record.json', 'candidate', 'previous'}:
+                raise ValueError(REVIEW)
+            private_directory(gen / 'candidate')
+            if {p.name for p in children(gen / 'candidate', 1)} - {'nvim'}:
+                raise ValueError(REVIEW)
+            rec = read_attempt(gen / 'record.json')
+            if (rec['lock_sha256'] != digest or set(rec['generated_tags']) - set(entries)
+                    or records and rec['normal'] != records[0][1]['normal']):
+                raise ValueError(REVIEW)
+            if rec['state'] == 'failed_sealed':
+                if (inventory(gen / 'candidate/nvim') != rec['candidate']
+                        or os.path.lexists(gen / 'previous')):
+                    raise ValueError(REVIEW)
+            elif index != len(paths):
+                raise ValueError(REVIEW)
+            records.append((gen, rec))
+    return records
+
+
+def require_history(attempts, digest, entries, expected):
+    if history(attempts, digest, entries) != expected:
+        raise ValueError(REVIEW)
+
+
+def prepare(home, normal, attempts, entries, digest, env, records, guard):
+    guard()
+    observed = stable_inventory(normal)
+    original = records[0][1]['normal'] if records else observed
+    if observed != original or len(records) >= MAX_ATTEMPTS:
+        raise ValueError(REVIEW)
+    # No receipts: never move an unknown parser/query/data destination (or even
+    # an unrelated sibling) out of normal use. Check bytes *between* snapshots.
+    if original is not None and {p.name for p in children(normal, 1)} - {'lazy'}:
+        raise ValueError(REVIEW)
+    precheck(normal / 'lazy', entries, {}, env)
+    if inventory(normal) != original:
+        raise ValueError(REVIEW)
+    gen = attempts / f'attempt-{len(records) + 1:04d}'
+    gen.mkdir(mode=0o700)
+    xdg = gen / 'candidate'
+    xdg.mkdir(mode=0o700)
+    data = xdg / 'nvim'
+    data.mkdir(mode=0o700)
+    publish(data / '.remote-workspace-generation', {'generation': gen.name}, create=True)
+    root = data / 'lazy'
+    root.mkdir(mode=0o700)
+    if data.stat().st_dev != normal.parent.stat().st_dev:
+        raise ValueError(REVIEW)
+    rec = dict(version=2, state='prepared', lock_sha256=digest, owner_sha256=OWNER_SHA256,
+               normal=original, candidate=None, generated_tags={})
+    durable_directory(data)
+    durable_directory(xdg)
+    write_attempt(gen, rec)
+    durable_directory(attempts)
+    records.append((gen, rec))
+    def running_guard():
+        guard()
+        if inventory(normal) != original:
+            raise ValueError(REVIEW)
+    running_guard()
+    transition(gen, rec, 'running')
+    controlled = dict(env, XDG_DATA_HOME=str(xdg), LAZY=str(root / 'lazy.nvim'),
+                      REMOTE_WORKSPACE_LAZY_ROOT=str(root))
+    pin = entries['lazy.nvim']
+    try:
+        bootstrap(root / 'lazy.nvim', pin['commit'], pin['branch'], controlled)
+        running_guard()
+        print('remote editor preparation headless-restore', flush=True)
+        editor(home, controlled, restore=True)
+        running_guard()
+        # The candidate startup and complete plugin and parser checks must
+        # describe the very same tree we subsequently journal and rename.
+        files = []
+        snapshot = stable_inventory(data, files=files)
+        if not parser_files(files, prefix=''):
+            raise EditorSetupFailure(1, 'remote editor invariant required compiled parser absent')
+        tags = check_plugins(root, entries, {}, controlled, fresh=True)
+        if inventory(data) != snapshot:
+            raise ValueError(REVIEW)
+        running_guard()
+        print('remote editor preparation second-startup', flush=True)
+        editor(home, controlled)
+        check_plugins(root, entries, tags, controlled)
+        running_guard()
+        if inventory(data) != snapshot:
+            raise ValueError(REVIEW)
+    except EditorSetupFailure:
+        running_guard()
+        snapshot = stable_inventory(data)
+        running_guard()
+        if snapshot is None or inventory(data) != snapshot:
+            raise ValueError(REVIEW) from None
+        finish_running(gen, rec, 'failed_sealed', snapshot, {})
+        raise
+    finish_running(gen, rec, 'verified', snapshot, tags)
+    return gen, rec
+
+
+def finish_running(gen, rec, state, snapshot, tags):
+    if rec['state'] != 'running' or read_attempt(gen / 'record.json') != rec or snapshot is None:
+        raise ValueError(REVIEW)
+    rec.update(state=state, candidate=snapshot, generated_tags=tags)
+    write_attempt(gen, rec)
+
+
+def select(gen, rec, normal, guard):
+    if rec['state'] == 'withdrawing':
+        move_generation(gen, rec, normal, guard, withdraw=True)
+    if rec['state'] in {'verified', 'withdrawn'}:
+        guard()
+        check_layout(gen, normal, (rec['normal'], rec['candidate'], None))
+        transition(gen, rec, 'promoting')
+    promote(gen, rec, normal, guard)
+
+
+def file_manifest(home, normal, snapshot):
+    paths = []
+    if inventory(normal, files=paths) != snapshot:
+        raise ValueError(REVIEW)
+    prefix = str(normal.relative_to(home)) + '/'
+    return sorted(prefix + path for path in paths)
+
+
+def parser_files(files, *, prefix='.local/share/nvim/'):
+    return {prefix + 'site/parser/' + lang + '.so'
+            for lang in (*PARSERS, 'markdown_inline')}.issubset(files)
 
 
 def main() -> None:
     if len(sys.argv) != 1:
         raise ValueError('unsupported editor setup operation')
     home = Path.home()
+    with setup_lock(home / '.local/state/remote-workspace') as lock_guard:
+        setup(home, lock_guard)
+
+
+def setup(home: Path, lock_guard) -> None:
     print('remote editor preparation inputs', flush=True)
     config = home / '.config/nvim'
     lock = config / 'lazy-lock.json'
-    if lock.is_symlink() or not lock.is_file() or lock.stat().st_uid != os.getuid():
+    if (lock.is_symlink() or not lock.is_file() or lock.stat().st_uid != os.getuid()
+            or lock.stat().st_nlink != 1 or lock.stat().st_size > MAX_MANIFEST_BYTES):
         raise ValueError('unsafe editor lock')
-    before = lock.read_bytes()
+    before = private_read(lock, private=False)
     lock_digest = hashlib.sha256(before).hexdigest()
+    script = home / '.config/remote-workspace/restore-nvim.lua'
     state = home / '.local/state/remote-workspace'
     target = state / 'editor-ready.json'
-    receipts = read_receipts(target, lock_digest)
-    entries = json.loads(before)
-    revision = entries['lazy.nvim']['commit']
-    branch = entries['lazy.nvim']['branch']
-    if not re.fullmatch('[0-9a-f]{40}', revision):
-        raise ValueError('invalid lazy revision')
-    env = {key: value for key, value in os.environ.items() if not key.startswith(('GIT_', 'LAZY'))}
+    ready = read_receipts(target, lock_digest)
+    entries = json.loads(before, object_pairs_hook=unique_object)
+    if not isinstance(entries, dict) or not 0 < len(entries) <= 500 or 'lazy.nvim' not in entries:
+        raise ValueError('unsafe editor lock')
+    for name, pin in entries.items():
+        if (not re.fullmatch('[A-Za-z0-9_.-]{1,200}', name) or name in {'.', '..'}
+                or not isinstance(pin, dict) or set(pin) != {'commit', 'branch'}
+                or not re.fullmatch('[0-9a-f]{40}', pin['commit'])
+                or not re.fullmatch('[A-Za-z0-9_./-]{1,200}', pin['branch'])):
+            raise ValueError('unsafe editor lock')
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith(('GIT_', 'LAZY', 'NVIM', 'VIM', 'EXINIT', 'LUA', 'XDG_',
+                                  'REMOTE_WORKSPACE_'))}
     env.update(HOME=str(home), XDG_CONFIG_HOME=str(home / '.config'),
                XDG_DATA_HOME=str(home / '.local/share'), XDG_STATE_HOME=str(home / '.local/state'),
                XDG_CACHE_HOME=str(home / '.cache'), GIT_TERMINAL_PROMPT='0', NVIM_APPNAME='nvim',
+               GIT_NO_REPLACE_OBJECTS='1',
                PATH=str(home / '.local/libexec/remote-workspace') + ':' + str(home / '.local/bin') + ':' + os.defpath)
+    env['GIT_OPTIONAL_LOCKS'] = '0'  # Even a status precheck must not rewrite the normal index.
     for tool in ('gcc', 'g++', 'make', 'tree-sitter'):
         if shutil.which(tool, path=env['PATH']) is None:
             raise ValueError('editor compiler prerequisite missing')
     print('remote editor preparation lazy-bootstrap', flush=True)
-    lazy = home / '.local/share/nvim/lazy/lazy.nvim'
-    for parent in (config, *config.parents, lazy.parent, *lazy.parent.parents):
-        if parent.is_symlink():
-            raise ValueError('unsafe editor directory')
-    lazy.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    if lazy.is_symlink():
-        raise ValueError('unsafe lazy directory')
-    new_plugins = {name for name in entries if not os.path.lexists(lazy.parent / name)}
-    if set(receipts) - set(entries):
-        raise ValueError('unsafe editor readiness manifest')
-    validate_existing_receipts(lazy.parent, entries, receipts, env=env)
-    if not lazy.exists():
-        with tempfile.TemporaryDirectory(prefix='.lazy-bootstrap-', dir=lazy.parent) as scratch:
-            candidate = Path(scratch) / 'lazy.nvim'
-            run('git', 'init', '-q', str(candidate), env=env)
-            run('git', '-C', str(candidate), 'remote', 'add', 'origin', 'https://github.com/folke/lazy.nvim.git', env=env)
-            run('git', '-C', str(candidate), 'fetch', '--depth', '1', 'origin', revision, env=env, timeout=180)
-            run('git', '-C', str(candidate), 'checkout', '--detach', revision, env=env)
-            run('git', '-C', str(candidate), 'check-ref-format', 'refs/remotes/origin/' + branch, env=env)
-            run('git', '-C', str(candidate), 'update-ref', 'refs/remotes/origin/' + branch, revision, env=env)
-            run('git', '-C', str(candidate), 'symbolic-ref', 'refs/remotes/origin/HEAD',
-                'refs/remotes/origin/' + branch, env=env)
-            candidate.rename(lazy)
-    if run('git', '-C', str(lazy), 'rev-parse', 'HEAD', env=env) != revision:
-        raise ValueError('installed lazy identity differs from lock')
-    for entry in lazy.parent.iterdir():
-        if entry.is_symlink():
-            raise ValueError('unsafe plugin link')
-        if (entry / '.git').exists():
-            status = run('git', '-C', str(entry), 'status', '--porcelain', env=env)
-            if status:
-                try:
-                    plugin_receipt(entry, entries[entry.name]['commit'], receipts.get(entry.name),
-                                   newly_installed=False, env=env)
-                except (KeyError, ValueError):
-                    print(dirty_summary(entry.name, entries, status), file=sys.stderr, flush=True)
-                    raise ValueError('plugin contains local work; refusing restore') from None
-            elif entry.name in receipts:
-                raise ValueError('plugin contains local work; refusing restore')
-    env['LAZY'] = str(lazy)
-    print('remote editor preparation headless-restore', flush=True)
-    nvim = str(home / '.local/bin/nvim')
-    run(nvim, '--headless', '-i', 'NONE', '-u', 'NONE', '-l',
-        str(home / '.config/remote-workspace/restore-nvim.lua'), env=env, timeout=900)
-    if before != lock.read_bytes():
-        raise ValueError('managed editor lock changed during restore')
-    generated_tags = {}
-    for name, pin in entries.items():
-        receipt = plugin_receipt(lazy.parent / name, pin['commit'], receipts.get(name),
-                                 newly_installed=name in new_plugins, env=env)
-        if receipt is not None:
-            generated_tags[name] = receipt
-    print('remote editor preparation second-startup', flush=True)
-    # Nvim may print its marker to stderr; success additionally requires a second
-    # first-open startup using the real owner init, without parser installation.
-    run(nvim, '--headless', '-i', 'NONE', '--cmd',
-        'lua _G.remote_setup_errors=0; local old=vim.notify; vim.notify=function(m,l,o) if l==vim.log.levels.ERROR then _G.remote_setup_errors=_G.remote_setup_errors+1 end; return old(m,l,o) end',
-        '-u', str(config / 'init.lua'),
-        '+lua if vim.v.errmsg ~= "" or _G.remote_setup_errors > 0 then vim.cmd("cquit 1") end', '+qa!', env=env, timeout=60)
-    if before != lock.read_bytes():
-        raise ValueError('managed editor lock changed during restore')
-    for name, pin in entries.items():
-        plugin_receipt(lazy.parent / name, pin['commit'], generated_tags.get(name),
-                       newly_installed=False, env=env)
-    for parent in (state, *state.parents):
-        if parent.is_symlink():
-            raise ValueError('unsafe editor state directory')
-        if parent.exists():
-            info = parent.stat()
-            if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, os.getuid()}
-                    or info.st_mode & 0o022 and not info.st_mode & stat.S_ISVTX):
-                raise ValueError('unsafe editor state directory')
-    state.mkdir(parents=True, exist_ok=True, mode=0o700)
-    paths = []
-    for root in (home / '.local/share/nvim', home / '.local/state/nvim', home / '.cache/nvim'):
-        if root.exists():
-            paths.extend(str(path.relative_to(home)) for path in root.rglob('*')
-                         if path.is_file() or path.is_symlink())
-    target = state / 'editor-ready.json'
-    if target.is_symlink() or (target.exists() and (
-            not target.is_file() or target.stat().st_uid != os.getuid() or target.stat().st_nlink != 1)):
-        raise ValueError('unsafe editor readiness manifest')
-    document = json.dumps({'lock_sha256': lock_digest, 'generated_tags': generated_tags,
-        'files': sorted(paths), 'required_parsers': ['bash', 'python', 'lua', 'vim', 'vimdoc',
-        'json', 'yaml', 'toml', 'markdown', 'sql']}, sort_keys=True) + '\n'
-    fd, temporary = tempfile.mkstemp(prefix='.editor-ready-', dir=state)
-    try:
-        with os.fdopen(fd, 'w') as stream:
-            stream.write(document)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, target)
-    finally:
-        if os.path.lexists(temporary):
-            os.unlink(temporary)
-    print('remote owner AstroNvim ten parsers verified')
+    normal = home / '.local/share/nvim'
+    ancestry(normal.parent)
+    normal.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    attempts = state / 'editor-attempts'
+    records = history(attempts, lock_digest, entries)
+    def guard():
+        lock_guard()
+        private_directory(state)
+        if before != private_read(lock, private=False):
+            raise ValueError('managed editor lock changed during restore')
+        if owner_digest(config, script) != OWNER_SHA256 or read_receipts(target, lock_digest) != ready:
+            raise ValueError(REVIEW)
+        require_history(attempts, lock_digest, entries, records)
+    guard()
+    # Logs, download workdirs, state and bytecode caches are process scratch;
+    # none are deployed or taken from the user's existing Neovim state/cache.
+    with tempfile.TemporaryDirectory(prefix='editor-session-', dir=state) as scratch:
+        env.update(XDG_STATE_HOME=scratch + '/state', XDG_CACHE_HOME=scratch + '/cache',
+                   XDG_RUNTIME_DIR=scratch, TMPDIR=scratch)
+        generation = None
+        rec = {}
+        if ready is not None:
+            tags = ready['generated_tags']
+            if records:
+                generation, rec = records[-1]
+                if (rec['state'] != 'accepted' or ready.get('generation') != generation.name
+                        or rec['generated_tags'] != tags):
+                    raise ValueError(REVIEW)
+                promote(generation, rec, normal, guard)
+                snapshot = rec['candidate']
+            elif 'generation' in ready or os.path.lexists(attempts):
+                raise ValueError(REVIEW)
+            else:
+                # Complete pre-journal readiness: verify only. Never restore,
+                # replace or infer authorship of the rest of the old XDG data.
+                snapshot = stable_inventory(normal)
+        else:
+            attempts.mkdir(mode=0o700, exist_ok=True)
+            durable_directory(state)
+            if not records or records[-1][1]['state'] == 'failed_sealed':
+                generation, rec = prepare(home, normal, attempts, entries, lock_digest, env, records, guard)
+            else:
+                generation, rec = records[-1]
+            select(generation, rec, normal, guard)
+            tags, snapshot = rec['generated_tags'], rec['candidate']
+        def publication_guard():
+            guard()
+            if generation is not None:
+                check_layout(generation, normal, (snapshot, None, rec['normal']))
+                if json.loads(private_read(normal / '.remote-workspace-generation'),
+                              object_pairs_hook=unique_object) != {'generation': generation.name}:
+                    raise ValueError(REVIEW)
+            elif inventory(normal) != snapshot:
+                raise ValueError(REVIEW)
+            # A directory scan can be long. Repeat the cheap lock/record checks
+            # after it, inside the publication boundary, just before link().
+            lock_guard()
+            if (before != private_read(lock, private=False) or owner_digest(config, script) != OWNER_SHA256
+                    or read_receipts(target, lock_digest) != ready
+                    or generation is not None and read_attempt(generation / 'record.json') != rec):
+                raise ValueError(REVIEW)
+        try:
+            paths = file_manifest(home, normal, snapshot)
+            if not parser_files(paths):
+                raise ValueError(REVIEW)
+            if ready is not None:
+                data_files = [p for p in ready['files'] if p.startswith('.local/share/nvim/')]
+                if (paths != data_files or generation is not None and paths != ready['files']
+                        or set(tags) - set(entries)):
+                    raise ValueError(REVIEW)
+            check_plugins(normal / 'lazy', entries, tags, env)
+            guard()
+            if inventory(normal) != snapshot:
+                raise ValueError(REVIEW)
+            print('remote editor preparation second-startup', flush=True)
+            editor(home, env)
+            check_plugins(normal / 'lazy', entries, tags, env)
+            publication_guard()
+            if ready is None:
+                assert generation is not None
+                if rec['state'] != 'accepted':
+                    transition(generation, rec, 'accepted')
+                document = dict(lock_sha256=lock_digest, generation=generation.name, files=paths,
+                                generated_tags=tags, required_parsers=PARSERS)
+                publish(target, document, create=True, limit=MAX_READY_BYTES, check=publication_guard)
+        except (OSError, ValueError):
+            if ready is None and generation is not None:
+                # Never discard even a concurrent edit. Restore the previous
+                # data path only when the journal and locations are unambiguous.
+                guard()
+                check_layout(generation, normal, (snapshot, None, rec['normal']))
+                transition(generation, rec, 'withdrawing')
+                move_generation(generation, rec, normal, guard, withdraw=True)
+            raise
+    print(PROOF)
 
 
 if __name__ == '__main__':
@@ -241,5 +884,5 @@ if __name__ == '__main__':
         main()
     except EditorSetupFailure as error:
         raise SystemExit('remote owner editor setup failed: ' + str(error)) from None
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+    except (OSError, ValueError, KeyError, TypeError, RecursionError, subprocess.SubprocessError) as error:
         raise SystemExit('remote owner editor setup failed: ' + preparation_reason(error)) from None
