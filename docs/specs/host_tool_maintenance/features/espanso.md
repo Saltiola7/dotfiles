@@ -52,6 +52,7 @@ or product UI is introduced.
   processes do not inherit the capability. (4) chezmoi to scripts: root run scripts
   execute only in an unqualified full apply.
 - **Affected artifacts.** `.chezmoiignore`, `.gitignore`, `.chezmoi.toml.tmpl`,
+  `private_dot_config/hypr/input.lua.tmpl`,
   `config.omarchy-try.example.toml`, `private_dot_config/espanso/`,
   `private_Library/Application Support/espanso/`, the Espanso systemd unit and
   enablement, `dot_local/lib/omarchy-apps/recipes/espanso-wayland/`, the guest
@@ -118,8 +119,11 @@ Given/When/Then in Domain terms; the apply contract above remains the authority.
 Machine settings. The guest sets `keyboard_layout.layout: fi`. HP and MBP set
 `layout: us`, `variant: colemak_dh_ortho` and `toggle_key: OFF`: the text the
 legacy helper generated for a fresh HP install and the base of the MBP `tis.xkb`
-keymap. The HP's live file and MBP expansion are compared and verified at their own
-rollout steps. The Mac file changes nothing.
+keymap. On an enabled MBP, the managed Hyprland input template assigns
+`~/.config/xkb/keymap/tis.xkb` to `espanso-virtual-device` and disables its
+keybindings. Otherwise Hyprland decodes the injected Colemak-DH keycodes with
+its Finnish default. This override does not change physical keyboard settings
+or render on other hosts. The Mac file changes nothing.
 
 Guest package. A reviewed copy of AUR `espanso-wayland` (commit `5e7d5a67`) raised
 to v2.4.1, `arch=(aarch64)`, source archive pinned by SHA-256
@@ -253,7 +257,18 @@ guest is enrolled, are operator acceptance steps for the next rollout stage.
 | Data/trust | required: directional flow | Where does confidential text or privilege cross? | Trust boundaries | New trust boundary |
 | Schema | not applicable: two-field state file is stated inline | - | Interfaces | New persisted field |
 | Dependency/deployment | required: covered by the sequence diagram's apply phase order | Why must install precede load precede start? | Script ordering | Script rename |
+| MBP input dependency | required: mapping table below | Which layout must Hyprland use for Espanso's virtual keyboard? | Machine settings | Injector or keymap change |
 | Quantitative | not applicable: correctness uses set and byte equality | - | Contract | Metric-controlled decision |
+
+| Input path | Hyprland device layout |
+|---|---|
+| MBP Espanso EVDEV injector | `tis.xkb`, based on Colemak-DH, with device keybindings disabled |
+| Other hosts or Espanso disabled | No new device override |
+
+**Text Equivalent:** Only on an enabled MBP, Hyprland interprets injected
+Espanso keycodes with `tis.xkb` instead of the Finnish default and ignores
+desktop keybindings from the injector. Owner: host maintenance; update when
+the injector or keymap changes.
 
 | Stage | Input → output | Gate to proceed |
 |---|---|---|

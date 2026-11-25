@@ -1,5 +1,17 @@
 # Host maintenance changelog
 
+## 2026-11-24 — ESPANSO-MBP-KEYMAP-001
+
+- Persist the tested MBP Hyprland override: Espanso's virtual keyboard uses
+  `tis.xkb` instead of the Finnish default and cannot trigger desktop bindings.
+  The override renders only for an enabled MBP.
+- Regression coverage checks the enabled MBP and five unaffected profiles.
+  The rendered candidate matches the working live MBP configuration, where
+  the operator verified a correct expansion. No live file needs replacing.
+- Recovery: revert the override and reapply the Hyprland input file. This
+  restores the prior virtual-device behavior without touching private matches.
+  Delivery: feature branch and draft PR into `main`; no standalone release.
+
 ## 2026-11-24 — ESPANSO-HOST-001
 
 - Added opt-in Espanso machine configuration. `espanso_enabled` renders the reviewed
