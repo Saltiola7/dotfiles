@@ -32,7 +32,7 @@ TARGETS = {
     "setup-blackarch.sh",
     "setup-tailscale.sh",
     ".local/bin/atuin-init-bash", ".local/bin/atuin-server-update",
-    ".local/bin/herdr-pane-reconcile", ".local/bin/ungrab",
+    ".local/bin/herdr-pane-reconcile", ".local/bin/omarchy-herdr-recovery", ".local/bin/ungrab",
     ".local/bin/opencode-usage-fast.py", ".local/bin/agents-panel-guard-loop",
     ".local/bin/omarchy-agent-usage-update",
     ".config/systemd/user/herdr-pane-reconcile.service",
