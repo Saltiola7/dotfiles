@@ -61,11 +61,11 @@ def test_fcitx5_autostart_suppressed_on_mbp():
     assert "Hidden=true" in desktop  # fcitx5 feeds apps its own fi/QWERTY layout
 
 
-def test_mbp_binds_brightness_directly_to_dcp_backlight():
+def test_mbp_brightness_keys_target_internal_display_with_osd():
     tmpl = (ROOT / "private_dot_config/hypr/bindings.lua.tmpl").read_text()
     assert 'hasPrefix "mbp-omarchy" .chezmoi.hostname' in tmpl
-    assert "brightnessctl -d apple-panel-bl set +5%" in tmpl
-    assert "XF86MonBrightnessDown" in tmpl
+    for key, step in (("Up", "+5%"), ("Down", "5%-")):
+        assert f'"XF86MonBrightness{key}", "Brightness {key.lower()}", "omarchy-brightness-display --monitor eDP-1 {step}"' in tmpl
 
 
 def test_fcitx5_dbus_activation_masked():
