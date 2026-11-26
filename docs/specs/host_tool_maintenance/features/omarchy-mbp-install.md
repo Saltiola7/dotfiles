@@ -40,8 +40,13 @@ macOS home written over SSH to a homelab disk, not a clone.
 - Wi-Fi dead after install: an Intel-Mac quirk script can write
   `/etc/modprobe.d/brcmfmac.conf` on Apple Silicon Broadcom chips
   (upstream #7439). Fix: remove the file and reload `brcmfmac`.
-- Brightness slider no-op: point `OMARCHY_BACKLIGHT_PATH` at the real
-  `apple-panel-bl` device (upstream #8125).
+- If brightness keys move the slider but not the panel, check `omarchy-hw-display`.
+  It should select `apple-panel-bl`, not the Touch Bar (upstream #8125).
+  On J293 with `7.2.11-14-1-ARCH`, even `actual_brightness` tracked requests
+  while light output stayed fixed. One eDP-1 power cycle restored visible
+  dimming and brightening. The `mbp-panel-backlight` post-boot hook applies
+  this workaround only on that build. After a kernel change, test visible
+  brightness from a cold boot before extending it.
 - Audio stuck after resume: `systemctl --user restart wireplumber`
   (PipeWire teardown defect, upstream #10858).
 - Built-in mic silence on 4.5.0-rc3 on J293 was reported (upstream #17602);

@@ -677,6 +677,7 @@ Library/LaunchAgents/dev.dotfiles.mbp-borg-backup.plist
 {{ end }}
 
 {{ if not (and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname)) }}
+.config/omarchy/hooks/post-boot.d/mbp-panel-backlight
 .config/xkb/
 always_mbp-keyboard-layers.sh
 {{ end }}
@@ -700,6 +701,9 @@ always_mbp-keyboard-layers.sh
 {{ end }}
 
 {{ if and (eq .machine_type "omarchy") (hasPrefix "mbp-omarchy" .chezmoi.hostname) }}
+!.config/omarchy/hooks/
+!.config/omarchy/hooks/post-boot.d/
+!.config/omarchy/hooks/post-boot.d/mbp-panel-backlight
 !.config/uwsm/
 .config/uwsm/*
 !.config/uwsm/env
