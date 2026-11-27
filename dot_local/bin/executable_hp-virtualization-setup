@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# KVM/libvirt stack for the HP ENVY 13 (i5-8250U, hostname omarchy).
+# Firmware VT-x and the reboot stay manual. Nothing here changes a firewall
+# default policy, disables a service, formats storage or reboots.
+set -euo pipefail
+
+# Input paths are overridable so tests can rehearse this off the hardware.
+: "${HP_VIRT_PRODUCT_FILE:=/sys/class/dmi/id/product_name}"
+: "${HP_VIRT_CPUINFO_FILE:=/proc/cpuinfo}"
+: "${HP_VIRT_KVM_DEVICE:=/dev/kvm}"
+: "${HP_VIRT_UFW_RULES:=/etc/ufw/user.rules}"
+
+note() { printf '[hp-virtualization] %s\n' "$*"; }
+fail() { note "$*" >&2; exit 1; }
+user=$(id -un)
+
+[[ $(hostname -s) == omarchy && $(<"$HP_VIRT_PRODUCT_FILE") == 'HP ENVY Laptop 13-ah0xxx' ]] ||
+    fail 'Only for the HP ENVY 13-ah0xxx (hostname omarchy).'
+[[ -t 0 ]] || fail 'Run hp-virtualization-setup in a terminal for sudo prompts.'
+
+# omarchy pkg add is pacman -S --needed: no database refresh, no system upgrade.
+packages=(qemu-desktop libvirt virt-install virt-manager dnsmasq swtpm)
+missing=()
+for package in "${packages[@]}"; do
+    pacman -Q "$package" >/dev/null 2>&1 || missing+=("$package")
+done
+if (( ${#missing[@]} )); then
+    note "Installing: ${missing[*]}"
+    omarchy pkg add "${missing[@]}"
+fi
+
+# Group members reach the system daemon socket without a polkit prompt.
+if ! id -nG "$user" | tr ' ' '\n' | grep -qx libvirt; then
+    getent group libvirt >/dev/null || sudo groupadd --system libvirt
+    sudo usermod -aG libvirt "$user"
+fi
+
+if ! systemctl is-enabled --quiet libvirtd.service || ! systemctl is-active --quiet libvirtd.service; then
+    sudo systemctl enable --now libvirtd.service
+fi
+readonly_virsh() { virsh --readonly --connect qemu:///system "$@"; }
+for _ in {1..15}; do
+    readonly_virsh uri >/dev/null 2>&1 && break
+    sleep 1
+done
+readonly_virsh uri >/dev/null || fail 'libvirtd is not reachable: journalctl -u libvirtd'
+
+network_state() {
+    readonly_virsh net-info default 2>/dev/null | awk -F ': *' -v key="$1" '$1 == key { print $2 }'
+}
+[[ $(network_state Persistent) == yes ]] ||
+    fail 'The libvirt default network definition is missing from /etc/libvirt/qemu/networks.'
+if [[ $(network_state Autostart) != yes ]]; then
+    sudo virsh --connect qemu:///system net-autostart default >/dev/null
+fi
+if [[ $(network_state Active) != yes ]]; then
+    sudo virsh --connect qemu:///system net-start default
+fi
+
+# UFW's default forward policy is DROP, which strands guests on virbr0.
+# These interface-scoped rules are the documented exception; nothing else opens.
+if systemctl is-active --quiet ufw.service; then
+    rules_ok() {
+        grep -qx -- '-A ufw-user-input -i virbr0 -j ACCEPT' "$HP_VIRT_UFW_RULES" &&
+            grep -qx -- '-A ufw-user-forward -i virbr0 -j ACCEPT' "$HP_VIRT_UFW_RULES" &&
+            grep -qx -- '-A ufw-user-forward -o virbr0 -j ACCEPT' "$HP_VIRT_UFW_RULES"
+    }
+    if ! rules_ok 2>/dev/null; then
+        sudo ufw route allow in on virbr0
+        sudo ufw route allow out on virbr0
+        sudo ufw allow in on virbr0
+    fi
+fi
+
+if ! grep -qw vmx "$HP_VIRT_CPUINFO_FILE"; then
+    note 'Stack installed, but VT-x is still disabled in firmware.'
+    note 'No OS command can switch it on. Reboot straight into BIOS Setup:'
+    note '    sudo systemctl reboot --firmware-setup'
+    note 'Configuration > Virtualization Technology > Enabled, then F10 to save.'
+    note 'Unlock, log in and run hp-virtualization-setup again to verify.'
+    exit 0
+fi
+[[ -c $HP_VIRT_KVM_DEVICE ]] || sudo modprobe kvm_intel
+readonly_virsh capabilities | grep -q "<domain type='kvm'" ||
+    fail 'VT-x is on but libvirt does not report KVM: journalctl -u libvirtd'
+if id -nG | tr ' ' '\n' | grep -qx libvirt; then
+    note 'Ready: virt-manager (QEMU/KVM system connection) or virt-install --connect qemu:///system.'
+else
+    note 'KVM works. Log out and back in once so the libvirt group applies to this session.'
+fi

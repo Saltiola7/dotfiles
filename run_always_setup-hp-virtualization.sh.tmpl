@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") (eq .chezmoi.hostname "omarchy") -}}
+set -euo pipefail
+if [[ -t 0 ]]; then
+    exec "$HOME/.local/bin/hp-virtualization-setup"
+fi
+# Quiet once the stack exists; a noninteractive apply cannot finish setup.
+if ! command -v virsh >/dev/null; then
+    echo "[hp-virtualization] Privileged setup pending: run hp-virtualization-setup in a terminal." >&2
+fi
+{{ else -}}
+exit 0
+{{ end -}}
