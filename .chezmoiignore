@@ -737,6 +737,14 @@ always_mbp-keyboard-layers.sh
 always_configure-old-omarchy.sh
 {{ end }}
 
+{{ if and (eq .machine_type "omarchy") (eq .chezmoi.os "linux") (eq .chezmoi.arch "amd64") (eq .chezmoi.hostname "omarchy") }}
+!.local/bin/hp-virtualization-setup
+!always_setup-hp-virtualization.sh
+{{ else }}
+.local/bin/hp-virtualization-setup
+always_setup-hp-virtualization.sh
+{{ end }}
+
 {{ if not (and (eq .machine_type "omarchy-try") (eq .chezmoi.os "linux")) }}
 .local/bin/omarchy-herdr-recovery
 .local/bin/herdr-pane-reconcile
