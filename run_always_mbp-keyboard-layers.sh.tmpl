@@ -10,6 +10,38 @@ if ! command -v keyd >/dev/null; then
     sudo pacman -S --needed --noconfirm keyd
 fi
 
+# keyd forwards only the built-in keyboard here. libinput needs to know that
+# its virtual keyboard is internal for the trackpad's disable-while-typing.
+sudo sh -s -- /etc/libinput/local-overrides.quirks <<'LIBINPUT'
+set -eu
+umask 022
+file=$1
+header='[MacBook remapped keyboard]'
+rule="$header
+MatchUdevType=keyboard
+MatchName=keyd virtual keyboard
+AttrKeyboardIntegration=internal"
+
+mkdir -p -- "${file%/*}"
+exec 3>>"$file"
+flock -x 3
+current=$(awk -v header="$header" '
+    { sub(/^[[:space:]]+/, ""); sub(/[[:space:]]+$/, "") }
+    /^\[/ { owned = ($0 == header) }
+    owned && NF && !/^#/ { print }
+' "$file")
+if [ -n "$current" ]; then
+    # Adopt the hand-installed section, including reordered keys or comments.
+    sorted() { printf '%s\n' "$1" | LC_ALL=C sort; }
+    if [ "$(sorted "$current")" = "$(sorted "$rule")" ]; then exit 0; fi
+    printf '[mbp-keyboard] Conflicting %s in %s; reconcile it before applying.\n' "$header" "$file" >&2
+    exit 1
+fi
+[ ! -s "$file" ] || printf '\n' >&3
+printf '%s\n' "$rule" >&3
+echo "[mbp-keyboard] installed trackpad typing protection; log out and back in to load it."
+LIBINPUT
+
 sudo tee /etc/keyd/mbp.conf > /dev/null << 'KEYD'
 # mbp built-in keyboard tap/hold layers; deployed by chezmoi (MKL-001).
 # External keyboards (ZSA over USB) never match [ids] and stay untouched.

@@ -6,3 +6,4 @@
 | 2 | Verify Omarchy Lua bridge forwards `kb_file` (OD-2); else wire `~/.config/xkb` overlay fallback | high | done | Resolved: `kb_file` forwarded (device field whitelist); single include-based keymap file |
 | 3 | ZSA parity pass from Moonlander Oryx screenshots (OD-1: `~`/`\|` placement, LSGT AltGr) | medium | pending | Blocked on operator-provided export |
 | 4 | Live `keyd monitor` walk incl. Shift+hold-/ → `\|` (OD-3); tune 200 ms timeouts | high | pending | Deploy gate; operator runs `chezmoi -S /tmp/mkl-001 apply always_mbp-keyboard-layers.sh` from a terminal for the sudo-gated system layer |
+| 5 | MKL-002: qualify trackpad protection from a fresh login | high | pending | Installer and fixture tests ready. After merge and terminal apply, verify a new touch is ignored while typing and ordinary pointing resumes after the pause. [Contract and rollback](README.md#trackpad-protection-while-typing). |

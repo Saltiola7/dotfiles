@@ -97,10 +97,11 @@ card and are different shoots that reused the folder number.
 The M1 host (mbp-omarchy) is the daily driver. Host-specific enablement
 all lives in the repo:
 
-- Input: global Finnish base (ZSA firmware owns Colemak-DH and types
-  native ä/ö); the built-in keyboard runs software Colemak-DH Matrix
-  with Right-Alt held selecting the Finnish group; natural touchpad
-  scrolling. See `private_dot_config/hypr/input.lua.tmpl`.
+- Input: the external ZSA keeps its Finnish base; the built-in keyboard
+  uses the `tis` keymap and keyd layers. The
+  [MBP keyboard context](../../mbp_keyboard_layout/README.md#trackpad-protection-while-typing)
+  owns the libinput rule and the post-login check for trackpad movement
+  while typing. Natural scrolling stays in `private_dot_config/hypr/input.lua.tmpl`.
 - Backup: `mbp-omarchy-borg-backup` script + user timer (04:00,
   Persistent) into `ssh://tis@mac-mini/.../mbp-omarchy/borg`; prune is
   glob-scoped to `mbp-omarchy-*` so the macOS golden image in the other
