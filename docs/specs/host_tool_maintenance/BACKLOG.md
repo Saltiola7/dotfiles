@@ -1,5 +1,10 @@
 # Host maintenance backlog
 
+- HP-VIRTUALIZATION-001: declared and rehearsed off-host (#127). Remaining: the
+  operator enables Virtualization Technology in BIOS Setup, reboots, reruns
+  `hp-virtualization-setup` until it reports Ready, then confirms a first guest
+  reaches the network. Update the homelab topology note afterwards.
+
 - ESPANSO-HOST-001: deployed on the guest (package, config, service) ahead of
   delivery. Remaining: the operator's typed guest-only expansion, then adopt the Mac
   matches in private Git, enroll the guest and verify the shared match and offline
