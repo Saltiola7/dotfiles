@@ -1,5 +1,20 @@
 # Host maintenance changelog
 
+## 2026-11-26 — HP-VIRTUALIZATION-001
+
+- Personal source declares the KVM/libvirt stack for the HP ENVY 13 through a
+  model-gated, always-run helper (#127). It installs QEMU, libvirt,
+  virt-manager, dnsmasq and swtpm without a system upgrade, grants the
+  `libvirt` group, enables the daemon and default network, and adds only the
+  three `virbr0` rules that UFW's DROP forward policy needs.
+- Linux pytest covered the managed set on five profiles, the shared gate and a
+  stubbed rehearsal: first run, converged rerun without sudo, inactive UFW,
+  missing network definition, foreign host and missing terminal. Firmware VT-x
+  was still off on the HP, so KVM readiness there is unverified; old-omarchy
+  already exposes `/dev/kvm` and ran a vCPU under KVM.
+- Firmware VT-x and the reboot remain operator steps; see the
+  [virtualization contract](features/hp-virtualization.md) for rollback.
+
 ## 2026-11-24 — OMARCHY-HERDR-LOGIN-001
 
 - Personal Try Omarchy source now declares a real graphical-login wants link.

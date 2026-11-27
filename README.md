@@ -564,6 +564,21 @@ changing those files. Wayland Espanso reads kernel input devices; expansions fro
 Waynergy's compositor-level virtual keyboard require separate verification and
 are not guaranteed by installing Espanso.
 
+### KVM virtualization on the HP
+
+The HP ENVY 13 (`omarchy`, x86_64) gets its KVM/libvirt stack from
+`hp-virtualization-setup`, which an interactive `chezmoi apply` runs on that
+machine alone. It installs QEMU, libvirt, virt-manager, dnsmasq and swtpm
+without a system upgrade, adds `tis` to the `libvirt` group, enables the daemon
+and the default NAT network, and adds three `virbr0` rules so UFW's DROP forward
+policy does not strand guests. No firewall default policy changes. With VT-x
+still off in firmware the helper installs everything and then prints the BIOS
+path; only you can enable Virtualization Technology and reboot
+(`sudo systemctl reboot --firmware-setup` enters Setup directly). Run the helper
+again afterwards until it prints Ready. Other machines, including the Try
+Omarchy guest that shares the hostname `omarchy`, never receive it. See the
+[virtualization contract](docs/specs/host_tool_maintenance/features/hp-virtualization.md).
+
 ## Headless Fedora / Pi400
 
 The `fedora-server` profile manages shared terminal tools without desktop or
