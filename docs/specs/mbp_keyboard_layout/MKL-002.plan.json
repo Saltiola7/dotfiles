@@ -1,0 +1,16 @@
+{
+  "profile": "docs/specs/mbp_keyboard_layout/PROFILE.md",
+  "gates": {
+    "domain": {"applicability": "required"},
+    "behavior": {"applicability": "required"},
+    "spec": {"applicability": "required"},
+    "contract": {"applicability": "required"},
+    "test_driven_implementation": {"applicability": "required"},
+    "refactor": {"applicability": "required"},
+    "review_integrate": {"applicability": "required"},
+    "release": {"applicability": "not_applicable", "reason": "The keyboard installer ships as chezmoi source; there is no versioned release artifact."},
+    "deploy": {"applicability": "required"},
+    "operate": {"applicability": "not_applicable", "reason": "The existing compositor consumes static libinput configuration; no new service or ongoing job."},
+    "maintain_retire": {"applicability": "required"}
+  }
+}

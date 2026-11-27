@@ -2,6 +2,19 @@
 
 All notable changes to this bounded context.
 
+## Unreleased — MKL-002: keep the pointer still while typing on the MBP
+
+The existing keyboard installer marks `keyd virtual keyboard` internal for
+libinput. It adopts the manual fix or appends its one section, preserving
+other rules on every apply. A conflicting section is reported and left intact.
+The [feature contract](README.md#trackpad-protection-while-typing) covers
+fresh installs, verification and rollback. All 29 MBP keyboard/daily-driver
+tests passed. The installer also adopted a copy of the live file without a
+write. Two guest tests (Espanso package rehearsal and the HP keymap fixture)
+failed identically on the pre-change tree, `b686869`. Intended delivery:
+draft PR into `main`, then terminal apply and a fresh-session typing check.
+Deployment is pending; no gate exception.
+
 ## 2026-11-19 — MKL-001: tis keymap + keyd layers + fn policy
 
 Outcome: mbp built-in keyboard moved from `us,fi` group switching to a

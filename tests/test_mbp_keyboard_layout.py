@@ -1,12 +1,16 @@
-"""MKL-001: mbp built-in keyboard — custom XKB keymap, keyd layers, fn policy.
+"""MBP built-in keyboard: XKB keymap, keyd layers, fn policy and trackpad DWT.
 
 Contract tests against docs/specs/mbp_keyboard_layout/README.md: direct ä/ö,
 AltGr punctuation cluster, duplicate-z fix, keyd tap/hold layers scoped to the
 built-in keyboard, Touch Bar fn policy, and zero drift on other machines.
 """
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).parents[1]
 KEYMAP_REL = "private_dot_config/xkb/keymap/tis.xkb"
@@ -135,12 +139,74 @@ def test_run_script_installs_keyd_and_persists_fn_policy():
     assert "/sys/module/hid_apple/parameters/fnmode" in script
 
 
+QUIRK = (
+    b"[MacBook remapped keyboard]\n"
+    b"MatchUdevType=keyboard\n"
+    b"MatchName=keyd virtual keyboard\n"
+    b"AttrKeyboardIntegration=internal\n"
+)
+
+
+def apply_libinput_section(path):
+    # Run the rendered installer body on a temporary overrides file, without sudo.
+    if sys.platform != "linux" and not shutil.which("flock"):
+        pytest.skip("MBP Linux installer uses util-linux flock")
+    body = re.search(
+        r"sudo sh -s -- /etc/libinput/local-overrides\.quirks <<'LIBINPUT'\n(.*?)\nLIBINPUT\n",
+        render(SCRIPT_REL), re.S,
+    )
+    assert body, "missing MBP libinput installer"
+    return subprocess.run(["sh", "-s", "--", str(path)], input=body[1], text=True,
+                          capture_output=True)
+
+
+@pytest.mark.parametrize("prior", [None, b"", b"# Other device\n[Other]\nMatchName=other"])
+def test_trackpad_rule_installs_once_and_preserves_other_rules(tmp_path, prior):
+    path = tmp_path / "libinput" / "local-overrides.quirks"
+    if prior is not None:
+        path.parent.mkdir()
+        path.write_bytes(prior)
+    apply_libinput_section(path).check_returncode()
+    expected = ((prior + b"\n") if prior else b"") + QUIRK
+    assert path.read_bytes() == expected
+    mtime = path.stat().st_mtime_ns
+    apply_libinput_section(path).check_returncode()
+    assert path.read_bytes() == expected
+    assert path.stat().st_mtime_ns == mtime
+
+
+@pytest.mark.parametrize("existing", [
+    QUIRK,
+    b"[MacBook remapped keyboard]\n# local note\nAttrKeyboardIntegration=internal\n"
+    b"MatchName=keyd virtual keyboard\nMatchUdevType=keyboard\n",
+])
+def test_adopts_manual_trackpad_rule_between_unrelated_sections(tmp_path, existing):
+    path = tmp_path / "local-overrides.quirks"
+    original = b"# keep this comment\n" + existing + b"\n[Other]\nMatchName=other\n"
+    path.write_bytes(original)
+    path.chmod(0o640)
+    before = path.stat()
+    apply_libinput_section(path).check_returncode()
+    assert path.read_bytes() == original
+    assert (path.stat().st_mtime_ns, path.stat().st_mode) == (before.st_mtime_ns, before.st_mode)
+
+
+@pytest.mark.parametrize("conflict", [QUIRK.replace(b"=internal", b"=external"), QUIRK + QUIRK])
+def test_conflicting_or_duplicate_owned_sections_are_left_for_the_operator(tmp_path, conflict):
+    path = tmp_path / "local-overrides.quirks"
+    path.write_bytes(conflict)
+    result = apply_libinput_section(path)
+    assert result.returncode != 0 and "MacBook remapped keyboard" in result.stderr
+    assert path.read_bytes() == conflict
+
+
 def test_run_script_noops_off_mbp():
-    for data in (DESK, TRY):
+    for data in (DESK, TRY, {**MBP, "machine_type": "omarchy-try"}):
         script = render(SCRIPT_REL, data)
         assert script.strip().splitlines()[-1] == "exit 0"
         assert "pacman" not in script
         assert "/etc/keyd" not in script
+        assert "/etc/libinput" not in script
         assert "fnmode" not in script
 
 

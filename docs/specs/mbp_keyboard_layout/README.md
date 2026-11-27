@@ -1,15 +1,15 @@
 # MBP Built-in Keyboard Layout
 
-**Status:** Implemented (pending live deploy)
+**Status:** MKL-001 deployed; MKL-002 installer tested, fresh-session typing check pending
 **Created:** 2026-11-18
-**Last updated:** 2026-11-19
+**Last updated:** 2026-11-27
 
 ## Engineering Profile
 
 Stable defaults live in [PROFILE.md](PROFILE.md). Current-cycle overrides: risk
 `routine`, delivery intent `draft_pr` (feature branch + draft PR into `main`;
-durable delivery is `chezmoi apply` on mbp-omarchy after merge), affected
-scope limited to the mbp built-in keyboards and Touch Bar policy.
+durable delivery is `chezmoi apply` on mbp-omarchy after merge). MKL-002
+covers how libinput identifies the remapped keyboard for the built-in trackpad.
 
 ## Overview
 
@@ -29,6 +29,9 @@ Problem being solved:
   (`¡ºª¢€ħðþ…`) while `[ ] { } '` need new homes after ä/ö take their keys.
 - Hyper/Meh chords in `bindings.lua` exist but have no comfortable physical
   source; the Touch Bar shows the opposite of the wanted default layer.
+- Brushing the trackpad while typing can move the pointer: the built-in
+  keyboard reaches libinput through a virtual device, so enabling “disable
+  while typing” in Hyprland alone does not identify the typing source.
 
 ## File Map
 
@@ -36,19 +39,17 @@ Problem being solved:
 |------|---------|
 | `private_dot_config/hypr/input.lua.tmpl` | mbp branch: built-in devices and keyd's virtual keyboard load the custom keymap via `kb_file` |
 | `private_dot_config/xkb/keymap/tis.xkb` | Self-contained keymap source (`xkb_keymap` directives with `include` over system `us(colemak_dh_ortho)`); loaded directly by Hyprland, no compiled artifact or regen script |
-| `run_always_mbp-keyboard-layers.sh.tmpl` | Installs keyd, writes `/etc/keyd/mbp.conf`, persists Touch Bar fn policy; gated like `run_always_mbp-asahi-hardware.sh.tmpl` |
-| `tests/test_mbp_keyboard_layout.py` | Render and content contract tests (pytest, same authority as `test_omarchy_try_profile.py`) |
+| `run_always_mbp-keyboard-layers.sh.tmpl` | Installs keyd, owns the keyboard's libinput section and persists Touch Bar fn policy; host- and terminal-gated |
+| `tests/test_mbp_keyboard_layout.py` | Tests the rendered profile, input mappings and real append/adopt/conflict behavior on temporary files |
 
-## Architecture
-
-### Visual Evidence
+## Visual Evidence
 
 | Concern | Decision |
 |---|---|
-| Boundary | `required: Context/container flowchart` — ownership of the three remapping layers decides every mapping |
+| Boundary | `required: Context/container flowchart` — which input layer owns mapping, and which decides whether to suppress trackpad movement? |
 | Interaction | `not_applicable: prose Given/When/Then scenarios below` |
-| State | `not_applicable: stateless remapping; tap/hold resolution is a single timeout decision` |
-| Data/trust | `not_applicable: no data crosses an ownership boundary; all artifacts are local config` |
+| State | `required: transition table` — the [trackpad contract](#trackpad-protection-while-typing) distinguishes create, adopt and conflict |
+| Data/trust | `not_applicable: the privileged installer writes local device metadata; this feature records no input events` |
 | Schema | `not_applicable: no persistent entities` |
 | Dependency/deployment | `not_applicable: delivery is one chezmoi apply; the boundary chart covers the only topology` |
 | Quantitative | `not_applicable: no decision depends on measured data` |
@@ -56,27 +57,31 @@ Problem being solved:
 ```mermaid
 flowchart LR
     accTitle: mbp-omarchy built-in keyboard remapping pipeline
-    accDescr: Physical built-in keyboard events pass through keyd tap/hold
-    layers, then Hyprland applies the custom XKB keymap before applications
-    receive symbols. External keyboards skip keyd and keep the Finnish base
-    layout because the ZSA firmware owns their Colemak-DH.
-    HW[Built-in keyboard<br/>apple-spi-keyboard] --> KEYD
-    KEYD[keyd tap/hold layers<br/>caps=HYPER · space=MEH ·<br/>right-Cmd=arrows · hold-/=\\] --> HYP[Hyprland input]
-    HYP --> XKB[custom keymap tis<br/>colemak_dh_ortho + ä/ö + AltGr cluster]
-    XKB --> APPS[applications]
-    HYP --> BINDS[window chords<br/>MEH/HYPER + number reuse]
-    EXT[External keyboards<br/>ZSA firmware Colemak-DH] --> FI[global kb_layout fi]
-    FI --> HYP
+    accDescr: keyd forwards built-in typing as an internal keyboard to libinput. Libinput suppresses new trackpad contacts while typing; Hyprland maps the keys. External keyboards bypass keyd.
+    HW["Built-in SPI keyboard"] --> KEYD["keyd tap/hold layers"]
+    KEYD -->|"keyd virtual keyboard: internal"| LI["libinput"]
+    PAD["Built-in SPI trackpad"] --> LI
+    LI -->|"permitted pointer motion"| APPS["Applications via Hyprland"]
+    LI -->|"keyboard events"| XKB["Hyprland: tis keymap"]
+    XKB --> APPS
+    XKB --> BINDS["MEH/HYPER window chords"]
+    EXT["External ZSA keyboard"] -->|"bypasses keyd"| FI["Hyprland: global Finnish layout"]
+    FI --> APPS
 ```
 
 **Text Equivalent:** Built-in keyboard events (device `apple-spi-keyboard`)
-flow through keyd, which owns tap/hold resolution and modifier layers, then
-into Hyprland, which applies the custom single-group XKB keymap (base
+flow through keyd, which owns tap/hold resolution and modifier layers.
+Libinput identifies keyd's virtual keyboard as internal and can suppress new
+trackpad contacts during typing. It forwards allowed motion and keyboard events
+to Hyprland, which applies the custom single-group XKB keymap (base
 `us(colemak_dh_ortho)`, Finnish keys and AltGr cluster added, LSGT duplicate
 fixed) before delivering symbols to applications. Hyprland keybinds consume
 MEH/HYPER chords produced by keyd unchanged. External keyboards bypass keyd
 (device-scoped) and keep the untouched global Finnish layout, since the ZSA
 firmware already owns their Colemak-DH.
+
+Source and owner: this context's keyboard installer and Hyprland input template.
+Update the diagram when device selection, typing suppression or keymap ownership changes.
 
 ## Domain
 
@@ -86,6 +91,13 @@ Personal Linux input remapping for one laptop. Adjacent: `omarchy_try`
 input template branch in the same file (must stay byte-identical), the macOS
 AeroSpace keymap reference ([`docs/keymap.md`](../../keymap.md)), and the ZSA
 Oryx firmware layout (external authority, see OD-1).
+
+For trackpad protection, `mbp_keyboard_layout` owns the rule because it
+introduces the virtual keyboard. [`host_tool_maintenance`](../host_tool_maintenance/features/omarchy-mbp-install.md#daily-driver-post-install-2026-11-16)
+owns host installation and links here for input qualification. Libinput owns
+the suppression algorithm; Hyprland supplies its existing “disable while typing”
+setting. No pointer speed, palm thresholds, external keyboard mappings or guest
+input settings change.
 
 ### Ubiquitous Language
 
@@ -184,6 +196,14 @@ Oryx firmware layout (external authority, see OD-1).
 - Then the bar shows device/media controls by default
 - When fn is held, the bar shows F1–F12
 
+### Feature: The pointer stays still while typing (MKL-002)
+
+- Given a fresh graphical session with “disable while typing” enabled, when
+  the operator types ordinary letters on the built-in keyboard and **then**
+  brushes the trackpad, the new touch does not move the pointer.
+- When typing stops, the palm is lifted and the brief suppression interval
+  passes, a deliberate new finger movement moves the pointer at its usual speed.
+
 ## Contracts & Invariants
 
 ### Custom keymap `tis` (XKB)
@@ -219,6 +239,44 @@ keyd re-emits all built-in keyboard events through its own `keyd virtual
 keyboard` uinput device, so Hyprland's custom keymap must also bind that
 device (see the template contract below).
 
+### Trackpad protection while typing
+
+On the `omarchy` profile with a hostname starting `mbp-omarchy`, the keyboard
+installer owns **one section** of `/etc/libinput/local-overrides.quirks`:
+
+```ini
+[MacBook remapped keyboard]
+MatchUdevType=keyboard
+MatchName=keyd virtual keyboard
+AttrKeyboardIntegration=internal
+```
+
+The literal match is on keyd's **output**, not the physical SPI device, keyd
+pointer, Espanso or other virtual keyboards. This is correct only while keyd's
+`[ids]` selects the built-in keyboard alone; revisit the rule if that changes.
+
+| Given | When the keyboard installer runs | Result |
+|---|---|---|
+| No local file, or only unrelated sections | Apply from a terminal | Create the directory/file if missing, or append the section once; preserve existing bytes, including an unterminated last line. |
+| The same section was installed by hand or by a previous apply | Apply again | Adopt it without rewriting the file. Comments, blank lines and key order do not require replacement. |
+| The named section differs or occurs twice | Apply from a terminal | Report the conflict and stop; leave the file intact for the operator to reconcile. |
+| Another machine profile, or a noninteractive run | Apply | No libinput write; the existing host and terminal gates apply. |
+
+**Text Equivalent:** The MBP keyboard installer adds a missing section, adopts
+one matching section, and refuses to overwrite a conflict. Other profiles and
+noninteractive runs skip it. Update this table when the installer's ownership or
+conflict policy changes.
+
+Preview with `chezmoi apply --dry-run "$HOME/always_mbp-keyboard-layers.sh"`.
+From a terminal on the MBP, omit `--dry-run` to deploy. **Log out and back in**
+to start a fresh libinput context. Check `hyprctl getoption input:touchpad:disable_while_typing`
+is true and perform the two typing scenarios above. File presence and a passing
+render test do not establish physical palm rejection.
+
+To roll back, revert the installer change **first** so the next apply does not
+restore it. Use `sudoedit /etc/libinput/local-overrides.quirks` to remove only
+`[MacBook remapped keyboard]` and its settings, then log out and back in.
+
 ### Template contract
 
 - **Pre:** `input.lua.tmpl` `omarchy-try` branch and the global Finnish base
@@ -235,6 +293,20 @@ Removing the keyd conf, keymap reference, and fn policy restores today's
 `us,fi` + `grp:ralt_switch` behavior; no data or firmware is touched.
 
 ## Gate Ledger
+
+**[MKL-002 applicability plan](MKL-002.plan.json)** (profile: `PROFILE.md`; routine, draft PR). No requested exceptions.
+
+| Gate | Applicability | Status | Evidence / remaining check |
+|---|---|---|---|
+| Domain, Behavior, Spec, Contract | Required | Documented | Owner, typing scenarios, exact device match and shared-file contract above. |
+| Test-driven implementation, Refactor | Required | Locally tested | Rendered shell and temporary-file tests for fresh install, adoption, repeated applies, conflicts and off-host isolation. |
+| Review/Integrate | Required | Pending | Review and CI on the candidate for `main`. |
+| Release | Not applicable | — | Host configuration; no versioned package. |
+| Deploy | Required | Pending | Terminal apply and physical typing check after a fresh login. |
+| Operate | Not applicable | — | Libinput runs in the existing compositor; no new daemon or ongoing operator job. |
+| Maintain/Retire | Required | Documented | Recheck keyd's device scope if its mapping changes; section-only rollback above. |
+
+**MKL-001 historical results:**
 
 | Gate | Capability | Applicability | Result | Authority/evidence | Exception | Owner |
 |---|---|---|---|---|---|---|
