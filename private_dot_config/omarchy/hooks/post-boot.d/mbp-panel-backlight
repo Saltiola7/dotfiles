@@ -1,0 +1,15 @@
+#!/bin/bash
+# Aurora 14 on J293: the bootloader panel accepts brightness writes without
+# changing its light output until DCP has powered the panel down and up.
+[[ $(uname -r) == 7.2.11-14-1-ARCH ]] || exit 0
+stamp=${XDG_RUNTIME_DIR:?}/mbp-panel-backlight-ready
+[[ ! -e $stamp ]] || exit 0
+hyprctl monitors -j | jq -e 'any(.[]; .name == "eDP-1" and .dpmsStatus)' >/dev/null || exit 0
+
+panel_on() { hyprctl dispatch 'hl.dsp.dpms({ action = "enable", monitor = "eDP-1" })'; }
+trap panel_on EXIT
+hyprctl dispatch 'hl.dsp.dpms({ action = "disable", monitor = "eDP-1" })' || exit 1
+sleep 2
+panel_on || exit 1
+trap - EXIT
+touch "$stamp"
