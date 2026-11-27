@@ -3,6 +3,10 @@
 [Try Omarchy Herdr login recovery](features/omarchy-herdr-login.md) covers the
 guest login dependency, layout repair and safe startup of mapped OpenCode panes.
 
+The [HP KVM virtualization contract](features/hp-virtualization.md) defines the
+model-gated libvirt stack installer, its `virbr0` firewall exception and the
+manual firmware step.
+
 The [Espanso machine contract](features/espanso.md) defines desktop installation, settings and optional private shortcut synchronization.
 
 The [Omarchy shell reliability contract](features/omarchy-shell-reliability.md)
